@@ -1,0 +1,3 @@
+compress(         []) -> [];
+compress([I|L=[I|_]]) -> compress(L);
+compress(      [I|L]) -> [I|compress(L)].

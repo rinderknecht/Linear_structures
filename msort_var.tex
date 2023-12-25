@@ -1,0 +1,26 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage{pst-tree,pst-eps}
+
+\begin{document}
+
+\TeXtoEPS
+%\psset{showbbox=true}
+\pstree[nodesep=2pt,levelsep=25pt,treesep=6pt,arrows=<-]{\TR{\(n\)}}{
+  \pstree{\TR{\(2^{e_{r}}+\dots+2^{e_1}\)}}{
+    \psset{linestyle=dotted}
+    \pstree[linestyle=solid]{\TR{\(2^{e_r}+2^{e_{r-1}}\)}}{
+      \TR{\(2^{e_r}\)}
+      \Tn
+      \TR{\(2^{e_{r-1}}\)}
+    }
+    \psset{linestyle=solid}
+    \TR{\(2^{e_1}\)}
+  }
+  \TR{\(2^{e_0}\)}  
+}
+\endTeXtoEPS
+
+\end{document}

@@ -1,0 +1,1374 @@
+%%-*-latex-*-
+
+\chapter{Answers to Exercises}
+%\addcontentsline{toc}{chapter}{Answers to Exercises}
+
+%\setcounter{chapter}{1}
+
+%\setcounter{section}{2}
+\section*{Joining and Reversing}
+\label{ans:joining_and_reversing}
+
+\noindent [See questions \vpageref{ex:joining_and_reversing}.] 
+
+\medskip
+
+\paragraph{Question 1.}
+An auxiliary function \erlcode{len\_\_/2} is needed to hold the
+current length from the beginning of the list. Accordingly, it has to
+be initialised to~\erlcode{0} in the first call.
+\begin{alltt}
+len\_tf(L)       \(\smashedrightarrow{\alpha}\) len__(L,0).
+len__(    [],N) \(\smashedrightarrow{\beta}\) N;
+len__([_|L]),N) \(\smashedrightarrow{\gamma}\) len__(L,N+1).
+\end{alltt}
+Clause~\clause{\alpha} is used only once, at the start,
+clause~\clause{\beta}, at the very end, and clause~\clause{\gamma} is
+used for each item in the list, that is, \(n\)~times. In total:
+\(n+2\)~rewrites.
+
+\medskip
+
+\paragraph{Question 2.}
+
+Here is how to find the penultimate item in a list:
+\begin{alltt}
+penul([I,_]) -> I;\hfill% \emph{Use a comma}
+penul([_|L]) -> penul(L).\hfill% \emph{Use a vertical bar}
+\end{alltt}
+We have to make sure that the calls \erlcode{penul([])} and
+\erlcode{penul([\(I\)])}, for any~\(I\), fail, whilst all the others
+succeed. When faced to choose among an infinite set of test values,
+select those which seems extreme cases. Here, this method is not
+useful, though, because the function is fully polymorphic in the type
+of the items, that is, it does not depend on the nature of the lists
+elements. This definition is in tail form because each body is in tail
+form: the first because it is a value, the second because it is a call
+not embedded in another call and not containing other calls. The
+number of rewrites to reach a value is number of items before and
+including the penultimate, that is, \(n-1\)~if the list contains
+\(n\)~items.
+
+\medskip
+
+\paragraph{Question 3.}
+
+Here a way to repeat the first item, while ignoring the others:
+\begin{verbatim}
+rep_fst([I|L])  -> [I|repeat(I,L)].
+repeat(_,   []) -> [];
+repeat(I,[_|L]) -> [I|repeat(I,L)].
+\end{verbatim}
+Notice that these are \emph{not} definitions in tail form, because the
+calls \erlcode{repeat(I,L)} are embedded into a list in the first and
+last clauses. A bad design would be to first compute the length of the
+list and then construct a list of this length containing the first
+item, because it would require two complete traversals of the list
+instead of one, thus about 50\%~more time, since the number of
+rewrites here is~\(n+2\) for an input of \(n\)~items.
+
+The following version uses temporarily more memory but is shorter.
+The number of rewrites to find a value is also~\(n+1\).
+\begin{alltt}
+rep_fst(     []) -> [];
+rep_fst(    [I]) -> [I];
+rep_fst([I,_|L]) -> [I|rep_fst([I|L])].\hfill% \emph{Two} | \emph{instead of 1}
+\end{alltt}
+
+\medskip
+
+\paragraph{Question 4.}
+
+The first approach that perhaps should spring up is to reuse
+\erlcode{rep\_fst/1} and the list reversing function \erlcode{rev/1}:
+\begin{verbatim}
+rep_lst(L) -> rep_fst(rev(L)).
+
+rev(L)            -> rev_join(L,[]).
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).
+\end{verbatim}
+The number of rewrites to compute a call is~\(2n+3\). Another method
+consists in finding the last item and repeating:
+\begin{verbatim}
+rep_lst([]) -> [];
+rep_lst(L) -> rep_fst(last(L)).
+
+last(  [I]) -> I;
+last([_|L]) -> last(L).
+\end{verbatim}
+The number of rewrites to reach the result is~\(2n+2\). What should be
+avoided here is the temptation of computing the length of the list
+with the intent of rebuilding one of same length, filled with the last
+item. This would lead to something in the following lines:
+\begin{verbatim}
+rep_lst([I|L])      -> len_and_make([I|L],0).
+
+len_and_make(  [I],N) -> make(N+1,I);
+len_and_make([_|L],N) -> len_and_make(L,N+1).
+
+make(0,_)             -> [];
+make(N,I)             -> [I|make(N-1,I)].
+\end{verbatim}
+The number of rewrites is \(1 + n + (n+1) = 2n+2\) but this program is
+really too long for solving such a simple problem, so previous
+approaches must be preferred instead.
+
+\medskip
+
+\paragraph{Question 5.}
+
+Let us label the rewrite rules with some Greek letters to distinguish
+them:
+\begin{alltt}
+rev_bis(   []) \(\smashedrightarrow{\alpha}\) [];
+rev_bis([I|L]) \(\smashedrightarrow{\beta}\) join(rev_bis(L),[I],[]).
+
+join(   [],Q,   []) \(\smashedrightarrow{\gamma}\) Q;
+join(   [],Q,[E|A]) \(\smashedrightarrow{\delta}\) join([],[E|Q],A);
+join([E|P],Q,    A) \(\smashedrightarrow{\epsilon}\) join(P,Q,[E|A]).
+\end{alltt}
+We deduce the trace of \erlcode{rev\_bis([3,2,1])} in flat
+representation as follows (we skip the abstract syntax trees):
+\begin{tabbing}
+\erlcode{rev\_} \= \(\smashedrightarrow{\beta}\) \=\kill
+\erlcode{rev\_bis([3,2,1])}\\
+\> \(\smashedrightarrow{\beta}\)
+\> \erlcode{join(rev\_bis([2,1]),[3],[])}\\
+\> \(\smashedrightarrow{\beta}\)
+\> \erlcode{join(join(rev\_bis([1]),[2],[]),[3],[])}\\
+\> \(\smashedrightarrow{\beta}\)
+\> \erlcode{join(join(join(rev\_bis([]),[1],[]),[2],[]),[3],[])}\\
+\> \(\smashedrightarrow{\alpha}\)
+\> \erlcode{join(join(join([],[1],[]),[2],[]),[3],[])}\\
+\> \(\smashedrightarrow{\gamma}\)
+\> \erlcode{join(join([1],[2],[]),[3],[])}\\
+\> \(\smashedrightarrow{\epsilon}\)
+\> \erlcode{join(join([],[2],[1]),[3],[])}\\
+\> \(\smashedrightarrow{\delta}\)
+\> \erlcode{join(join([],[1,2],[]),[3],p[)}\\
+\> \(\smashedrightarrow{\gamma}\)
+\> \erlcode{join([1,2],[3],[])}\\
+\> \(\smashedrightarrow{\epsilon}\)
+\> \erlcode{join([2],[3],[1])}\\
+\> \(\smashedrightarrow{\epsilon}\)
+\> \erlcode{join([],[3],[2,1])}\\
+\> \(\smashedrightarrow{\delta}\)
+\> \erlcode{join([],[2,3],[1])}\\
+\> \(\smashedrightarrow{\delta}\)
+\> \erlcode{join([],[1,2,3],[])}\\
+\> \(\smashedrightarrow{\gamma}\)
+\> \erlcode{[1,2,3]}\textrm{.}
+\end{tabbing}
+
+\section*{Delay}
+\label{ans:delay}
+
+\noindent [See questions \vpageref{ex:delay}.]
+
+\medskip
+
+\paragraph{Question 1.}
+
+We are given
+\begin{alltt}
+rev_ter(   []) \(\smashedrightarrow{\alpha}\) [];
+rev_ter([I|L]) \(\smashedrightarrow{\beta}\) join_tf(rev_ter(L),[I]).
+
+join_tf(P,Q)        \(\smashedrightarrow{\gamma}\) join(P,Q,[]).
+join(   [],Q,   []) \(\smashedrightarrow{\delta}\) Q;
+join(   [],Q,[I|A]) \(\smashedrightarrow{\epsilon}\) join([],[I|Q],A);
+join([I|P],Q,    A) \(\smashedrightarrow{\zeta}\) join(P,Q,[I|A]).
+\end{alltt}
+Let \(\comp{rev\_ter}{n}\) be the delay of the call
+\erlcode{rev\_ter(\(L\))}, where the list~\(L\) holds \(n\)~items. The
+definitions yield the equations
+\begin{align*}
+\comp{rev\_ter}{0}   &\eqn{\alpha} 1,\quad
+\comp{rev\_ter}{n+1} \eqn{\beta} 1 + \comp{rev\_ter}{n}
+                                    + \comp{join\_tf}{n}.
+\intertext{We proved earlier that \(\comp{join\_tf}{n} = 2n + 2\),
+  therefore}
+\comp{rev\_ter}{n+1} &= 2n + 3 + \comp{rev\_ter}{n}\\
+\sum_{k=0}^{n-1}{\comp{rev\_ter}{k+1}}
+   &= \sum_{k=0}^{n-1}{(2k+3)} + \sum_{k=0}^{n-1}{\comp{rev\_ter}{k}}\\
+\comp{rev\_ter}{n}
+  &= 2 \cdot \frac{n(n-1)}{2} + 3n + \comp{rev\_ter}{0}
+  \eqn{\alpha} n^2 + 2n + 1 = (n+1)^2.
+\end{align*}
+
+\medskip
+
+\paragraph{Question 2.} Skipped.
+
+\medskip
+
+\paragraph{Question 3.}
+We are given
+\begin{verbatim}
+join_3a(P,Q,R) -> join(P,join(Q,R)).
+join_3b(P,Q,R) -> join(join(P,Q),R).
+\end{verbatim}
+The proved earlier \vpageref{delay:join} that
+\(\comp{join}{n,m}=n+1\), where \(n\)~and~\(m\) are, respectively, the
+length of the first and second lists. We straightforwardly deduce
+\begin{align*}
+\comp{join\_3a}{p,q,r}
+  &= 1 + \comp{join}{q,r} + \comp{join}{p,q+r}
+   = 1 + (q+1) + (p+1) = p + q + 3;\\
+\comp{join\_3b}{p,q,r}
+  &= 1 + \comp{join}{p,q} + \comp{join}{p+q,r}
+   = 1 + (p+1) + (p+q+1) = 2p + q + 3\\
+  &= \comp{join\_3a}{p,q,r} + p \geqslant \comp{join\_3a}{p,q,r}.
+\end{align*}
+Therefore, never use the call
+\erlcode{join(join(\(P\),\(Q\)),\(R\))}.
+
+
+\section*{Filtering Out}
+\label{ans:filtering_out}
+
+\noindent [See questions \vpageref{ex:filtering_out}.]
+
+\medskip
+
+\paragraph{Question 1.} Skipped.
+
+\medskip
+
+\paragraph{Question 2.}
+
+The conceptual difference between \erlcode{rm\_fst/2} and the sought
+\erlcode{rm\_all/2} is simply that the latter must not stop after
+finding the first occurrence, but instead traverse the whole list to
+find more occurrences---and ignore them in the reconstructed
+list. Hence
+\begin{verbatim}
+rm_all(_,   []) -> [];
+rm_all(I,[I|L]) -> rm_all(I,L);
+rm_all(J,[I|L]) -> [I|rm_all(J,L)].
+\end{verbatim}
+Following the previous remark, there is no worst case and there is no
+need to rely on equations to compute the delay: \(\comp{rm\_all}{n} =
+n+1\). In the same vein, the number of pushes if the number of found
+items. A version in tail form requires a list accumulator in which to
+save the visited items which are not the one sought after, and,
+therefore, it needs a final reversal:
+\begin{verbatim}
+rm_all_tf(I,L) -> rm_all_tf__(I,L,[]).
+
+rm_all_tf__(_,   [],A) -> rev(A);
+rm_all_tf__(I,[I|L],A) -> rm_all_tf__(I,L,A);
+rm_all_tf__(I,[J|L],A) -> rm_all_tf__(I,L,[J|A]).
+\end{verbatim}
+
+\medskip
+
+\paragraph{Question 3.}
+
+\begin{alltt}
+rm_lst3(_,   []) \(\smashedrightarrow{\alpha}\) [];
+rm_lst3(I,[I|P]) \(\smashedrightarrow{\beta}\) aux3(I,P,P);
+rm_lst3(I,[J|P]) \(\smashedrightarrow{\gamma}\) [J|rm_lst3(I,P)].
+aux3(_,   [],P)  \(\smashedrightarrow{\delta}\) P;
+aux3(I,[I|_],P)  \(\smashedrightarrow{\epsilon}\) [I|rm_lst3(I,P)];
+aux3(I,[_|Q],P)  \(\smashedrightarrow{\zeta}\) aux3(I,Q,P).
+\end{alltt}
+If the item is missing, the sequential search fails as usual with a
+delay of \(n+1\). Otherwise, let us name \(x_1 < x_2 < \dots < x_p\)
+the indices of all the occurrences of the item in the list. Then, the
+trace is
+\begin{equation*}
+\gamma^{x_1} 
+\cdot
+\prod_{k=2}^{p}(\beta\zeta^{x_k-x_{k-1}-1})(\epsilon\gamma^{x_k-x_{k-1}-1})
+\cdot
+(\beta\zeta^{n-x_p-1}\delta).
+\end{equation*}
+The length of the trace is therefore
+\begin{equation*}
+x_1 + 2\sum_{k=2}^{p}(x_k-x_{k-1}) + n - x_p + 1 = n + x_p - x_1 + 1.
+\end{equation*}
+oIn other words, if the position of the first occurrence is
+noted~\(f\) and the position of the last is~\(k\), we find that
+\(\comp{rm\_lst3}{n,f,k} = n + k - f + 1\). We deduce that the best
+delay happens when \(k-f+1=p\), that is, when all the occurrences are
+consecutive: we have \(\best{rm\_lst3}{n,p} = n + p\). The worst case
+occurs when~\({f=0}\) and~\({k=n-1}\), that is, when there is at least
+one occurrence at the head and one at the end: \(\worst{rm\_lst3}{n} =
+n + (n-1) + 1 = 2n\). We can check that when the list only contains
+occurrences of the item, best and worst delays concur in~\(2n\). The
+average delay when the item is present:
+\begin{align*}
+\ave{rm\_lst3}{n} 
+  &:=
+   \frac{2}{n(n+1)}\!\!\sum_{f=0}^{n-1}\sum_{k=f}^{n-1}{\comp{rm\_lst3}{n,f,k}}
+   = \frac{2}{n(n+1)}\!\!\sum_{f=0}^{n-1}\sum_{k=f}^{n-1}{(n-f+k+1)}\\
+  &= n + 1 + \frac{2}{n(n+1)}\sum_{f=0}^{n-1}\left(-f(n-f) +
+   \sum_{k=f}^{n-1}{k}\right)\\
+  &= n + 1 
+     + \frac{2}{n(n+1)}\sum_{f=0}^{n-1}\left(f^2-nf+
+         \left(\sum_{k=0}^{n-1}{k} -
+         \sum_{k=0}^{f-1}{k}\right)\right)\\
+  &= n + 1 
+     + \frac{2}{n(n+1)}\sum_{f=0}^{n-1}\left(f^2 -nf + 
+       \left(\frac{n(n-1)}{2} - \frac{f(f-1)}{2}\right)\right)\\
+  &= n + 1 + \frac{2}{n(n+1)} \cdot \frac{n^2(n-1)}{2}\\
+  &\phantom{= n\;}
+     + \frac{2}{n(n+1)}\sum_{f=0}^{n-1}{\left(\frac{1}{2}{f^2} -
+       \frac{2n-1}{2}{f}\right)}\\
+  &= n + 1 + \frac{n(n-1)}{n+1}\\
+  &\phantom{= n\;}
+     + \frac{1}{n(n+1)}\sum_{f=0}^{n-1}{f^2}
+     - \frac{2}{n(n+1)} \cdot \frac{2n-1}{2}\sum_{f=0}^{n-1}{f}\\
+  &= n + 1 + \frac{n(n-1)}{n+1}\\
+  &\phantom{= n\;}
+     + \frac{1}{n(n+1)} \cdot \frac{(n-1)n(2n-1)}{6}
+     - \frac{2n-1}{n(n+1)} \cdot \frac{n(n-1)}{2}\\
+  &= \frac{4}{3}{n} + \frac{2}{3}.
+\end{align*}
+The complete table is now found in
+\fig~\vref{fig:complete_table_rm_lst}.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 603 375 721]{rm_lst_table}
+\caption{Complete table of delays for variations on ``filtering out''
+\label{fig:complete_table_rm_lst}}
+\end{figure}
+On a last note, clause \clause{\delta} allows the output to share with
+the input the longest common suffix \emph{if the item occurs in the
+  list}. (This was not the case with other versions based on
+reversals.) The code can thus be improved so the sharing is maximum in
+any case. How?
+
+\smallskip
+
+\noindent We can compare \(\worst{rm\_lst2}{n}\) and
+\(\worst{rm\_lst3}{n}\) because the worst case of the former happens
+when the item occurs \emph{anywhere} in the list, whilst the worst
+case of the latter is when the item occurs uniquely at the end of the
+list. Indeed, this means that for any input list of length~\(n\),
+\(\worst{rm\_lst3}{n} < \worst{rm\_lst2}{n}\). Since both best cases
+happen when the item is absent, we conclude that \(\comp{rm\_lst3}{n}
+< \comp{rm\_lst2}{n}\). Furthermore, we observe that
+\(\worst{rm\_lst3}{n} < \best{rm\_lst}{n}\) and \(\worst{rm\_lst3}{n}
+< \best{rm\_lst\_tf}{n}\), so \(\comp{rm\_lst3}{n} <
+\comp{rm\_lst}{n}\) and \(\comp{rm\_lst\_tf}{n}\). The only way to
+compare \erlcode{rm\_lst3/2} to \erlcode{rm\_lst1/2} is to consider
+their exact delays. We have, for all~\({f \leqslant k}\),
+\[
+k < n \Rightarrow \comp{rm\_lst3}{n,f,k} < \comp{rm\_lst1}{n,f,k}.
+\]
+Therefore, the fastest function is \erlcode{rm\_lst3/2}.
+
+Note: Using the \erlcode{case} construct presented in
+section~\vref{chap:higher-order_functions}, we can write more clearly
+the code above as
+\begin{alltt}
+rm_lst3(_,   []) -> [];
+rm_lst3(I,[I|P]) -> \textbf{case} mem(I,P) \textbf{of}
+                      true  -> [I|rm_lst3(I,P)];
+                      false -> P
+                    \textbf{end};
+rm_lst3(I,[J|P]) -> [J|rm_lst3(I,P)].
+mem(_,   [])     -> false;
+mem(I,[I|\_])     -> true;
+mem(I,[\_|P])     -> mem(I,P).
+\end{alltt}
+
+\medskip
+
+\paragraph{Question 4.}
+
+Reading the definition with~\({n=0}\), that is, a null period, leads
+to ``..., except the items occurring every \(0\)~positions.''
+Therefore, the output ought to be the same as the input. If~\(n\) is
+greater than the length of the list, the items at these extra
+positions are simply ignored because they don't exist. Interpreting
+the definition for the case of \(n < 0\) is inconclusive, so let us
+decide, for instance, that this case is the same as \(n=0\). No case
+has been left out in our analysis. We need a counter to record the
+current position, thus initially set to~\erlcode{1}, and, when the
+counter matches the period, it is reset to~\erlcode{1}. For the sake
+of versatility, we shall set the accumulator as first argument,
+instead of the last:
+\begin{alltt}
+drop(L,P) -> drop([],1,L,P).
+
+drop(A,_,   [],_) \(\smashedrightarrow{\alpha}\) rev(A);
+drop(A,P,[_|L],P) \(\smashedrightarrow{\beta}\) drop(A,1,L,P);
+drop(A,N,[I|L],P) \(\smashedrightarrow{\gamma}\) drop([I|A],N+1,L,P).
+\end{alltt}
+The delay occurs when the delay of the call \erlcode{rev(A)} is
+maximum, that is, when the accumulator~\erlcode{A} is the
+longest. This is achieved when the minimum number of items have been
+dropped (skipped), that is , when clause~\clause{\beta} is never
+used. This means that no item is dropped and the output matches the
+input, so the accumulator at the end is simply the input reversed. The
+design analysis reminds us that this happens when the period is either
+negative or greater than the length of the list. Moreover,
+\(\comp{drop}{n} = 1 + n + 1 + (n+2) = 2n+4\), because \(\comp{rev}{n}
+= n+2\).
+
+\medskip
+
+\paragraph{Question 5.}
+
+We are given
+\begin{verbatim}
+diff([M,N]) -> M - N;
+diff([M|L]) -> M - diff(L).
+\end{verbatim}
+This definition only fails on the empty list. Also, the first clause
+is in tail form but not the second, because the call \erlcode{diff(L)}
+is an argument to the operator~(\erlcode{-}). If we add an integer
+accumulator, we end in trouble:
+\begin{alltt}
+diff([]) -> list_too_short;
+diff( L) -> diff__(L,0).
+
+diff__([M,N],A) -> (M-N)-A;\hfill% \emph{Wrong}
+diff__([M|L],A) -> diff__(L,M-A).\hfill% \emph{Wrong}
+\end{alltt}
+because subtraction is not associative: \(x-(y-z) \neq (x-y)-z\). A
+more general method is to be preferred then: the accumulator is a list
+in which the numbers are stored until we can begin subtracting
+them. This is equivalent to reverse the input and then performing the
+delayed series of subtractions:
+\begin{alltt}
+diff_tf([]) -> list_too_short;
+diff_tf( L) -> rev_diff(L,[]).
+
+rev_diff(   [],A) -> diff__(A,0);\hfill% \emph{Prepare to subtract}
+rev_diff([I|L],A) -> rev_diff(L,[I|A]).\hfill% \emph{Reversal}
+
+diff__(   [],N) -> N;
+diff__([I|L],N) -> diff__(L,I-N).
+\end{alltt}
+The delay of \erlcode{diff/1} is~\(n-1\), when the input contains
+\(n\)~numbers. The delay of \erlcode{diff\_tf/1} is
+\(\comp{diff\_tf}{n} = 1 + (n+1) + (n+1) = 2n + 3\).
+
+\medskip
+
+\paragraph{Question 6.}
+
+We are given two definitions not in tail form:
+\begin{verbatim}
+srev(   []) -> [];
+srev([I|L]) -> join(srev(L),[I]).
+
+join(   [],Q) -> Q;
+join([I|P],Q) -> [I|join(P,Q)].
+\end{verbatim}
+We have
+\begin{alltt}
+srev_tf([]) -> [];
+srev_tf( L) -> srev__(L,[]).
+
+srev__(   [],[I|A]) -> join__([],[I],[],A);
+srev__([I|L],    A) -> srev__(L,[I|A]).
+
+join__(   [],Q,   [],   []) -> Q;
+join__(   [],Q,   [],[I|B]) -> join__(Q,[I],[],B);
+join__(   [],Q,[I|A],    B) -> join__([],[I|Q],A,B);
+join__([I|P],Q,    A,    B) -> join__(P,Q,[I|A],B).
+\end{alltt}
+
+\section*{Delay and Tail Form Revisited}
+\label{ans:delay_and_tail_form_revisited}
+
+\noindent [See questions \vpageref{ex:delay_and_tail_form_revisited}.]
+
+\medskip
+
+\paragraph{Question 1.}
+\begin{alltt}
+split(L,N) when N > 0 -> split([],L,N).
+
+split(A,P=[\_|\_],0) -> \{rev(A),P\};
+split(A,  [I|L],N) -> split([I|A],L,N-1).
+
+% \emph{Reminder}
+%
+rev(L) -> rev_join(L,[]).
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).
+\end{alltt}
+
+\medskip
+
+\paragraph{Question 2.}
+\begin{alltt}
+rot(L,N) when N < 0 -> aux(len(L));
+rot(L,N)            -> rot([],L,N rem len(L)).
+
+aux(Len) -> rot([],L,Len + N rem Len).
+
+rot([],    L,0) -> L;
+rot( A,    L,0) -> join(L,rev(A));
+rot( A,[I|L],N) -> rot([I|A],L,N-1).
+
+% \emph{Reminder}
+%
+rev(L) -> rev_join(L,[]).
+
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).
+
+join(   [],Q) -> Q;
+join([I|P],Q) -> [I|join(P,Q)].
+\end{alltt}
+
+\section*{Queues}
+\label{ans:queues}
+
+\noindent [See questions \vpageref{ex:queues}.]
+
+\medskip
+
+\paragraph{Question 1.}
+\verbatiminput{r.erl}
+
+\medskip
+
+\paragraph{Question 2.} Skipped.
+
+\section*{Aliasing and Tail\hyp{}Call Optimisation}
+\label{ans:aliasing_and_tail-call_optimisation}
+
+\noindent [See question
+  \vpageref{ex:aliasing_and_tail-call_optimisation}.]
+
+The only sharing between the input and the output lies in the items of
+the list. This was expected because when building a list in reverse we
+cannot reuse any part of the original superstructure.
+
+\section*{Persistence and Backtracking}
+\label{ans:persistence_and_backtracking}
+
+\noindent [See questions \vpageref{ex:persistence_and_backtracking}.]
+
+\medskip
+
+\paragraph{Question 1.} Skipped.
+
+\medskip
+
+\paragraph{Question 2.} Skipped.
+
+\medskip
+
+\paragraph{Question 3.}
+
+\begin{itemize}
+
+  \item {[\erlcode{version/1}]} Skipped.
+
+  \item {[\erlcode{set/3}]} Either the index is in bounds or not:
+\begin{alltt}
+set(E,I,\{\{L,U\},D,S\}) when L =< I,I =< U -> \fbcode{aux(E,I,A)}.
+\end{alltt}
+  Note the conjunction of tests in the guard, meaning here ``when
+  \erlcode{L~=<~I} \emph{and} \erlcode{I~=<~U}.'' The same effect can
+  be achieved with an auxiliary function, like
+\begin{alltt}
+set(E,I,A=\{\{L,_\},_,_\}) when L =< I -> aux(E,I,A);
+aux(E,I,  \{\{L,U\},D,S\}) when I =< U -> \fbcode{aux(E,I,A)}.
+\end{alltt}
+  The case ``empty'' is easy because it means that the index is
+  necessary out of bounds, according to the specification. This is the
+  same as having a non\hyp{}empty array but the index is out of
+  bounds:
+\begin{alltt}
+set(E,I,\{\{L,U\},D,S\}) when L =< I,I =< U -> \fbcode{aux(E,I,A)};
+set(_,_,          _)                    -> \textbf{out}.
+\end{alltt}
+  We can see now that we can remove the first clause:
+\begin{alltt}
+set(E,I,\{\{L,U\},D,S\}) when L =< I,I =< U -> \fbcode{aux(E,I,A)};
+set(_,_,          _)                    -> out.
+\end{alltt}
+  We need now an auxiliary function \erlcode{set\_\_/3} such that the
+  function call \erlcode{set\_\_(\(E\),\(I\),\(S\))} rewrites into the
+  the updated~\(S\).
+\begin{alltt}
+set(E,I,\{B=\{L,U\},D,S\}) when L =< I,I =< U ->
+\hfill\{B,D,\textbf{set__(E,I,S)}\};
+set(_,_,          _)                    -> out.
+set__(E,I,         \{\})                  -> \fbcode{aux(E,I,A)};
+set__(E,I,\{set,E,J,S\})                  -> \fbcode{aux(E,I,A)}.
+\end{alltt}
+  The first clause of \erlcode{set\_\_/3} corresponds to an out of
+  bound access:
+\begin{alltt}
+set__(_,_,         \{\})                  -> \textbf{out};
+set__(E,I,\{set,E,J,S\})                  -> \fbcode{aux(E,I,A)}.
+\end{alltt}
+  We realise now that we actually do not need to know the details of
+  the first update because what only matters is that there is at least
+  one. Then we add the assignment:
+\begin{alltt}
+set__(_,_,\{\})                  -> out;
+set__(E,I, \textbf{S})                  -> \textbf{\{set,E,I,S\}}.
+\end{alltt}
+
+
+  \item {[\erlcode{get/2}]} The beginning of the analysis is identical
+    to the analysis of \erlcode{set/3} until:
+\begin{alltt}
+get(\{\{L,U\},_,S\},I) when L =< I,I =< U -> get__(S,I);
+get(          _,_)                    -> out.
+get__(         \{\},_)                  -> out;
+get__(\{set,E,J,S\},I)                  -> \fbcode{aux(E,I,A)}.
+\end{alltt}
+  The remaining clause needs its head to be refined in two cases:
+  either~\erlcode{I} has been found in the current assignment or not:
+\begin{alltt}
+get__(         \{\},_)                  -> out;
+get__(\{set,E,I,A\},I)                  -> \fbcode{aux(E,I,A)}.
+get__(\{set,E,J,A\},I)                  -> \fbcode{aux(E,I,A)}.
+\end{alltt}
+  If found, the end with the current content of the cell; otherwise,
+  we need to check the previous assignments, that is, perform a
+  recursive call on the rest of the updates:
+\begin{alltt}
+get__(         \{\},_)                  -> out;
+get__(\{set,E,I,_\},I)                  -> \textbf{E};
+get__(\{set,_,_,A\},I)                  -> \textbf{get\_\_(A,I)}.
+\end{alltt}
+
+  \item {[\erlcode{nth/2}]} This function can simply be expressed in
+    terms of \erlcode{get/2}:
+\begin{verbatim}
+nth(A={{L,_},_,_},I) -> get(A,L+I-1).
+\end{verbatim}
+
+  \item {[\erlcode{mem/2}]} Skipped.
+    
+  \item {[\erlcode{inv/1}]} Skipped.
+
+  \item {[\erlcode{unset/2}]}
+\begin{alltt}
+unset(\{B=\{L,U\},D,S\},I) when L =< I,I =< U ->
+\hfill\{B,D,unset__(S,I)\};
+unset__(         \{\},_) -> out;\hfill% \emph{Absent}
+unset__(\{set,_,I,A\},I) -> A;\hfill% \emph{Found}
+unset__(\{set,E,J,A\},I) -> \{set,E,J,unset__(A,I)\}.
+\end{alltt}
+
+\end{itemize}
+
+
+\section*{Permutations and Sorting}
+\label{ans:permutations_and_sorting}
+
+\noindent [See question \vpageref{ex:permutations_and_sorting}.]
+The straight application of our algorithm leads to the following code.
+
+\verbatiminput{p.erl}
+
+\noindent The clauses of \erlcode{appk/2} matching the tags
+\erlcode{k1}, \erlcode{k2}~and~\erlcode{k4} have isomorphic bodies, so
+they can be merged into one clause. To keep track of the fusion, we
+call the new tag~\erlcode{k124} in the following last version.
+
+\verbatiminput{q.erl}
+
+
+\section*{Insertion Sort}
+\label{ans:insertion_sort}
+
+\noindent [See questions \vpageref{ex:insertion_sort}.]
+
+\medskip
+
+\paragraph{Question 1.}
+Let us recall the code and label the arrows as follows:
+\begin{alltt}
+i2w_a(L) -> i2w_a([],[],L).
+
+i2w_a(   [],    Q,     []) \(\smashedrightarrow{\alpha}\) Q;
+i2w_a([I|P],    Q,     []) \(\smashedrightarrow{\beta}\) i2w_a(    P,[I|Q],[]);
+i2w_a(    P,[J|Q],L=[K|_]) when J < K 
+                            \(\smashedrightarrow{\gamma}\) i2w_a([J|P],    Q, L);
+\textbf{i2w_a(   [],    Q,  [K|R]) \(\smashedrightarrow{\delta}\) i2w_a(  [K],    Q, R);}
+i2w_a([I|P],    Q,L=[K|_]) when K < I
+                           \(\smashedrightarrow{\epsilon}\) i2w_a(    P,[I|Q], L);
+i2w_a(    P,    Q,  [K|R]) \(\smashedrightarrow{\zeta}\) i2w_a(    P,[K|Q], R).
+\end{alltt}
+Clause~\clause{\delta} (in bold) leads to a slightly more balanced
+scheme than \erlcode{isort2w/1}, insofar as when the left list is
+empty, the item under consideration will be pushed in it instead of
+the right list. Let us start with a small example, shown in
+\fig.~\vref{fig:i2w_a}.
+\begin{figure}
+\centering
+\includegraphics{i2w_a}
+\caption{Slightly balanced two\hyp{}way insertions with
+  \erlcode{i2w\_a/1}\label{fig:i2w_a}}
+\end{figure}
+Note how the configuration \erlcode{[],[\(c\),\(a\),\(b\)]} is not
+reached anymore, as it is maximally unbalanced. Therefore, we should
+expect in average a little improvement over the original function
+\erlcode{isort2w/1}. We shall skip the best and worst cases and
+instead focus on the average delay as follows. Let us
+note~\(\ave{}{p,q}\) the average delay for inserting one number in a
+configuration where the left list is made of \(p\) numbers and the
+right list contains \(q\)~numbers, all of them being unique. This
+function was \vpageref{A_pq}:
+\[
+\ave{\(\gamma\delta\epsilon\)}{k-q,q}
+  = \frac{1}{k+1}{q^2} - \frac{k}{k+1}{q} + \frac{k+2}{2}.
+\]
+Let~\(\ave{}{n}\) represent the average delay required to insert a
+random number into two random lists of \(n\)~numbers in total. This
+function is different. As hinted, the difference with the analysis of
+\erlcode{isort2w/1} consists in \emph{not} having to sum the
+term~\(\ave{}{0,k}\) to compute~\(\ave{}{n}\) and, in its stead,
+use~\(\ave{}{1,k-1}\), this change corresponding to the added
+clause. We have
+\begin{align*}
+  \ave{}{0} &:= 1,\quad
+  \ave{}{1} := \frac{3}{2},\\
+  \ave{}{k} &:= \frac{1}{k}
+     \left(\sum_{p+q=k}^{p,q>0}{\ave{}{p,q}} +
+     \ave{}{1,k-1}\right)
+     = \frac{1}{k}\left(\sum_{q=1}^{k-1}{\ave{}{k-q,q}} +
+     \ave{}{1,k-1}\right).
+\end{align*}
+The values of \(\ave{}{0}\)~and~\(\ave{}{1}\) come from examining
+\fig~\vref{fig:i2w_a}. Because
+\[
+\ave{}{1,k-1} = \frac{k^2 + k + 4}{2k+2},
+\]
+we resume
+\begin{align*}
+  \ave{}{k}
+    &= \frac{1}{k}\left(\frac{1}{k+1}\sum_{q=1}^{k-1}{q^2} 
+       - \frac{k}{k+1}\sum_{q=1}^{k-1}{q}
+       + \frac{k+2}{2}\sum_{q=1}^{k-1}{1}
+       + \frac{k^2 + k + 4}{2k+2}\right)\\
+    &= \frac{2k^3 + 9k^2 + k + 6}{6k(k+1)}
+     = \frac{k}{3} + \frac{1}{k} - \frac{2}{k+1} 
+       + \frac{7}{6}.
+ \end{align*}
+ Let~\(\ave{\(\alpha\beta\)}{k}\) be the number of rewrites to reverse
+ \(k\)~numbers from the first list to the second and finally return
+ the second list. We have
+ \begin{align*}
+   \ave{\(\alpha\beta\)}{k} &:= k + 1;\quad
+   \ave{i2w\_a}{0} := 1,\\
+   \ave{i2w\_a}{n} &:= 1 + \sum_{k=0}^{n-1}{\ave{}{k}}
+        + \frac{1}{n}\left(\sum_{k=1}^{n-1}{\ave{\(\alpha\beta\)}{k}}
+        + 2\right)\\
+     &= 1 + \left(\ave{}{0} + \ave{}{1} +
+        \sum_{k=2}^{n-1}{\ave{}{k}}\right)
+        + \frac{1}{n}\left(\sum_{k=1}^{n-1}{(k+1)} + 2\right)\\
+     &= \frac{7}{2} + \sum_{k=2}^{n-1}{\left(\frac{k}{3}
+        + \frac{1}{k} - \frac{2}{k+1} + \frac{7}{6}\right)}
+        + \frac{1}{n}\left(\sum_{k=1}^{n}{k} - 1\right) +
+        \frac{2}{n}\\
+     &= \frac{7}{2} + \sum_{k=1}^{n-1}{\left(\frac{k}{3}
+        + \frac{1}{k} - \frac{2}{k+1} + \frac{7}{6}\right)}
+        - \left(\frac{1}{3}
+        + \frac{1}{1} - \frac{2}{1+1} + \frac{7}{6}\right)\\
+     &\phantom{= \frac{7}{2} \;}
+        + \frac{1}{n} \cdot \frac{n(n+1)}{2} - \frac{1}{n} +
+          \frac{2}{n}\\
+     &= \left(\frac{1}{3}\sum_{k=1}^{n-1}{k}
+        + \sum_{k=1}^{n-1}{\frac{1}{k}} 
+        - 2 \sum_{k=1}^{n-1}{\frac{1}{k+1}}
+        + \frac{7}{6}{(n-1)}\right)
+        + \frac{n}{2} + \frac{1}{n} + \frac{5}{2}\\
+     &= \frac{1}{3} \cdot \frac{n(n-1)}{2}
+        + \sum_{k=1}^{n}{\frac{1}{k}}
+        - 2 \sum_{k=2}^{n}{\frac{1}{k}}
+        + \frac{5}{3}{n} + \frac{4}{3}\\
+     &= \frac{1}{6}{n^2} + \frac{3}{2}{n} + H_n - 2(H_n - 1) +
+        \frac{4}{3}
+      = \frac{1}{6}{n^2} + \frac{3}{2}{n} - H_n + \frac{10}{3}.
+\end{align*}
+Furthermore,
+\[
+\ave{i2w\_a}{n} = \frac{1}{6}{n^2} + \frac{3}{2}{n} - H_n + \frac{10}{3}
+  < \frac{1}{6}{n^2} + \frac{3}{2}{n} + \frac{4}{3} = \ave{isort2w}{n}
+\Leftrightarrow 2 < H_n.
+\]
+Moreover, since \((H_n)_n\) is increasing and \(H_3 = 11/6\) and \(H_4
+= 25/12\),
+\[
+H_3 < 2 < H_4 \leqslant H_n,
+\]
+so~\(\ave{i2w\_a}{n} < \ave{isort2w}{n} \Leftrightarrow 3 < n\). This
+means that if four or more items are to be sorted, it is faster to
+call \erlcode{i2w\_a/1} than \erlcode{isort2w/1}.
+
+
+\section*{Higher\hyp{}Order Functions}
+\label{ans:higher-order_functions}
+
+\noindent [See questions \vpageref{ex:higher-order_functions}.]
+
+\verbatiminput{ho.erl}
+
+\section*{Merge Sort}
+\label{ans:merge_sort}
+
+\noindent [See questions \vpageref{ex:merge_sort}.]
+
+\medskip
+
+\paragraph{Question 1.}
+
+It is not necessary to redo all the calculations. The shortcut reveals
+itself if we start with assessing the difference between
+\(\cdelay{merge}{m,n}\), which is the number of comparisons, and
+\(\comp{merge}{m,n}\), which is the number of function calls. Let us
+recall the \Erlang definition of \erlcode{merge/2}:
+\input{merge_alpha} In order to only count the number of comparisons,
+we must not count clauses \clause{\alpha}~and~\clause{\beta} in the
+delay: \(\cdelay{merge}{m,n} = \comp{merge}{m,n} - 1\). Thus
+\begin{align*}
+\cbest{merge}{m,n}  &= \best{merge}{m,n} - 1 = \min\{m,n\};\\
+\cworst{merge}{m,m} &= \worst{merge}{m,n} - 1 = m + n - 1;\\
+\cave{merge}{m,m}   &= \ave{merge}{m,n} - 1 = mn/(m+1) + mn/(n+1).
+\end{align*}
+The shape of equation \eqref{eq:delay_power_2}
+\vpageref{eq:delay_power_2} is the same, except it applies now to the
+number of comparisons:
+\begin{align*}
+\Dcomp(2^p) &= 2^{p-1}\sum_{k=0}^{p-1}{\frac{1}{2^k}\cdelay{merge}{2^k,2^k}}
+ = 2^{p-1}\sum_{k=0}^{p-1}{\frac{1}{2^k}\left(\comp{merge}{2^k,2^k}-1\right)}\\
+ &= 2^{p-1}\sum_{k=0}^{p-1}{\frac{1}{2^k}\comp{merge}{2^k,2^k}}
+   - 2^{p-1}\sum_{k=0}^{p-1}{\frac{1}{2^k}}
+ = \Dideal(2^p) - 2^{p-1}\left(2 - \frac{1}{2^{p-1}}\right)\\
+ &= \Dideal(2^p) - 2^p + 1.
+\end{align*}
+Therefore
+\begin{align*}
+\Bcomp(2^p) &= \Bideal(2^p) - 2^p + 1 = p2^{p-1};\\
+\Wcomp(2^p) &= \Wideal(2^p) - 2^p + 1 = p2^p - 2^p + 1;\\
+\Acomp(2^p) &= \Aideal(2^p) - 2^p + 1
+             = p2^p - 2^p\sum_{k=0}^{p-1}\frac{1}{2^k+1}.
+\end{align*}
+For the general case, let us reconsider equation \eqref{eq:msort_gen}
+\vpageref{eq:msort_gen}:
+\begin{equation*}
+\Dideal(n)
+  = \sum_{i=0}^{r}{\Dideal(2^{e_i})}
+    +
+    \sum_{i=1}^{r}{\comp{merge}{2^{e_i},2^{e_{i-1}}+\dots+2^{e_0}}}.
+\end{equation*}
+Let us take into account only the number of comparisons:
+\begin{align*}
+\Dcomp(n)
+  &= \sum_{i=0}^{r}{\Dcomp(2^{e_i})}
+    +
+    \sum_{i=1}^{r}{\cdelay{merge}{2^{e_i},2^{e_{i-1}}+\dots+2^{e_0}}}\\
+  &= \sum_{i=0}^{r}{(\Dideal(2^{e_i}) - 2^{e_i} + 1)}
+    +
+    \sum_{i=1}^{r}{\left(\comp{merge}{2^{e_i},2^{e_{i-1}}+\dots+2^{e_0}}
+      - 1\right)}\\
+  &= \sum_{i=0}^{r}{\Dideal(2^{e_i})} - \sum_{i=0}^{r}{2^{e_i}}
+     + (r+1)
+     +  \sum_{i=1}^{r}{\comp{merge}{2^{e_i},2^{e_{i-1}}+\dots+2^{e_0}}}
+     - r,\\
+\Dcomp(n)
+  &= \Dideal(n) - n + 1.
+\end{align*}
+It is easy to derive the best, worst and average number of
+comparisons:
+\[
+\begin{array}{r@{\,}c@{\,}c@{\,}c@{\,}l}
+  \frac{1}{2}{n\lg n} - \frac{3}{2}{n} + 1 & \leqslant & \Bcomp(n)
+     & \leqslant & \frac{1}{2}{n \lg n} + n - 1,\\
+  n\lg n - 4n + 3 & \leqslant & \Wcomp(n)
+                  & \leqslant & n\lg n + n - 1,\\
+  n\lg n - (\alpha + 3)n + \frac{3}{2} & \leqslant & \Acomp(n)
+                             & \leqslant & n\lg n + n - 1.
+\end{array}
+\]
+We have \(S(n) \leqslant \overline{\Wideal}(n)\), therefore, \(S(n)
+\leqslant n \lg n + n - 1\).
+
+\medskip
+
+\paragraph{Question 2.}
+
+If \(n=2^p-1\), then the binary representation of \(n\) is only made
+of \(1\)\hyp{}bits. In other words, if we use the variant
+representation \(n=2^{e_r} + \dots + 2^{e_1} + 2^{e_0} > 0\), with
+\(e_r > \dots > e_1 > e_0 \geqslant 0\) and \({r \geqslant 0}\), it
+means that \({e_i=i}\). Let us start by recalling the delays when
+\({n=2^p}\). Equality \eqref{eq:best_power} \vpageref{eq:best_power}
+is: \(\Bideal(2^p) = p2^{p-1} + 2^p -
+1\). Equality~\eqref{eq:worst_power} \vpageref{eq:worst_power}:
+\(\Wideal(2^p) = p2^p\). Reusing equation~\eqref{eq:Bideal}
+\vpageref{eq:Bideal}, defining~\(\Bideal(n)\) in the general, with the
+additional constraint \({e_i=i}\), becomes
+\begin{align*}
+\Bideal(n)
+  &=   \sum_{i=0}^{r}{\Bideal(2^{e_i})}
+     + r + \sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}
+   = \sum_{i=0}^{r}{\Bideal(2^i)}
+     + r + \sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^j}\\
+  &= \sum_{i=0}^{r}{(i2^{i-1} + 2^i - 1)}
+     + r + \sum_{i=1}^{r}{(2^i - 1)}\\
+  &= \sum_{i=1}^{r}{i2^{i-1}} + 2^{r+2} - r - 4.
+\end{align*}
+A closed form for the remaining sum can be reached by the
+\emph{perturbation technique}, which consists in summing one more term
+and rewriting the new sum in terms of the original sum. Let \(S_{r} :=
+\sum_{i=1}^{r}{i2^{i-1}}\). Then
+\begin{align*}
+S_{r} + (r+1)2^r
+  &= \sum_{i=1}^{r+1}{i2^{i-1}} = \sum_{i=0}^{r}{(i+1)2^{i}}
+   = \sum_{i=0}^{r}{i2^{i}} + \sum_{i=0}^{r}{2^{i}}\\
+  &= 2\sum_{i=1}^{r}{i2^{i-1}} + (2^{r+1} - 1)
+   = 2S_{r} + 2^{r+1} - 1,
+\end{align*}
+yielding \(S_{r} = (r+1)2^r - 2^{r+1} + 1 = (r-1)2^r + 1\). Then
+\begin{equation*}
+\Bideal(n) = ((r-1)2^r + 1) + 2^{r+2} - r - 4
+           = (r+3)(2^r - 1).
+\end{equation*}
+We assumed \({e_i=i}\), that is, the bits of~\(n\) are all~\(1\),
+which implies that there exists~\(p\) such that \(n=2^p-1\), hence
+\(\nu_n := r+1 = p\). We conclude:
+\begin{equation*}
+\Bideal(2^p-1) = (p+2)(2^{p-1} -1).
+\end{equation*}
+We may remark that \(\Bideal(2^p) = \Bideal(2^p-1) + p + 1\).
+Furthermore, reusing the result \(\Bcomp(n) = \Bideal(n) - n + 1\) of
+Question~1, we would deduce
+\begin{equation}
+\Bcomp(2^p) = \Bcomp(2^p-1) + p.\label{eq:Bcomp}
+\end{equation}
+Let us turn now to equation \eqref{eq:Wideal} \vpageref{eq:Wideal}
+defining \(\Wideal(n)\):
+\begin{align*}
+\Wideal(n)
+  &=   \sum_{i=0}^{r}{\Wideal(2^{e_i})}
+     + \sum_{i=1}^{r}\sum_{j=0}^{i}{2^{e_j}}
+   =   \sum_{i=0}^{r}{e_i2^{e_i}}
+     + \sum_{i=1}^{r}\sum_{j=0}^{i}{2^{e_j}}\\
+  &=   \sum_{i=0}^{r}{i2^{i}}
+     + \sum_{i=1}^{r}\sum_{j=0}^{i}{2^{j}}
+   = 2S_r + \sum_{i=1}^{r}(2^{i+1} - 1),\\
+%  &= (r-1)2^{r+1} + 2 + \sum_{i=0}^{r-1}{2^{i+2}} - r
+%   = (r-1)2^{r+1} + 2 + 4(2^r - 1) - r\\
+\Wideal(2^p-1)
+  &= (r+1)2^{r+1} - r - 2
+   = p2^p - p - 1.
+\end{align*}
+Remarkably, we stumble upon a familiar pattern again:
+\begin{equation}
+\Wcomp(2^p) = \Wcomp(2^p-1) + p.\label{eq:Wcomp}
+\end{equation}
+
+\medskip
+
+\paragraph{Question 3.}
+
+Let us take \(a=1\), \(b=n\) and \(f(x) = \lg x\). The theorem implies
+% \lg (n-1)! = \sum_{k=1}^{n-1}{\lg k} \leqslant
+\[
+\int_{1}^{n}{\!\!\lg x} \,dx \leqslant \sum_{k=2}^{n}{\lg k} = \lg n!
+\leqslant S(n).
+\]
+Since
+\[
+\int_{1}^{n}{\!\!\lg x}\,dx = \frac{1}{\ln 2}[x\ln x - x]^{n}_1 = n\lg n -
+\frac{n}{\ln 2} + \frac{1}{\ln 2},
+\]
+we conclude, together with the result of Question~\ref{ex:merge_sort:1}:
+\[
+n\lg n - \frac{n}{\ln 2} + \frac{1}{\ln 2}
+\leqslant S(n) \leqslant n\lg n + n - 1.
+\]
+
+\medskip
+
+\paragraph{Question 4.}
+
+We found earlier \(n\floor{\lg n}/2 + 2n - 2^{\floor{\lg n}+1}
+\leqslant \Bideal(n)\). We want to find the largest~\(\lambda'\) such
+that
+\[
+\tfrac{1}{2}n\lg n + \lambda' n
+\leqslant \tfrac{1}{2}n\floor{\lg n} + 2n - 2^{\floor{\lg n}+1}.
+\]
+Equivalently, \(n\lg n + 2\lambda' n \leqslant n\floor{\lg n} + 4n -
+2^{\floor{\lg n}+2}\), which is an instance of \(n\lg n + \lambda n
+\leqslant n\floor{\lg n} + \psi n - \omega 2^{\floor{\lg n}}\), with
+\(\lambda = 2\lambda'\), \(\psi = 4\)~and~\(\omega = 4\). Therefore,
+let us work out the general case where \(\psi\)~and~\(\omega\) are
+positive integers. We set \(n=q2^p\), where \(p \in \mathbb{N}, q \in
+\mathbb{R}\) and \(1 \leqslant q < 2\). Thus \(\floor{\lg n} = p\) and
+the previous inequality is equivalent to \(q2^p(\lg q + p) + \lambda
+q2^p \leqslant pq2^p + \psi q2^p - \omega 2^p\), which, in turn, is
+equivalent to \(q\lg q + (\lambda - \psi) q + \omega \leqslant 0\).
+Let us define \(f(q) := q\lg q + (\lambda - \psi) q + \omega\). We
+have \(f'(q) = \lg q + 1/\ln 2 + \lambda - \psi\) and \(f'(q) = 0
+\Leftrightarrow q = 1/e/2^{\lambda - \psi}\). Furthermore,
+\(\lim_{q\rightarrow 0^{+}}{f(q)} = \omega^{-}\) and \(\lim_{q
+  \rightarrow +\infty}{f(q)} = +\infty\). This means that \(f\)~can be
+continuously extended by setting \(f(0) := \lambda - \psi\), that it
+decreases to its minimum \(f(1/e/2^{\lambda-\psi})\) and then
+increases without a bound. Let us allow \({q=2}\) and consider what
+happens at the bounds of the interval \([1,2]\): \(f(1) \leqslant 0
+\Leftrightarrow \lambda - \psi \leqslant -\omega\) and \(f(2)
+\leqslant 0 \Leftrightarrow \lambda - \psi \leqslant -\omega/2 - 1\).
+Either \(-\omega \leqslant -\omega/2 - 1\) or else the converse
+holds. In other words, either \(\omega \geqslant 2\) or~\(\omega
+\leqslant 2\). Since the bounds we are interested in have~\(\omega
+\geqslant 2\), we shall only consider the former case, from which we
+deduce that \(f(1) \leqslant 0 \Rightarrow f(2) \leqslant 0\). Let us
+then set \(\lambda - \psi := -\omega\) and prove that \(f(q) \leqslant
+0\) then holds for \(q \in [1,2]\). We have now \(f(q) = q\lg q -
+\omega q + \omega = q\lg q +(1-q)\omega \leqslant 0 \Leftrightarrow
+q\lg q \leqslant (q-1)\omega\). Since \(1 \leqslant q\), this is
+equivalent to \(q\lg q/(q-1) \leqslant \omega\). Let us define \(g(q)
+:= q\lg q/(q-1)\). Then \(g'(q) = (-(\ln 2)\lg q + q - 1)/(q-1)^2/\ln
+2\). The denominator is positive, so we turn our attention to the
+numerator by setting \(h(q) := -(\ln 2)\lg q + q - 1\), yielding the
+derivative \(h'(q) = 1 - 1/q\), which is positive because \({q
+  \geqslant 1}\). So \(h\)~increases and, since \({h(1) = 0}\), we
+have \(g'(q) \geqslant 0\) for \({q \geqslant 1}\). Thus
+\(g\)~increases and reaches its maximum in \([1,2]\) at the upper
+bound: \(g(2) = 2\). Since we set \(\omega \geqslant 2\), we proved
+that \(f(q) \leqslant 0\), for all~\({q \in [1,2]}\). Because we
+defined \(\lambda - \psi := -\omega\) and \(\lambda = 2\lambda'\), we
+have the answer \(\lambda' = (\psi - \omega)/2\). In the example
+above, \(\psi = 4\) and \(\omega = 4\), we can check that \(\omega
+\geqslant 2\) and thus \(\lambda'= 0\). In other words:
+\[
+\tfrac{1}{2}n\lg n
+\leqslant \tfrac{1}{2}n\floor{\lg n} + 2n - 2^{\floor{\lg n}+1}
+\leqslant \Bideal(n).
+\]
+Let us apply the same theorem to the following remaining lower
+bounds. First, \(n\floor{\lg n} + 2n - 2^{\floor{\lg n}+2} + 2
+\leqslant \Wideal(n)\). Inequation \(n\lg n + \lambda n + 2 \leqslant
+n\floor{\lg n} + 2n - 2^{\floor{\lg n}+2} + 2\) is equivalent to
+\(n\lg n + \lambda n \leqslant n\floor{\lg n} + 2n - 2^{\floor{\lg
+    n}+2}\), for which we want to maximise~\(\lambda\). We have \(\psi
+= 2\) and \(\omega = 4 \geqslant 2\). Thus \(\lambda = \psi - \omega =
+-2\) and
+\[
+n\lg n - 2n + 2 \leqslant n\floor{\lg n} + 2n - 2^{\floor{\lg n}+2} + 2
+\leqslant \Wideal(n).
+\]
+Finally, \(n\floor{\lg n} + (3 - \alpha)n - 2^{\floor{\lg n}+2} + 1/2
+\leqslant \Aideal(n)\). Inequation \(n\lg n + \lambda n + 1/2
+\leqslant n\floor{\lg n} + (3 - \alpha)n - 2^{\floor{\lg n}+2} + 1/2\)
+is equivalent to \(n\lg n + \lambda n \leqslant n\floor{\lg n} + (3 -
+\alpha)n - 2^{\floor{\lg n}+2}\), for which we want to maximise
+\(\lambda\). We have \(\psi = 3 - \alpha\) and \(\omega = 4 \geqslant
+2\). Thus \(\lambda = \psi - \omega = - 1 - \alpha\) and
+\[
+n\lg n - (1+\alpha)n + 1/2
+\leqslant n\floor{\lg n} + (3 - \alpha)n - 2^{\floor{\lg n}+2} + 1/2
+\leqslant \Aideal(n).
+\]
+Let us now modify our previous line of argumentation to tackle upper
+bounds. In other words, given \(\psi\)~and~\(\omega\), we want to find
+the \emph{minimum}~\(\lambda\) such that \(n\floor{\lg n} + \psi n -
+\omega 2^{\floor{\lg n}} \leqslant n\lg n + \lambda n\). We derive
+\(f(q) \geqslant 0\), with \(f(q) := q\lg q + (\lambda - \psi) q +
+\omega\). From~\(\omega \geqslant 2\) we deduce \(f(2) \geqslant 0
+\Rightarrow f(1) \geqslant 0\). Let us set \(\lambda - \psi :=
+-\omega/2 - 1\) and prove that \(f(q) \geqslant 0\) for \(q \in
+[1,2]\). We have now \(f(q) = q\lg q - (\omega/2 + 1)q + \omega
+\geqslant 0 \Leftrightarrow (2-q)\omega \geqslant 2q(1-\lg q)\). Since
+\(q \leqslant 2\), this is equivalent to \(\omega \geqslant 2q(\lg q -
+1)/(q-2)\). Let \(g(q) := q(\lg q - 1)/(q-2)\). Then \(g'(q) = (-(2\ln
+2)\lg q + q + 2\ln 2 - 2)/(q-2)^2/\ln 2\). The denominator is
+positive, so let us focus on determining the sign of the numerator by
+setting \(h(q) := -(2\ln 2)\lg q + q + 2\ln 2 - 2\), yielding the
+derivative \(h'(q) = 1 - 2/q\), and \(q \leqslant 2 \Rightarrow h'(q)
+\leqslant 0\). Therefore, \(h\)~decreases and, because \(h(1) = 2\ln2
+- 1 > 0\) and \(h(2) = 0\), we conclude that \(h(q) \geqslant 0\) and
+then \(g'(q) \geqslant 0\), which means that \(g(q)\)~is increasing
+and reaches its maximum at the limit \({q=2}\). This limit can be
+found by applying \emph{L'H{\^o}pital's Rule}: \(\lim_{q \rightarrow
+  2}g(q) = 1/\ln 2\). Therefore, \(2.88 \simeq 2/\ln 2 \geqslant
+2q(\lg q - 1)/(q - 2)\), when \(q \in [1,2]\) and the bound is tight
+when \(q \rightarrow 2\). If we restrict the range of \(\omega\) so
+\(\omega \geqslant 3\) (it is an integer), then we prove \(f(q)
+\geqslant 0\), for all \(q \in [1,2]\) and \(\lambda = \psi - \omega/2
+- 1\). Consider again \(\Bideal(n) \leqslant \tfrac{1}{2}{n\floor{\lg
+    n}} + 3n - 2^{\floor{\lg n}+1} - 1\). This is equivalent to \(2
+\cdot \Bideal(n) \leqslant n\floor{\lg n} + 6n - 4 \cdot 2^{\floor{\lg
+    n}} - 2\), which fits the conditions of the previous theorem,
+where \(\psi = 6\) and \(\omega = 4 \geqslant 3\). Then \(\lambda =
+3\) and
+\[
+\Bideal(n) \leqslant \tfrac{1}{2}{n\lg n} + \tfrac{3}{2}n - 1.
+\]
+The case~\(\omega = 2\) is problematic and requires a solution because
+it occurs in the upper bound of the worst and average delays (it is
+the same bound): \(\Wideal(n) \leqslant n\floor{\lg n} + 3n -
+2^{\floor{\lg n}+1} - 1\). A simple workaround consists in slightly
+weakening the bound so \(\omega \geqslant 3\): \(-2^{\floor{\lg n}+1}
+= -3 \cdot 2^{\floor{\lg n}} + 2^{\floor{\lg n}} \leqslant -3 \cdot
+2^{\floor{\lg n}} + n\). In other words, whenever~\({\omega = 2}\), we
+change~\(\psi\) into~\(\psi+1\) and \(\omega\)~into~\(\omega+1\), then
+apply the theorem, so \(\lambda = \psi - 3/2\). Then \(\Wideal(n)
+\leqslant n\floor{\lg n} + 4n - 3 \cdot 2^{\floor{\lg n}} - 1\) and
+\[
+\Wideal(n) \leqslant n\lg n + \tfrac{3}{2}{n} - 1.
+\]
+From Question~\ref{ex:merge_sort:1}, we know that \(\Wcomp(n) =
+\Wideal(n) - n + 1\), therefore \(\Wcomp(n) \leqslant n\lg n +
+\tfrac{1}{2}n\). Furthermore, we have \(S(n) \leqslant \Wcomp(n)\),
+hence, together with the lower bound from
+Question~\ref{ex:merge_sort:3}, we conclude
+\[
+n\lg n - \frac{n}{\ln 2} + \frac{1}{\ln 2}
+\leqslant S(n) \leqslant n\lg n + \frac{1}{2}{n}.
+\]
+
+\medskip
+
+\paragraph{Question 5.}
+
+From definition~\eqref{def:nu} \vpageref{def:nu} of the bit sum
+\(\nu_{n}\),
+\[
+\nu_{0} = 0,\quad \nu_{2n} = \nu_{n},\quad \nu_{2n+1} = \nu_{n} + 1,
+\]
+we derive a straightforward implementation in \Erlang as follows:
+\begin{verbatim}
+nu(0) -> 0;
+nu(N) -> nu(N div 2) + N rem 2.
+\end{verbatim}
+where \erlcode{N~div~2} realises \(\floor{n/2}\) and \erlcode{N~rem~2}
+realises \(n - 2\floor{n/2}\). (By the way, we have \(\comp{nu}{n} =
+\comp{exp2}{n}\). See definition \eqref{def:exp2}
+\vpageref{def:exp2}.)
+
+\medskip
+
+\paragraph{Question 6.}
+
+First, let us explicitly express the dependence on~\(n\) by defining
+\({e_0 := \rho_n}\), where \(\rho_n\)~is \emph{the number of trailing
+  zeros} of~\(n\) and \(\rho\)~is called \emph{the ruler
+  function}. Next, we define~\(\rho\) recursively as
+\begin{align*}
+\rho_0 &:= \infty, & \rho_{2n} &:= \rho_{n} + 1,
+& \rho_{2n+1} &:= 0.
+\intertext{Finally, we recall the recursive definition of~\(\nu\)
+  \eqref{def:nu} \vpageref{def:nu}:}
+\nu_{0} &:= 0, & \nu_{2n} &:= \nu_{n}, &
+\nu_{2n+1} &:= \nu_{n} + 1.
+\end{align*}
+At first sight, a simple relationship between these two functions is
+not obvious. Without loss in generality, we can assume that \(2n+1 :=
+(\alpha 01^a)_2\), where \(\alpha\)~is an arbitrary bit string and
+\(1^a\)~is a 1-bit string of length~\(a\). Then \(2n+2 =
+(\alpha10^a)_2\) and
+\[
+\nu_{2n+1} = \nu_{\alpha} + a,\quad \rho_{2n+1} = 0,\quad
+\nu_{2n+2} = \nu_{\alpha} + 1,\quad \rho_{2n+2} = a.
+\]
+Now, we can relate \(\rho\)~and~\(\nu\) by means of~\(a\):
+\[
+\rho_{2n+2} = \nu_{2n+1} - \nu_{\alpha} = \nu_{2n+1} - (\nu_{2n+2} -
+1) = 1 + \nu_{2n+1} - \nu_{2n+2}.
+\]
+We can check now that the same pattern also works for~\(\rho_{2n+1}\)
+by simply using the definitions of \(\rho\)~and~\(\nu\): \(\rho_{2n+1}
+= 1 + \nu_{2n} - \nu_{2n+1}\). This achieves to establish, for any
+integer \({n>0}\), that \(e_0 := \rho_n = 1 + \nu_{n-1} -
+\nu_{n}\). Summing on both sides leads to \(\sum_{k=1}^{n}{\rho_k} = n
+- \nu_n\).
+
+\medskip
+
+\paragraph{Question 7.}
+
+There are two cases: either \(n+1\) is odd or it is even. If the
+former, we need to draw the trees corresponding to those in
+\fig~\vref{fig:Bcomp_2p}, to be found in
+\fig~\vref{fig:Bcomp_2p_succ}; if the latter, we draw trees from those
+in \fig~\vref{fig:Bcomp_2p_1}, as seen in
+\fig~\vref{fig:Bcomp_2p_1_succ}.
+\begin{figure}[t]
+\centering
+\subfloat[Nodes with list lengths\label{fig:bcomp_2p_merge_succ}]{%
+  \includegraphics[bb=71 611 196 721]{bcomp_2p_merge_succ}
+}
+\quad
+\subfloat[Nodes with best delays\label{fig:bcomp_2p_succ}]{%
+  \includegraphics[bb=71 607 208 721]{bcomp_2p_succ}
+}
+\caption{Best case for \(n+1\) odd (see \fig~\vref{fig:Bcomp_2p})
+\label{fig:Bcomp_2p_succ}}
+\end{figure}
+\begin{figure}[!b]
+\centering
+\subfloat[Nodes with list lengths\label{fig:bcomp_2p_1_merge_succ}]{%
+\includegraphics[bb=71 661 142 721]{bcomp_2p_1_merge_succ}
+}
+\qquad
+\subfloat[Nodes with best delays\label{fig:bcomp_2p_1_succ}]{%
+\includegraphics[bb=71 657 146 721]{bcomp_2p_1_succ}
+}
+\caption{Best case for \(n+1\) even (see \fig~\ref{fig:Bcomp_2p_1} on
+  page~\pageref{fig:Bcomp_2p_1})
+\label{fig:Bcomp_2p_1_succ}}
+\end{figure}
+Next, we compare all the best delays involved in the trees in
+\fig~\vref{fig:bcomp_2p}, whose sum of the nodes is~\(\Bcomp(n)\), and
+\fig~\vref{fig:bcomp_2p_succ}, whose sum of the nodes is
+\(\Bcomp(n+1)\), when \(n\) is even. We can clearly see that the
+latter tree contains an excess of \(r + 1 + \Bcomp(2^0) = r+1 :=
+\nu_n\). This means that we have \(\Bcomp(n+1) = \Bcomp(n) + \nu_n\),
+when \(n\)~is even. We need to apply the same scrutiny to the
+complementary case, \(n\)~odd, which corresponds to the trees in
+\fig~\vref{fig:bcomp_2p_1} and \fig~\vref{fig:bcomp_2p_1_succ}. The
+latter contains an excess of~\(\Bcomp(2^q)\) (we do not find this
+node\hyp{}delay in the other tree) and a default of
+\(\sum_{i=0}^{q-1}{\Bcomp(2^i)} - r + \sum_{j=1}^{q-1}{2^j}\). That
+is, when \(n\)~is odd:
+\begin{equation*}
+\Bcomp(n+1) - \Bcomp(2^q) + \sum_{i=0}^{q-1}{\Bcomp(2^i)}
+- r + \sum_{j=1}^{q-1}{2^j} = \Bcomp(n).
+\end{equation*}
+Because we already found that \(\Bcomp(2^p) = p 2^{p-1}\), this is
+equivalent to
+\begin{equation*}
+\Bcomp(n+1) = \Bcomp(n) + q2^{q-1} - \sum_{i=0}^{q-1}{i2^{i-1}} + r - (2^q - 2).
+\end{equation*}
+From Question~\ref{ex:merge_sort:2}, we know that
+\(\sum_{i=0}^{r}{i2^{i-1}} = (r-1)2^{r} + 1\), so
+\begin{align*}
+\Bcomp(n+1) &= \Bcomp(n) + q2^{q-1} - (q-2)2^{q-1} - 1 + r - 2^q + 2\\
+            &= \Bcomp(n) + r + 1,
+\end{align*}
+that is, \(\Bcomp(n+1) = \Bcomp(n) + \nu_n\), just as in the case
+\(n\)~even. Therefore, the equality is independent of the parity
+of~\(n\). By summing both sides from \(0\) to \(n-1\), we obtain the
+pretty \emph{exact} formula
+\[
+\Bcomp(n) = \Bcomp(0) + \sum_{i=0}^{n-1}{\nu_i} = \sum_{i=0}^{n-1}{\nu_i}.
+\]
+Let us look at \fig~\vref{fig:bit_table}. Note that \(n=0\) is missing
+in the table, but it is important to consider it here and also to fill
+the blanks in the table with \(0\)s. We can see bit strings whose
+pattern is \(0^{2^{i}}1^{2^{i}}\) repeating themselves downward, where
+\(i\)~is the exponent of~\(2\) of the binary notation in the rows. Let
+us call them \emph{\(01\)\hyp{}strings}. For example, in the third
+column, that is, \({i=2}\), we see \(\underline{00001111}00001\dots\)
+The bit string from~\(0\) to~\(n-1\) has length~\(n\) and the length
+of the \(01\)\hyp{}strings is \(2^{i+1}\), hence the number of
+\(01\)\hyp{}strings it contains is \(\floor{n/2^{i+1}}\). For example,
+if~\(n=13\), that is, \(n=(1101)_2\), and \({i=1}\), the number of
+\(01\)\hyp{}strings is~\(\floor{13/2^2} = 3\). Since half the bits in
+a \(01\)\hyp{}string are \(1\)\hyp{}bits, each of these strings
+contains \(2^i\)~\(1\)\hyp{}bits, for instance, there are at least \(3
+\cdot 2^1 = 6\) such bits between~\(0\) and~\(12\), on the second
+column from the right. We wrote ``at least'' because there may be
+other \(1\)\hyp{}bits which could not make up half a complete
+\(01\)\hyp{}string, as, for instance, in the bit string from~\(0\)
+to~\(10\) included, when \(i=1\). This happens when \(n\)~is not a
+power of~\(2\). These extra bits can at most make up a
+\(1\)\hyp{}string of length~\(2^{i}-1\), which is the greatest
+remainder of the Euclidean division by~\(2^{i}\). Let us
+define~\(\sigma_{n-1,i}\) as the sum of the bits of the \(i\)th
+column, where the column~\(0\) is the rightmost, from the row~\(0\)
+to~\(n-1\). Then
+\begin{equation*}
+\left\lfloor\frac{n}{2^{i+1}}\right\rfloor 2^i 
+\leqslant \sigma_{n-1,i} \leqslant
+\left\lfloor\frac{n}{2^{i+1}}\right\rfloor 2^i + (2^i - 1).
+\end{equation*}
+By means of \(x - 1 < \floor{x} \leqslant x\), we deduce the weaker,
+but simpler
+\begin{equation}
+n/2 - 2^{i} < \sigma_{n-1,i} \leqslant n/2 + 2^{i} - 1.
+\label{ineq:sigma}
+\end{equation}
+Remains to sum on all the columns so the leftmost bit of \(n-1\) is
+accounted for. Equation~\eqref{eq:e_r} \vpageref{eq:e_r} tells us that
+\(n\)~is made of \(\floor{\lg n}+1\) bits, so its leftmost bit is at
+position \(\floor{\lg n}\). Accordingly, the leftmost bit of~\(n-1\)
+is at position \(\floor{\lg(n-1)}\). This expression can be simplified
+by a simple variation of the argument that led to
+equation~\eqref{eq:e_r}. Let us assume that \(n\)~is made of
+\(m\)~bits, that is, \(n := (b_{m-1}\dots b_{0})_2\).
+\begin{gather*}
+2^{m-1} \leqslant n \leqslant 2^{m} - 1
+\Rightarrow
+2^{m-1} < 2^{m-1} + 1 \leqslant n + 1 \leqslant 2^{m}\\
+\Rightarrow
+m - 1 < \lg(n+1) \leqslant m
+\Rightarrow
+\ceiling{\lg(n+1)} = m = \floor{\lg n} + 1.
+\end{gather*}
+Substituting~\(n-1\) for~\(n\) leads to \(\floor{\lg(n-1)} =
+\ceiling{\lg n} - 1\). By summing all the sides of inequations
+\eqref{ineq:sigma} from~\({i=0}\) to~\(\ceiling{\lg n}-1\), we cover
+all the \(1\)\hyp{}bits of all the binary expansions of the integers
+in~\([0..n-1]\):
+\begin{equation*}
+\sum_{i=0}^{\ceiling{\lg n}-1}{\left(\frac{n}{2} - 2^{i}\right)}
+< \sum_{i=0}^{\ceiling{\lg n}-1}{\sigma_{n-1,i}} \leqslant
+\sum_{i=0}^{\ceiling{\lg n}-1}{\left(\frac{n}{2} + 2^{i} - 1\right)}.
+\end{equation*}
+The sum in the middle is none other than \(\Bcomp(n) =
+\sum_{i=0}^{n-1}{\nu_{i}}\), therefore 
+\begin{equation*}
+\tfrac{1}{2}{n\ceiling{\lg n}} - 2^{\ceiling{\lg n}} + 1 
+< \Bcomp(n) \leqslant
+\tfrac{1}{2}{n\ceiling{\lg n}} + 2^{\ceiling{\lg n}} - \ceiling{\lg n}
+- 1.
+\end{equation*}
+Using the inequalities \(x \leqslant \ceiling{x} < x + 1\) leads to
+\begin{equation*}
+\tfrac{1}{2}{n\lg n} - 2n + 1 
+< \Bcomp(n) \leqslant
+\tfrac{1}{2}{n\lg n} + \tfrac{5}{2}{n} - \lg n - 1.
+\end{equation*}
+The same approach, based upon delay trees, leads to
+\[
+\Wcomp(2p) = \Wcomp(2p-1) + \nu_{2p-1};\quad 
+\Wcomp(2p+1) = \Wcomp(2p) + 2^{\rho_{2p}} + \nu_{2p} - 1.
+\]
+In Question~\ref{ex:merge_sort:2}, we derived equation
+\eqref{eq:Wcomp}: \(\Wcomp(2^p) = \Wcomp(2^p-1) + p\), which is
+consistent with the recurrent equation for \(\Wcomp(2p)\), but
+\(\Wcomp(n+1) = \Wcomp(n) + \nu_n\) does \emph{not} hold for even
+values of~\(n\).
+
+\medskip
+
+\paragraph{Question 8.} Skipped.
+
+\medskip
+
+\paragraph{Question 9.}
+
+If~\(n=2^p\), then \(\floor{\lg n} = \ceiling{\lg n} = \lg n\), thus
+\(n\floor{\lg n} + 2n - 2^{\floor{\lg n}+1} = n\lg n = n\ceiling{\lg
+  n} + n - 2^{\ceiling{\lg n}};\) otherwise, \(\floor{\lg n} + 1 =
+\ceiling{\lg n}\), thus \(n\floor{\lg n} + 2n - 2^{\floor{\lg n}+1} =
+n\ceiling{\lg n} + n - 2^{\ceiling{\lg n}}\).~\textsc{qed.} This
+identity can be used to derive a legible upper bound for
+\(\Wideal(n)\)~and~\(\Aideal(n)\):
+\begin{align*}
+\Wideal(n) &\leqslant n\floor{\lg n} + 3n - 2^{\floor{\lg n}+1} - 1 
+= n\ceiling{\lg n} + 2n - 2^{\ceiling{\lg n}} - 1\\
+ &\leqslant n\ceiling{\lg n} + n - 1.
+\end{align*}
+
+\medskip
+
+\paragraph{Question 10.}
+
+We have \(\ave{sort}{n} \geqslant n\lg n - (\alpha - 1) n + 2\lg n +
+9/2\). A computer algebra system leads to \(1 \leqslant n \leqslant 26
+\Rightarrow \ave{i2wb}{n} < \ave{sort}{n}\).

@@ -1,0 +1,605 @@
+%%-*-latex-*-
+
+\chapter{Aliasing and Tail\hyp{}Call Optimisation}
+
+We arbitrarily defined, \vpageref{def:call_stack_heap}, two distinct
+memory zones: the call stack and the heap. We would like now to
+provide a rationale for this scheme. Perhaps the best way is to forget
+now about the call stack and assume that everything, program and data,
+is stored in the heap, which is under the exclusive supervision of the
+garbage collector. The garbage collector can be thought of as an
+invisible manager which has full access to the contents of the memory
+at any moment and whose task consists in finding the nodes in the
+abstract syntax trees which are forever useless at some point during
+run\hyp{}time. It consequently gets rid of them, so that subsequent
+nodes can find enough room in which to be stored. The remainder of
+this chapter will hopefully demonstrate that the concept of control
+stack, as a complement to the heap, arises naturally enough from a
+refined computational model solely based on the heap and that its
+purpose is a more efficient memory management.
+
+We showed \vpageref{counting_the_pushes} how the technique used to
+find or estimate the delay of a call can also be applied to determine
+the number of pushes performed during the evaluation. This number
+gives, in general, an overestimation of how much memory needs to be
+allocated for the computation. Up to now, we assumed that the result
+of a rewrite step constitutes all the data in memory and, somehow, the
+function call is wholly replaced by the body of the first clause that
+matches it. In terms of abstract syntax trees, the tree on the
+left\hyp{}hand side of the arrow is wholly replaced by the one on the
+right\hyp{}hand side. For instance, let us recall the following
+definition
+\begin{alltt}
+sum(  [N]) \(\smashedrightarrow{\alpha}\) N;
+sum([N|L]) \(\smashedrightarrow{\beta}\) N + sum(L).
+\end{alltt}
+and consider again the example in \fig~\vref{fig:sum_1234_bis}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 605 374 721]{sum_1234}
+\caption{Computation of \erlcode{sum([1,2,3,4])}\label{fig:sum_1234_bis}}
+\end{figure}
+Nothing is said about how nodes are created or erased. For instance,
+on the first rewrite, one node~(\erlcode{|}) has disappeared while a
+node~(\erlcode{+}) has been created and connected to a node
+\erlcode{sum}. Of the latter, we don't know if it is the same as the
+one before the rewrite or whether a copy has been made and
+reconnected---because the argument is different. All these details are
+considered to be low\hyp{}level, that is, they depend heavily on
+implementation issues, as how the run\hyp{}time environment operates,
+and can be ignored if one only wants to understand the evaluation
+process and assess its delay. Nevertheless, when the concern about
+memory usage arises, for example, node creation and deletion, maximum
+amount of memory used etc., a more detailed view of the rewriting
+process is needed. This finer view relies on the abstract syntax
+trees, as they are a canonical representation of both data and
+programs. For example, the definition of \erlcode{sum/1} is best
+interpreted in terms of rewrites on the abstract syntax trees in
+\fig~\vref{fig:sum_ast}.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 666 248 721]{sum_ast}
+\caption{Definition of \erlcode{sum/1} with abstract syntax trees
+\label{fig:sum_ast}}
+\end{figure}
+It seems that the node~(\erlcode{|}) in the head of
+clause~\clause{\beta} can be freed, that is, reclaimed by the garbage
+collector, but the argument of \erlcode{sum/1} may be in fact shared
+in the body where the function call is located by means of a variable
+with multiple occurrences. For example, let us imagine something like
+the following definition:
+\begin{alltt}
+f(L) -> g(L,sum(L)).\hfill% \emph{Variable} L \emph{is repeated.}
+\end{alltt}
+If we assume that the value of the parameter~\erlcode{L} is not
+duplicated but, instead, that the two arguments~\erlcode{L} in the
+body refer to the same node in memory, then the root of the abstract
+syntax tree of~\erlcode{L} cannot be deleted just after the rewrite
+step~\clause{\beta} because it is still necessary to compute the first
+argument of the call to~\erlcode{g/2} later. In general, it is best to
+assume that all values may be \emph{shared} and, if not, the garbage
+collector will find out and delete the useless nodes. Consequently,
+when applying a rewrite rule, let us assume that the abstract syntax
+tree of the left\hyp{}hand side remains in memory together with the
+right\hyp{}hand side \emph{and} that identical subtrees are shared by
+both, that is, are not duplicated. The garbage collector will detect
+and take care of useless nodes at unpredictable moments.
+
+In other words, the rewrite rules do not explicitly delete any node
+and identical subtrees are shared. In order to visualise this data
+sharing, we need a kind of abstract syntax tree where identical
+subtrees occur only once, which supposes that some nodes can have two
+or more incoming edges. Of course, this cannot be a proper tree since,
+by definition, all nodes except the root must have exactly one
+parent. The adequate data structure which extends the abstract syntax
+tree with sharing is the finite \emph{Directed Acyclic Graph}
+(DAG). Actually, a DAG is a collection of trees, called a
+\emph{forest}, potentially sharing some of their subtrees. Therefore,
+such a graph has not, in general, a single root.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 666 237 721]{sum_dag}
+\caption{Definition of \erlcode{sum/1} with maximum sharing
+\label{fig:sum_dag}}
+\end{figure}
+In \fig~\vref{fig:sum_dag}, we have the same definition
+of \erlcode{sum/1} as in \fig~\vref{fig:sum_ast} but with two DAGs,
+one for each clause, allowing maximum node sharing. Sharing is, as in
+\fig~\vref{fig:fib5_sharing} implemented by arrowed edges. Notice how
+this lower\hyp{}level feature does not imply any explicit deletion of
+nodes or edges---which, at this level, can be thought of as
+references, or indirections, to nodes. Let us make use of this
+implementation of the definition of \erlcode{sum/1} on the evaluation
+of the call \erlcode{sum([3,7,5])}, whose first stages are shown in
+\fig~\vref{fig:sum_375_push}, where the full state of the memory is
+given as snapshots between dashed arrows and the last created node
+\erlcode{sum} is framed.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 625 365 721]{sum_375_push}
+\caption{Computation of \erlcode{sum([3,7,5])} with a DAG (phase 1/2)
+\label{fig:sum_375_push}}
+\end{figure}
+The arrows are dashed as to distinguish them from the ones in the
+definition, since clauses apply only to parts of the memory, in
+general, and we wanted to display all the data after each
+rewrite. Notice that all the nodes must be considered useful by the
+garbage collector. This property is entailed if the \emph{roots} of
+all the abstract syntax trees are deemed useful.
+
+Naturally, this gives rise to the question on how the value of the
+original function call is finally computed. Examining
+\fig~\vref{fig:sum_375_push} and comparing memory snapshots from left
+to right, we realise that roots~(\erlcode{+}) have been accumulating
+at the right of the original call, until a reference to a value has
+been reached---here, the integer~\erlcode{5}. This process is
+analogous to pushing items on a list, although a list containing not
+only values, but also expressions as \erlcode{7 + sum([5])}. This
+invites us to perform the inverse operation, that is, popping items
+from the list in question, in order to finish the calculation. More
+precisely, we want to compute \emph{values} from the trees composing
+the DAG from right to left, the roots of which are considered an item
+in a special list, until the tree of the original call is reached and
+associated with its own value---which is, by definition, the final
+result. A value can either be an \emph{immediate} value like integers,
+atoms and empty lists, or a \emph{constructed} value like
+non\hyp{}empty lists and tuples. We may also deal with
+\emph{references} to values, which are graphically represented by
+edges; for instance, the rightmost tree in the DAG is a reference to
+the immediate value~\erlcode{5}. \emph{When the rightmost tree is an
+  immediate value or a reference to a value, the second phase of the
+  computation (leftward) can take place.} In the following, for the
+sake of conciseness, we shall write ``value'' when a ``reference to a
+value'' is also acceptable.
+
+While our presently refined computational model forbids erasing nodes,
+because this is the exclusive task of the garbage collector, it does
+allow for the edge ending in the latest rewritten call to be
+overwritten by its value. As explained before, these calls have been
+successively framed in \fig~\vref{fig:sum_375_push}. The process
+therefore consists here in replacing the edge to the previous node
+\erlcode{sum} with an edge to the current value. Then the patched tree
+is evaluated, perhaps leading to more trees to be pushed, and the
+process resumes.
+
+This algorithm is shown at play in \fig~\vref{fig:sum_375_pop},
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 626 376 721]{sum_375_pop}
+\caption{Computation of \erlcode{sum([3,7,5])} (phase 2/2,
+  heap\hyp{}based)
+\label{fig:sum_375_pop}}
+\end{figure}
+which is to be read from right to left. The rightmost memory state is
+the result of the prior ``pushing phase,'' on the last state of
+\fig~\ref{fig:sum_375_push}. Note how all the nodes~\erlcode{sum}
+and~(\erlcode{+}) become useless, step by step. For illustration
+purposes, we made all the nodes~(\erlcode{+}) disappear as soon as
+possible and three nodes~\erlcode{sum} are reclaimed by the garbage
+collector, including the original one, that is, the leftmost. The
+leftmost dashed arrow has the superscript~\(2\) because it combines
+two steps (\(3+12 \rightarrow 15\) and discarding the original
+node~\erlcode{sum}) at once, for the sake of room. A node is useful if
+it can be reached from one of the roots of the DAG. Keep in mind that
+the argument of the original call, that is, \erlcode{[3,7,5]}, may or
+may not be freed by the garbage collector, depending on it being
+shared or not (from outside the figure, that is, by some control
+context). The intermediary node containing the value~\erlcode{12} has
+been freed as well along the way. As far as the programmer is
+concerned, the moments when nodes are collected are arbitrary, as the
+garbage collector is exclusively in charge of this task, but we wanted
+to bring to the fore that garbage collection is interleaved with the
+computation or, if adhering to a multiprocessing view, we would say
+that collection and computation run in parallel, sharing the same
+memory space but without interferences from the programmer's point of
+view---only nodes that are forever unreachable from a point onwards
+during the execution are swept away.
+
+The previous example is actually worth another, closer look. Indeed,
+we can predict exactly when the nodes~\erlcode{sum} can be reclaimed:
+after each step backwards (from right to left in
+\fig~\vref{fig:sum_375_pop}), the rightmost node~\erlcode{sum} becomes
+useless. Same for the intermediary value~\erlcode{12}: it becomes
+unreachable from the roots of the DAG as soon is has been used to
+compute~\erlcode{15}. The same observation can be made about the
+nodes~(\erlcode{+}). All these facts mean that, in our example, we do
+not need to rely on the garbage collector to identify these nodes as
+useless: let us really implement a list of expressions, \emph{separate
+  from the heap}, instead of solely relying on an analogy of push and
+pop and storing everything in the heap. This list is called the
+\emph{control stack}. \emph{For implementation reasons, the control
+  stack never contains constructed data but references to constructed
+  data.} As a consequence, a garbage collector is still needed for
+checking the constructed data---the heap and the control stack are
+complementary and make up the whole memory.
+
+Consider how the computation in \fig~\vref{fig:sum_375_pop} can be
+improved with automatic deallocation of nodes based on a
+stack\hyp{}based policy (``Last In, First Out'') in
+\fig~\vref{fig:sum_375_pop_bis}. Remember that the value
+\erlcode{[3,7,5]} is stored in the heap, not in the call stack, and
+that it may be shared. Also, due to space limitations on the page, the
+last step is actually twofold, as it was in
+\fig~\vref{fig:sum_375_pop}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 626 369 721]{sum_375_pop_bis}
+\caption{Computation of \erlcode{sum([3,7,5])} (phase 2/2, stack and heap)
+\label{fig:sum_375_pop_bis}}
+\end{figure}
+We can seize the growth of the call stack in
+\fig~\vref{fig:sum_375_stack_push}.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 673 377 721]{sum_375_stack_push}
+\caption{Call stack while computing \erlcode{sum([3,7,5])} (phase 1/2)
+\label{fig:sum_375_stack_push}}
+\end{figure}
+The poppings, from right to left, are presented in
+\fig~\vref{fig:sum_375_stack_pop}. The corresponding algorithm
+consists in the following steps. Let us first assume, as a result of
+the previous steps, that the call stack is not empty and that the top
+item is a non\hyp{}contructed value or a reference to a value,
+although we shall refer to them both as values.
+\begin{enumerate}
+
+  \item While the call stack contains at least two objects, pop out
+    the value, but without losing it, so another tree becomes the top;
+    \begin{enumerate}
+      
+    \item if the root of the top tree is a node~\erlcode{sum}, then
+      pop it and push instead the value;
+      
+    \item else, the node~\erlcode{sum} in the tree has an incoming
+      edge:
+      \begin{enumerate}
+        
+      \item change its destination so it reaches the value and discard
+        the node~\erlcode{sum};
+        
+      \item evaluate the patched top tree and resume the loop.
+        
+      \end{enumerate}
+      
+    \end{enumerate}
+    
+  \item The only item remaining in the call stack is the result.
+    
+\end{enumerate}
+Actually, we allowed for atoms and integers to be stored in the call
+stack, so we could replace any tree which consists solely of a
+reference to such kind of value in the heap by a copy of the value.
+We can see in \fig~\vref{fig:sum_375_stack_push} that the call stack
+grows at every step until a value is reached.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 682 373 721]{sum_375_stack_pop}
+\caption{Call stack while computing \erlcode{sum([3,7,5])} (phase 2/2)
+\label{fig:sum_375_stack_pop}}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[bb=71 580 377 721]{sum_tf_375_0}
+\includegraphics[bb=71 580 377 721]{sum_tf_375_1}
+\includegraphics[bb=71 580 238 721]{sum_tf_375_2}
+\includegraphics[bb=71 625 249 721]{sum_tf_375_3}
+\caption{Computation of \erlcode{sum\_tf([3,7,5])},
+no tail\hyp{}call optimisation\label{fig:sum_tf_375}}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[bb=71 580 340 721]{sum_tf_375_tco_0}
+\includegraphics[bb=71 580 362 721]{sum_tf_375_tco_1}
+\includegraphics[bb=71 580 228 721]{sum_tf_375_tco_2}
+\includegraphics[bb=71 625 230 721]{sum_tf_375_tco_3}
+\caption{Computation of \erlcode{sum\_tf([3,7,5])}, 
+tail\hyp{}call optimisation\label{fig:sum_tf_375_tco}}
+\end{figure}
+Let us investigate what happens when using an equivalent definition in
+tail form. We found \vpageref{code:sum_tf}:
+\begin{alltt}
+sum_tf([N|L])   \(\smashedrightarrow{\alpha}\) sum_tf(L,N).
+sum_tf(   [],A) \(\smashedrightarrow{\beta}\) A;
+sum_tf([N|L],A) \(\smashedrightarrow{\gamma}\) sum_tf(L,A+N).
+\end{alltt}
+For the sake of clarity in \fig~\vref{fig:sum_tf_375}, where we can
+follow the computation of \erlcode{sum\_tf([3,7,5])}, let us swap the
+arguments of \erlcode{sum\_tf/2}, that is, we shall use the following
+equivalent definition instead:
+\begin{alltt}
+sum_tf([N|L])   \(\smashedrightarrow{\alpha}\) sum_tf(N,L).
+sum_tf(A,   []) \(\smashedrightarrow{\beta}\) A;
+sum_tf(A,[N|L]) \(\smashedrightarrow{\gamma}\) sum_tf(A+N,L).
+\end{alltt}
+\Fig~\vref{fig:sum_tf_375} only shows the first phase, which consists
+in pushing in the call stack the tree newly produced by a clause and
+sharing the subtrees denoted by variables occurring both in the head
+and the body. The second phase consists in popping the accumulated
+roots in order to resume suspended control contexts and, in the end,
+only the final result remains in the control stack. In the case
+of \erlcode{sum\_tf/1}, we notice that we already found the result
+after the first phase:~\erlcode{15}. Therefore, in this case, the
+second phase does not contribute to build the value, which raises the
+question: why keep the previous trees in the first place? Indeed, they
+are useless and a common optimisation, named \emph{tail\hyp{}call
+  optimisation} and implemented by compilers of functional languages,
+consists in popping the previous tree (matched by the head of the
+clause) and pushing the new one (created by the body of the
+clause). This way the control stack contains only one item at all
+times and, since we are using a stack, the garbage is collected
+immediately without the need for an external garbage collector, as in
+the heap. This optimisation is shown in \fig~\vref{fig:sum_tf_375_tco}
+and should be contrasted with the series in
+\fig~\vref{fig:sum_tf_375}. \emph{Tail\hyp{}call optimisation can be
+  applied to all functions in tail form.}
+
+Perhaps the previous discussions gave the impression that sharing is
+always maximum, that is, given a clause, the compiler will determine
+the largest abstract syntax subtrees common to the head and the body
+and create a directed acyclic graph (DAG) to implement this data
+sharing. That is not the case. Compilers, for example, the \Erlang
+compilers, only rely on multiple occurrences of variables to define
+sharing, so it may be not maximum. Take for instance the function
+\erlcode{compress/1} such that the call \erlcode{compress(\(L\))}
+results in a list identical to~\(L\), except that successively
+repeated items are reduced to one occurrence, for example,
+\erlcode{compress([4,a,b,b,b,a,a])} is rewritten into
+\erlcode{[4,a,b,a]}. One possible definition is the following:
+\begin{alltt}
+compress(      []) \(\smashedrightarrow{\alpha}\) [];
+compress([I,I|L]]) \(\smashedrightarrow{\beta}\) compress([I|L]);
+compress(   [I|L]) \(\smashedrightarrow{\gamma}\) [I|compress(L)].
+\end{alltt}
+In clause~\clause{\beta}, we can see that~\erlcode{[I|L]} both occurs
+in the pattern and the body because \erlcode{[I,I|L]}~is the same
+as~\erlcode{[I|[I|L]]}. In \fig~\vref{fig:compress_dag1} is shown the
+abstract syntax view of clause~\clause{\beta}.
+\begin{figure}
+\centering
+\includegraphics[bb=71 627 191 721]{compress_dag1}
+\caption{Directed acyclic graph (DAG) of clause \clause{\beta} of
+  \erlcode{compress/1}\label{fig:compress_dag1}}
+\end{figure}
+Notice that the two occurrences of~\erlcode{I} in the left\hyp{}hand
+side of the clause are not shared because we can only be certain of
+sharing when it is obtained by a known clause and the origin of the
+two~\erlcode{I}s is unknown. We can also see that no
+node~(\erlcode{|}) is shared, despite two lists sharing the same
+head~\erlcode{I} and same tail~\erlcode{L}. This shows that the
+sharing is not maximal and relies on the programmer. In order to
+increase the level of sharing, we need some special \Erlang construct
+to express ``This part of the pattern is given a name which can be
+used in the body.'' The notation we need is the operator~(\erlcode{=})
+with a variable on its left\hyp{}hand side and a pattern on its
+right\hyp{}hand side. Consider the changes in
+bold:\label{code:compress}
+\begin{alltt}
+compress(         []) -> [];
+compress([I|\textbf{L=}[I|_]]) -> compress(L);\hfill% L \emph{is an alias}
+compress(      [I|L]) -> [I|compress(L)].
+\end{alltt}
+The variable \erlcode{L} is now an \emph{alias} for the pattern
+\erlcode{[I|\_]}, so what the compiler understands now is displayed in
+\fig~\vref{fig:compress_dag2}.
+\begin{figure}
+\centering
+\includegraphics[bb=71 647 191 721]{compress_dag2}
+\caption{DAG of clause \clause{\beta} of
+  \erlcode{compress/1} with maximum sharing\label{fig:compress_dag2}}
+\end{figure}
+Note how the alias~\erlcode{L} does not occur in the figure, as it was
+used with the sole intent to have the edge representing the argument
+of \erlcode{compress/1} connected to the second node~(\erlcode{|}),
+thus specifying that the entire sub\hyp{}list is shared and this
+without changing the meaning of the head of \erlcode{compress/1}, that
+is, it matches the same input as before.
+
+There is another definition, found \vpageref{code:sflat_par_alpha},
+which would benefit from using an alias: \input{sflat_par_alpha.def}
+In clause~\clause{\gamma}, the list~\erlcode{[I|M]} is repeated in the
+head and the body, so the node~(\erlcode{|}) in it is not shared, thus
+incurring one useless node creation every time this clause is
+applied. Let us change it to
+\begin{alltt}
+sflat(       [])   \(\smashedrightarrow{\alpha}\) [];
+sflat(   [[]|L])   \(\smashedrightarrow{\beta}\) sflat(L);
+sflat([\textbf{P=}[_|_]|L]) \(\smashedrightarrow{\gamma}\) join(sflat(\textbf{P}),sflat(L));\hfill% \emph{Alias} P
+sflat(      [I|L]) \(\smashedrightarrow{\delta}\) [I|sflat(L)].
+\end{alltt}
+Now, the number of created nodes~(\erlcode{|}) is the number of
+non\hyp{}list items in the input, or, in terms of the output, it is
+\erlcode{len(sflat(\(L\)))}, where \(L\)~is the input list to be
+flattened.
+
+It is interesting to revisit previous definitions with a focus on
+memory use instead on the delay. Let us consider again the following
+definition of \erlcode{join/2}:
+\begin{alltt}
+join(   [],Q) \(\smashedrightarrow{\alpha}\) Q;
+join([I|P],Q) \(\smashedrightarrow{\beta}\) [I|join(P,Q)].
+\end{alltt}
+In \fig~\vref{fig:join_dag}, we can see the same definition making use
+of two DAGs in order to explicitly display node sharing.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 653 292 721]{join_dag}
+\caption{Definition of \erlcode{join/2} with maximum
+sharing\label{fig:join_dag}}
+\end{figure}
+Let us detail the computation of \erlcode{join([a,b],[c,d])} by
+evincing the node sharing and the call stack management. The first
+phase, consisting in pushing the newly created trees in the control
+stack is shown in \fig~\vref{fig:join_abcd_push}.
+\begin{figure}[h]
+\centering
+\includegraphics[bb=71 612 295 735]{join_abcd_push}
+\caption{Computation of \erlcode{join([a,b],[c,d])} (end of phase 1/2)
+\label{fig:join_abcd_push}}
+\end{figure}
+
+Note that, for the sake of room, we didn't use dashed arrows as
+before, but solid ones which are exactly the arrows used in the
+definition, thus the figure as a whole represents the last state of
+the control stack, its top being the rightmost value or reference to a
+value and its bottom being the leftmost call (the call originally
+evaluated). The second phase of the computation of
+\erlcode{join([a,b],[c,d])} is shown in \fig~\ref{fig:join_abcd_pop}
+\vpageref{fig:join_abcd_pop}. It consists in replacing from right to
+left the reference to the previous call by the current (reference to
+a) value, until the initial call itself is removed and only the final
+result remains. Notice how the second argument, \erlcode{[c,d]}, is
+actually shared with the output \erlcode{[a,b,c,d]}.
+\begin{figure}[!h]
+\centering
+\includegraphics[bb=71 600 267 716]{join_abcd_pop_0}
+\includegraphics[bb=71 600 245 716]{join_abcd_pop_1}
+\includegraphics[bb=71 610 245 713]{join_abcd_pop_2}
+\caption{Computation of \erlcode{join([a,b],[c,d])} (phase 2/2)
+\label{fig:join_abcd_pop}}
+\end{figure}
+
+Let us go back to the definition of \erlcode{rev/1}, as given
+\vpageref{code:rev_join}: \verbatiminput{rev.def} The last clause
+allocates a new node to hold~\erlcode{I}. In the end, whilst the list
+items are shared, the structure itself is not, that is, new
+nodes~(\erlcode{|}) are built. If the list contains \(n\)~items, the
+delay is~\(n+2\) and the number of extra nodes is~\(n\). There is
+perhaps nothing surprising since these two lists are actually
+different, but if we reverse the reversed list, we end up with a list
+equal to the original \emph{with a distinct, non\hyp{}overlapping
+  structure}. Therefore, reversing a list twice incurs a penalty both
+in terms of memory and time, although the input and the output are
+logically indistinguishable. This unfortunate situation may seem
+infrequent, but reversing twice \emph{part of a list} has been done
+quite often up to this point. Think of a list accumulator in a
+definition in tail form.
+
+Let us revisit~\erlcode{rm\_fst/2}, as defined
+\vpageref{code:rm_fst_alpha}:
+\verbatiminput{rm_fst.def} This definition allows the output list to
+share the sub\hyp{}list starting after the first occurrence of the
+item in the input list. This list is denoted by the
+variable~\erlcode{L} in the second clause. As a consequence, if the
+item occurs at position~\(k\), the head of the list being located at
+position~\(0\), this function creates \(k\)~extra nodes. Its worst
+case for the delay is the same as for memory consumption, that is, it
+happens when the item is absent from the list. Then the result is a
+list equal to the input, sharing its items with the input but not the
+structure, that is, the nodes (\erlcode{|}).
+
+What about \erlcode{rm\_fst\_tf/2}, as found
+\vpageref{code:rm_fst_tf}? We have
+\verbatiminput{rm_fst_tf.def} The accumulator~\erlcode{A} stores in
+reverse order the first items of the input which are not equal to the
+item that is searched. This list is finally reversed on top of the
+remaining part of the input, in order to build the result, so the
+situation is the same as with~\erlcode{rm\_fst/2}, except that
+\(k\)~more nodes have been created (two reversals are composed). This
+is too much if the item is missing in the list, because in this case
+the output is exactly the same as the input. What we want is to return
+the original list if the sequential search fails, instead of reversing
+the accumulator in the second clause. Hence, we need to add a
+parameter which is this original list and use it in case of failure:
+\begin{alltt}
+rm_fst_tf(I,L)      -> rm_fst(I,L,[],\textbf{L}).
+rm_fst(_,   [],_,\textbf{P}) -> \textbf{P};\hfill% \emph{Here}
+rm_fst(I,[I|L],A,\textbf{_}) -> rev_join(A,L);
+rm_fst(I,[J|L],A,\textbf{P}) -> rm_fst(I,L,[J|A],\textbf{P}).
+\end{alltt}
+Incidentally, this change for the sake of memory improves also the
+delay in the case of a failure, since there is no more a reversal of a
+list whose size~\(n\) is those of the initial list, thus saving
+\(n+2\) steps. Furthermore, this modification cannot be performed on
+\erlcode{rm\_fst/2}, \vpageref{code:rm_fst}:
+\verbatiminput{rm_fst.def} If we try
+\begin{alltt}
+rm_fst(P)         -> rm_fst(P,P).
+rm_fst(_,   [],P) -> P;\hfill% Error
+rm_fst(I,[I|L],_) -> L;
+rm_fst(I,[J|L],P) -> [J|rm_fst(I,L,P)].
+\end{alltt}
+we make a mistake because of the control context of the last clause
+(so the result is, wrongly, the original list \emph{doubled}). Having
+a definition in tail form is a prerequisite for this kind of
+optimisation.
+
+Let us also consider the original definition of \erlcode{rm\_lst/2},
+as given \vpageref{rm_lst}:
+\begin{verbatim}
+rm_lst(I,L) -> rev(rm_fst(I,rev(L))).
+\end{verbatim}
+At this point, we know that \erlcode{rev(\(L\))}~always allocates
+\(n\)~nodes if list~\(L\) contains \(n\)~items, and that
+\erlcode{rm\_fst(\(I\),rev(\(L\)))} does as well in the worst case,
+which happens when \(I\)~is missing in~\(L\). Under this assumption,
+\erlcode{rev(rm\_fst(\(I\),rev(\(L\))))} also allocates \(n\)~nodes,
+because \erlcode{rm\_fst(\(I\),rev(\(L\)))} holds \(n\)~items.
+Therefore, \erlcode{rm\_lst(\(I\),\(L\))} creates \(3n\)~nodes in the
+worst case. It is worth noticing that the worst case for the delay
+coincides with the worst case for the memory consumption. The input
+and the output do not share any node~(\erlcode{|}), because of the
+reversals, only the items.
+
+What about \erlcode{rm\_lst\_tf(\(I\),\(L\))}, as found
+\vpageref{code:rm_lst_tf}? We have \input{rm_lst_tf_alpha}
+Clause~\clause{\alpha} does not allocate in the
+heap. Clause~\clause{\gamma} creates one node~(\erlcode{|}), that is,
+\(n\)~nodes if the input list contains
+\(n\)~items. Clause~\clause{\beta} performs no allocation. We found
+that the worst case for the delay occurs when the item~\erlcode{I} is
+present \emph{anywhere} in the input list. How does that translates to
+pushes?  Remarkably, one rewrite by means of clause~\clause{\zeta}
+results in exactly one node allocation. Same for the recursive clause
+of \erlcode{rev\_join/2} (see definition above). Therefore, the worst
+case in terms of delay is also the worst case in terms of memory
+allocation. Let us assume arbitrarily, but without loss of generality,
+that the item is the head of the input list. Then
+clause~\clause{\zeta} is unused and \erlcode{rev\_join/2} performs
+\(n\)~node creations in the body of clause \clause{\epsilon}. So the
+total number of node allocations is~\(2n\) in the worst case, of which
+\(n\)~hold the result and \(n\)~are temporary nodes which can be
+reclaimed by the garbage collector.
+
+Consider another example. We want to make a list containing the head
+of a given list repeated as many times as there are items in the given
+list. For instance, \erlcode{[b,3,1]}~results
+in~\erlcode{[b,b,b]}. There are at least two ways to implement this
+effect, with the same
+% The delay is 1+((n-1)+1)=n+1.
+\begin{verbatim}
+rep_fst1(   []) -> [];
+rep_fst1([I|L]) -> [I|repeat(I,L)].
+repeat(_,   []) -> [];
+repeat(I,[_|L]) -> [I|repeat(I,L)].
+\end{verbatim}
+and
+\begin{verbatim}
+rep_fst2(     []) -> [];
+rep_fst2(    [I]) -> [I];
+rep_fst2([I,_|L]) -> [I|rep_fst2([I|L])].
+\end{verbatim}
+Both functions have delay~\(n+1\). The difference lies in the memory
+used: the last clause of \erlcode{rep\_fst2/1} performs two pushes
+instead of one for the last clause of~\erlcode{repeat/2}. As a
+consequence, \erlcode{rep\_fst2/1} allocates \(2(n-1)+1=2n-1\) nodes
+if~\(n \neq 0\), of which~\(n-1\) are temporary. By contrast,
+\erlcode{rep\_fst1/1} only allocates \(n\)~nodes.
+
+\medskip
+
+\paragraph{Exercise.}
+\label{ex:aliasing_and_tail-call_optimisation}
+
+\noindent [See answer
+  page~\pageref{ans:aliasing_and_tail-call_optimisation}.]
+
+Consider now the definition of \erlcode{srev/1}:
+\begin{verbatim}
+srev(   []) -> [];
+srev([I|L]) -> join(srev(L),[I]).
+\end{verbatim}
+Determine what part of the input is shared with the output. Is there a
+best and worst case? If so, are they different from the delay cases?
+

@@ -1,0 +1,94 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\raisebox{-3pt}{\(=\)}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum\_tf}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{three2}{\erlcode{3}}}
+    \pstree{\TR{\rnode[r]{sevenRoot2}{\erlcode{|}}}}{
+      \erlnode{7}
+      \pstree{\TR{\rnode[r]{fiveRoot2}{\erlcode{|}}}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-18pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc2}{\rnode[rb]{arg2}{\erlnode{sum\_tf}}}}{
+  \Tn
+  \Tn
+}
+\hspace*{0pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc3}{\rnode[rb]{arg3}{\erlbox{sum\_tf}}}}{
+  \psset{nodesepB=2pt}
+  \erlnode{10}
+  \Tn
+}
+%
+\hspace*{1pt}
+\raisebox{-3pt}{\(\stackrel{\gamma}{\dashrightarrow}\)}
+\hspace*{0pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum\_tf}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{three5}{\erlcode{3}}}
+    \pstree{\TR{\rnode[r]{sevenRoot5}{\erlcode{|}}}}{
+      \erlnode{7}
+      \pstree{\TR{\rnode[r]{fiveRoot5}{\erlcode{|}}}}{
+        \TR{\rnode[tr]{five}{\erlcode{5}}}
+        \erlnode{\rnode[r]{empty5}{[]}}
+      }
+    }
+  }
+}
+\hspace*{-18pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc9}{\rnode[rb]{arg9}{\erlnode{sum\_tf}}}}{
+  \Tn
+  \Tn
+}
+\hspace*{0pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc10}{\rnode[rb]{arg10}{\erlnode{sum\_tf}}}}{
+  \TR{\rnode[rb]{ten}{\erlcode{10}}}
+  \Tn
+}
+\hspace*{0pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc11}{\rnode[rb]{arg11}{\erlbox{sum\_tf}}}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+    {\rnode[lb]{plusA2}{\rnode[rb]{plusB2}{\erlnode{+}}}}{
+      \Tn
+      \Tn
+  }
+  \Tn
+}
+\ncarc[arcangle=15,nodesepA=6pt]{->}{acc2}{three2}
+\nccurve[angleA=-45,angleB=20,nodesepA=6pt]{->}{arg2}{sevenRoot2}
+\nccurve[angleA=-45,angleB=20,ncurvA=1,nodesepA=6.5pt]{->}{arg3}{fiveRoot2}
+
+\ncarc[arcangle=15,nodesepA=6pt]{->}{acc9}{three5}
+\nccurve[angleA=-45,angleB=20,nodesepA=6pt]{->}{arg9}{sevenRoot5}
+\nccurve[angleA=-45,angleB=20,ncurvA=1,nodesepA=6pt]{->}{arg10}{fiveRoot5}
+\nccurve[angleA=-45,angleB=10,ncurv=1,nodesepA=7pt]{->}{arg11}{empty5}
+\nccurve[angleA=-135,angleB=-60,ncurv=1.5,nodesepA=4pt]{->}{plusA2}{ten}
+\nccurve[angleA=-45,angleB=20,nodesepA=4pt]{->}{plusB2}{five}
+\endTeXtoEPS
+
+\end{document}

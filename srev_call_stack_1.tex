@@ -1,0 +1,70 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+\usepackage{amsmath}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+\newcommand\ghostnode{\TR{\phantom{\erlcode{[]}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{-16pt}
+\pstree[nodesepA=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+ \pstree[arrows=->,nodesepA=0pt]{\erlbox{join}}{
+   \ghostnode
+   \ghostnode
+ }
+ {\psset{arrows=->}\ghostnode}
+}
+\hspace{-6pt}\raisebox{-2pt}{\(\xrightarrow{\delta}\)}\hspace{-21pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+ \pstree{\erlnode{|}}{
+   \erlnode{1}
+   \psset{nodesepB=0pt}
+   \pstree[arrows=->,nodesepA=0pt]{\erlbox{join}}{
+     \ghostnode
+     \ghostnode
+   }
+ }
+ \Tn
+ {\psset{nodesepB=0pt,arrows=->}\ghostnode}
+}
+\hspace{-8pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{-2pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\erlbox{join}}{
+  {\psset{arrows=->}\ghostnode}
+  {\psset{arrows=->}\ghostnode}
+}
+\hspace{-2pt}\raisebox{-3pt}{\(\xrightarrow{\delta}\)}\hspace{-12pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \erlnode{1}
+  \psset{nodesepB=0pt}
+  \pstree[arrows=->,nodesepA=0pt]{\erlbox{join}}{
+    \ghostnode
+    \ghostnode
+  }
+}
+\hspace{-8pt}\raisebox{-3pt}{\(\xrightarrow{\delta}\)}\hspace{2pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \erlnode{1}
+  \Tn
+  \pstree{\erlnode{|}}{
+    \erlnode{2}
+    \psset{nodesepB=0pt}
+    \pstree[arrows=->,nodesepA=0pt]{\erlbox{join}}{
+      \ghostnode
+      \ghostnode
+    }
+  }
+}
+\hspace{-24pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{18pt}
+\pstree[nodesepA=-1pt,nodesepB=6pt,levelsep=20pt,treesep=14pt,arrows=->]{\TR{\(\circ\)}}{\TR{}}
+\endTeXtoEPS
+
+\end{document}

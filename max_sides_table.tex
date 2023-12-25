@@ -1,0 +1,29 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-eps}
+\usepackage{booktabs}
+\usepackage{amssymb}
+
+\input{commands}
+
+\begin{document}
+
+\TeXtoEPS
+\(
+\begin{array}{rccccccccc}
+\toprule
+y \preccurlyeq x & \word{a} & \word{b} & \word{a} & \word{c} 
+ & \word{a} & \word{b} & \word{a} & \word{c}\\
+\midrule
+  \Border{}{y}
+& \varepsilon & \varepsilon & \word{a} 
+& \varepsilon & \word{a} & \word{ab} & \word{aba} & \word{abac}\\
+\bottomrule
+\end{array}
+\)
+\endTeXtoEPS
+
+\end{document}

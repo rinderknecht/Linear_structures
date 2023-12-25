@@ -1,0 +1,36 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlcirc[1]{\Tcircle[linestyle=solid]{\erlcode{#1}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+  \pstree{\erlnode{join}}{
+    \psset{linestyle=solid}
+      \pstree{\erlnode{|}}{
+        \erlnode{a}
+        \erlnode{[]}
+      }
+      \pstree{\erlnode{|}}{
+        \erlnode{b}
+        \erlnode{[]}
+      }
+  }
+  \Tn
+  \pstree{\erlnode{|}}{
+    \erlnode{c}
+    \erlnode{[]}
+  }
+}
+\endTeXtoEPS
+
+\end{document}

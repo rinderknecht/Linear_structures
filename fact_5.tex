@@ -1,0 +1,7 @@
+\begin{alltt}
+fact(5) \(\xrightarrow{\beta}\) 5 * fact(4)
+        \(\smashedrightarrow{\beta}\) 5 * (4 * fact(3))
+        \(\smashedrightarrow{\beta}\) 5 * (4 * (3 * fact(2)))
+        \(\smashedrightarrow{\beta}\) 5 * (4 * (3 * (2 * fact(1))))
+        \(\smashedrightarrow{\alpha}\) 5 * (4 * (3 * (2 * (1))))    \(=\) 120\textrm{.}
+\end{alltt}

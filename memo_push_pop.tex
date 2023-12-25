@@ -1,0 +1,91 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{push}}{
+  \TR{\rnode[b]{I_push2_to}{\erlcode{I}}}
+  \pstree{\TR{\rnode[r]{H_push2_to}{\erlcode{|}}}}{
+    \TR{\rnode[b]{L_push2_to}{\erlcode{L}}}
+    \psset{nodesepB=8pt}
+    \erlnode{\_}
+  }
+}
+\hspace*{0pt}\raisebox{-3pt}{\(\xrightarrow{\alpha}\)}\hspace*{-4pt}
+\pstree[levelsep=20pt,treesep=14pt,nodesepA=-1pt,nodesepB=2pt,arrows=->]{\TR{\(\circ\)}}{
+  \pstree[nodesepA=2pt,arrows=-]{\TR{\rnode[br]{H_push2_from}{\erlcode{|}}}}{
+    \pstree{\TR{\rnode[bl]{I_push2_from}{\rnode[br]{L_push2_from}{\erlcode{|}}}}}{
+      \Tn
+      \Tn
+    }
+    \Tn
+  }
+}
+%
+\qquad\qquad
+%
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{pop}}{
+  \pstree{\TR{\rnode[r]{H_pop_to}{\erlcode{|}}}}{
+    \pstree{\erlnode{|}}{
+      \TR{\rnode[b]{I_pop_to}{\erlcode{I}}}
+      \TR{\rnode[b]{L_pop_to}{\erlcode{L}}}
+    }
+    \psset{nodesepB=8pt}
+    \erlnode{\_}
+  }
+}
+%\hspace*{0pt}\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\hspace*{-2pt}
+\hspace*{6pt}\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\hspace*{0pt}
+\pstree[levelsep=20pt,treesep=14pt,nodesepA=-1pt,nodesepB=2pt,arrows=->]{\TR{\(\circ\)}}{
+  \pstree[nodesepA=2pt,arrows=-]{\TR{\rnode[b]{I_pop_from}{\erlcode{\{\textvisiblespace,\textvisiblespace\}}}}}{
+    \Tn
+    \Tn
+    \pstree{\TR{\rnode[bl]{L_pop_from}{\rnode[br]{H_pop_from}{\erlcode{|}}}}}{
+      \Tn
+      \Tn
+    }
+  }
+}
+
+
+
+%\nccurve[angleA=-130,angleB=-90,ncurvA=1.5,nodesep=2pt]{->}{push_l1}{I_pushA}
+%
+\nccurve[angleA=-130,angleB=-90,ncurvA=1.8,ncurvB=1,nodesep=2pt]{->}{I_push2_from}{I_push2_to}
+\nccurve[angleA=-45,angleB=-60,ncurvA=2,ncurvB=1,nodesep=2pt]{->}{L_push2_from}{L_push2_to}
+\nccurve[angleA=-45,angleB=-10,ncurvA=2,ncurvB=1,nodesep=2pt]{->}{H_push2_from}{H_push2_to}
+%
+\nccurve[angleA=-125,angleB=-90,ncurvA=1.8,ncurvB=0.8,nodesep=2pt]{->}{I_pop_from}{I_pop_to}
+\nccurve[angleA=-125,angleB=-90,ncurvA=1.8,ncurvB=1,nodesepA=3pt,nodesepB=2pt]{->}{L_pop_from}{L_pop_to}
+\nccurve[angleA=-45,angleB=-20,ncurvA=2,ncurvB=1,nodesep=2pt]{->}{H_pop_from}{H_pop_to}
+\endTeXtoEPS
+
+\end{document}
+%% \pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{push}}{
+%%   \TR{\rnode[b]{I_pushA}{\erlcode{I}}}
+%%   \erlnode{[]}
+%% }
+%% \hspace*{0pt}\raisebox{-3pt}{\(\xrightarrow{\alpha}\)}\hspace*{-15pt}
+%% \pstree[levelsep=20pt,treesep=14pt,nodesepA=-1pt,nodesepB=2pt,arrows=->]{\TR{\(\circ\)}}{
+%%   \pstree[nodesepA=2pt,arrows=-]{\erlnode{|}}{
+%%     \pstree{\TR{\rnode[bl]{push_l1}{\erlcode{|}}}}{
+%%       \Tn
+%%       \erlnode{[]}
+%%     }
+%%     \erlnode{[]}
+%%   }
+%% }
+
+%% \quad
+

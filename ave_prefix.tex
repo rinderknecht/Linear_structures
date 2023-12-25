@@ -1,0 +1,50 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath}
+
+\input{commands}
+
+\begin{document}
+
+\TeXtoEPS
+%\psset{showbbox=true}
+\psset{radius=3pt}
+\pstree[levelsep=20pt,treesep=10pt]{\TC*}{
+  \psset{tpos=0.2}
+  \pstree{\TC\tlput{\word{a}}}{
+    \psset{tpos=0.3}
+    \TC^{\word{a}\!\!}
+    \Tn
+    \psset{tpos=0.5}
+    \TC^{\word{b}\!\!\!}
+    \psset{tpos=0.3}
+    \TC_{\!\!\word{c}}
+  }
+  \psset{tpos=0.5}
+  \pstree[tpos=0.3]{\TC*\tlput{\word{b}\!\!}}{
+    \psset{tpos=0.3}
+    \TC*^{\word{a}\!\!}
+    \Tn
+    \psset{tpos=0.5}
+    \TC^{\word{b}\!\!\!}
+    \psset{tpos=0.3}
+    \TC_{\!\!\word{c}}
+  }
+  \psset{tpos=0.2}
+  \pstree{\TC\trput{\word{c}}}{
+    \psset{tpos=0.3}
+    \TC^{\word{a}\!\!}
+    \Tn
+    \psset{tpos=0.5}
+    \TC^{\word{b}\!\!\!}
+    \psset{tpos=0.3}
+    \TC_{\!\!\word{c}}
+  }
+}
+\endTeXtoEPS
+
+\end{document}

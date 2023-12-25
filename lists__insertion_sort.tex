@@ -1,0 +1,1940 @@
+%%-*-latex-*-
+
+\chapter{Insertion Sort}
+\label{chap:insertion_sort}
+
+Let us start by the following observation. At any time, if we already
+have a sorted list, it is easy to insert one more number at the right
+place by comparing it with the first number, then, if necessary, the
+second, the third etc. If it is greater than all the numbers in the
+list, we must build a list where the number is present at the end. For
+example, inserting~\erlcode{1} in \erlcode{[3,6]} requires comparing
+\erlcode{1}~and~\erlcode{3} and, since~\erlcode{1~=<~3}, the result is
+\erlcode{[\textbf{1},3,6]}---we don't need to compare~\erlcode{1}
+to~\erlcode{6}. When inserting~\erlcode{4} in~\erlcode{[1,3,6]}, we
+compare first \erlcode{4}~and~\erlcode{1}; because~\erlcode{4~>~1}, we
+must compare \erlcode{4}~with~\erlcode{3}; since~\erlcode{4~>~3}, we
+must further compare \erlcode{4}~and~\erlcode{6}; because
+\erlcode{4~=<~6}, we know that the result is
+\erlcode{[1,3,\textbf{4},6]}. Inserting~\erlcode{7} in~\erlcode{[3,6]}
+results in comparing \erlcode{7}~with~\erlcode{3} and~\erlcode{6},
+then concluding \erlcode{[3,6,\textbf{7}]}. Inserting a number in the
+empty list results in no comparison and the result is a singleton
+list. The algorithm, called \emph{insertion sort}, consists then in
+inserting the numbers one by one in a list originally empty.
+
+\medskip
+
+\paragraph{One\hyp{}way insertion sort.}
+
+The previous description shows that insertion sort requires two
+functions: one to insert a number in a sorted list and another to
+traverse the input and call the insertion function for each number
+encountered. Let us focus first on \erlcode{insert/2}, such that
+\erlcode{insert(\(I\),\(S\))} is rewritten in the sorted list
+containing all the numbers in the sorted list~\(S\) plus~\(I\). As
+usual, we reason by case analysis and prepare patterns matching the
+empty list and the non\hyp{}empty list:
+\begin{alltt}
+insert(I,   []) -> \fbcode{[J|insert(I,S)]};
+insert(I,[J|S]) -> \fbcode{[J|insert(I,S)]}.
+\end{alltt}
+The first clause is easy to complete: the result is the singleton
+list~\erlcode{[I]} and no comparison is involved (we have only one
+number at hand, anyway):
+\begin{alltt}
+insert(I,   []) -> \textbf{[I]};
+insert(I,[J|S]) -> \fbcode{[J|insert(I,S)]}.
+\end{alltt}
+The second clause must be split because either \erlcode{I~=<~J} or
+\erlcode{I~>~J}. Let us try
+\begin{alltt}
+insert(I,   [])             -> [I];
+insert(I,[J|S]) \textbf{when I =< J} -> \fbcode{[J|insert(I,S)]};
+insert(I,[J|S])             -> \fbcode{[J|insert(I,S)]}.
+\end{alltt}
+If \erlcode{I~=<~J}, then~\erlcode{I} must be before~\erlcode{J} in
+the output, therefore we can, here too, conclude in one step:
+\begin{alltt}
+insert(I,   [])             -> [I];
+insert(I,[J|S]) when I =< J -> \textbf{[I,J|S]};
+insert(I,[J|S])             -> \fbcode{[J|insert(I,S)]}.
+\end{alltt}
+Finally, if~\erlcode{I~>~J}, we know that \erlcode{I}~must be
+\emph{after}~\erlcode{J} in the output, so we must keep~\erlcode{J} at
+its current relative position and insert~\erlcode{I} in~\erlcode{S}:
+\begin{alltt}
+insert(I,   [])             -> [I];
+insert(I,[J|S]) when I =< J -> [I,J|S];
+insert(I,[J|S])             -> \textbf{[J|insert(I,S)]}.
+\end{alltt}
+Focusing back on the second clause, we realise that we do nothing
+with~\erlcode{S} and we copy as a whole \erlcode{[J|S]}, because
+\erlcode{[I,J|S]}~is just the same as~\erlcode{[I|[J|S]]}. As we saw
+earlier, this results in the creation of a node~(\erlcode{|}), while
+it would be more economical to refer to the node~(\erlcode{|}) in
+\erlcode{[J|S]}. This is where an \emph{alias} comes handy:
+\begin{alltt}
+insert(I,   [])               -> [I];
+insert(I,\textbf{L=[J|S]}) when I =< J -> [I|\textbf{L}];
+insert(I,[J|S])               -> [J|insert(I,S)].
+\end{alltt}
+We could go further and silence~\erlcode{S} in the aliased pattern:
+\begin{alltt}
+insert(I,   [])               -> [I];
+insert(I,L=[J|\textbf{\_}]) when I =< J -> [I|L];
+insert(I,[J|S])               -> [J|insert(I,S)].
+\end{alltt}
+But this improvement is not entirely satisfying. What if we test
+\erlcode{I~>~J} first? This results in swapping the two last clauses:
+\begin{alltt}
+insert(I,     [])            -> [I];
+insert(I,  [J|S]) \textbf{when I > J} -> [J|insert(I,S)];
+insert(I,L=[J|_])            -> [I|L].
+\end{alltt}
+Nothing is done with~\erlcode{J} in the last clause, so we can silence
+it and rename~\erlcode{L} into~\erlcode{S} to remind the reader that
+it is a sorted list:
+\begin{alltt}
+insert(I,   [])            \(\smashedrightarrow{\gamma}\) [I];
+insert(I,[J|S]) when I > J \(\smashedrightarrow{\delta}\) [J|insert(I,S)];
+insert(I,    \textbf{S})            \(\smashedrightarrow{\epsilon}\) [I|\textbf{S}].
+\end{alltt}
+This is better because we use only two variables instead of three and
+sharing is maximum without the need of an alias. Still, another look
+reveals that clause~\clause{\gamma} is useless if~\erlcode{S} in
+clause~\clause{\epsilon} is allowed to match the empty list. The final
+word seems to be\label{code:insert}
+\begin{alltt}
+insert(I,[J|S]) when I > J \(\smashedrightarrow{\delta}\) [J|insert(I,S)];
+insert(I,    S)            \(\smashedrightarrow{\epsilon}\) [I|S].
+\end{alltt}
+The remaining function is \erlcode{isort/1}, such that
+\erlcode{isort(\(L\))} is rewritten into the sorted list
+corresponding to list \(L\). The only task left consists in walking
+the input list and inserting each number, that is, calling
+\erlcode{insert/2}:
+\begin{alltt}
+isort(   []) \(\smashedrightarrow{\beta}\) [];
+isort([I|L]) \(\smashedrightarrow{\gamma}\) insert(I,isort(L)).
+\end{alltt}
+Let us compute now the delay. At this point it is worth mentioning
+that, traditionally, textbooks about program analysis assess the
+delays of sorting algorithms by counting the number of comparisons,
+not the number of function calls. Doing so allows one to compare with
+the same measure different sorting algorithms, as long as they perform
+comparisons. (There are sorting algorithms which do not rely on
+comparisons.) A glimpse at the definition of \erlcode{insert/2}
+convinces us that the delay depends on the result of \emph{all the
+  comparisons} needed to insert a number. It is not possible to
+capture this into a single, exact number, therefore we have instead to
+think in terms of best, worst and average delays. How can we pick and
+arrange \(n\)~integers into a list~\(L\) which leads to the minimum
+delay for evaluating \erlcode{isort(\(L\))}? The first hint comes from
+the observation that such an input would not exert
+clause~\clause{\delta}, since it is recursive, whereas it would rely
+on clause~\clause{\epsilon}, which contains no call at all. In other
+words, each number to be inserted would be lower or equal than the
+head of the current sorted list. The second hint is that \emph{the
+  items are inserted in reverse order}, due to clause~\clause{\gamma},
+that is, the last item is first inserted in the empty list, the
+penultimate is then inserted, thus compared to the last number in the
+input list (which is the first now). Since it is expected here to be
+lower, it means that the penultimate number in the input is lower than
+the last. Plainly, this means that \emph{the best case happens when
+  the input list is already nondecreasingly sorted.}
+
+Let us note \(\best{isort}{n}\) the delay in the best case for
+\(n\)~items. Then the execution trace is
+\(\gamma^n\beta\epsilon^n\). In total, \(\best{isort}{n} = 2n+1\).
+
+The worst case must exert clause~\clause{\delta} as much as possible,
+which implies that \emph{the worst case happens when the input is a
+  list decreasingly sorted}. Note the precision of the vocabulary:
+``decreasingly'' excludes the possibility of two numbers being equal,
+contrary to ``non\hyp{}increasingly,'' which allows that to
+happen. Let us note \(\worst{isort}{n}\) the delay in the worst case
+of \(n\)~items to be sorted. It requires more care as the number of
+times clause~\clause{\delta} is used is the length of its second
+argument, which means that we cannot count separately the number of
+rewrites by clauses \clause{\gamma}~and~\clause{\delta}. In this case,
+it is wiser to write down the recurrence equations corresponding to
+the program, the measure being the length of the list. Assuming
+\(p\geqslant{}0\), we deduce that
+\begin{align*}
+  \worst{insert}{0}    &\eqn{\epsilon} 1;
+& \worst{isort}{0}   &\eqn{\beta} 1;\\
+  \worst{insert}{p+1}  &\eqn{\delta} 1 + \worst{insert}{p};
+& \worst{isort}{p+1} &\eqn{\gamma} 1 + \worst{insert}{p} +
+                                         \worst{isort}{p}.
+\end{align*}
+In equation~\((\eqn{\gamma})\), the term \(\worst{insert}{p}\) is
+correct because the call \erlcode{isort(L)} evaluates in a list of the
+same length as~\erlcode{L}, that is,~\(p\). Notice that we use
+clause~\clause{\epsilon} only in the case of the empty list, because,
+otherwise, we would use clause~\clause{\delta}. It is now easy to
+deduce from equations \((\eqn{\delta})\)~and~\((\eqn{\epsilon})\) a
+closed expression for \(\worst{insert}{n}\), where \(n\)~is the length
+of the input list:
+\[
+\worst{insert}{n} = n + 1,\,\; \text{with} \,\; n \geqslant 0.
+\]
+Replacing this expression in the remaining equations leads to
+\[
+\worst{isort}{0}   \eqn{\beta} 1,\quad
+\worst{isort}{p+1} \eqn{\gamma} 2 + p + \worst{isort}{p}.
+\]
+Summing both sides of~\((\eqn{\gamma})\) and simplifying (this is the
+telescoping technique), we get
+\begin{align*}
+\sum_{p=0}^{n-1}{\worst{isort}{p+1}}
+  &= \sum_{p=0}^{n-1}{2} + \sum_{p=0}^{n-1}{p}
+     + \sum_{n=0}^{n-1}{\worst{isort}{p}},\\
+\worst{isort}{n}
+  &= 2n + n(n-1)/2 + \worst{isort}{0}
+  = (n^2 + 3n + 2)/2\\ 
+  &= \frac{1}{2}(n+1)(n+2) = \sum_{k=1}^{n+1}{k}
+ \mathrel{\sim} \frac{1}{2} n^2,\;\, \text{as}
+\,\; n \rightarrow \infty.
+\end{align*}
+In short, \erlcode{isort/1}~has a quadratic delay in the worst case,
+which is when the input is sorted in decreasing order.
+
+There is another way to find the result, by means of the execution
+trace~\(T_w\) of the worst case. We expect it to be 
+\[
+T_w := \gamma^n\beta \cdot \epsilon
+(\delta\epsilon)(\delta^2\epsilon)
+\cdot\ldots\cdot (\delta^{n-1}\epsilon) =
+\gamma^n\beta \prod_{k=0}^{n-1}\delta^k\epsilon.
+\]
+Thus, the length of the trace is
+\[
+\len{T_w} = \len{\gamma^n\beta} +
+\sum_{k=0}^{n-1}\len{\gamma^k\epsilon} = n + 1 +
+\sum_{k=0}^{n-1}{(k+1)} = \frac{1}{2}n^2 + \frac{3}{2}n + 1.
+\]
+We can do a rapid test to see if we made a mistake: Is \((n^2 + 3n +
+2)/2\) always an integer? This question boils down to: Is \(n^2 + 3n\)
+even? That is: Do \(n^2\) and \(3n\) have the same parity? The answer
+is clearly yes, so \((n^2 + 3n + 2)/2\) is always an integer and we
+cannot deduce anything. (But it was worth a try.)
+
+The delay \(\comp{isort}{n}\) laying obviously between the best and
+worst case delays, we deduce, for all~\(n\geqslant{}0\),
+\[
+2n + 1 \leqslant \comp{isort}{n} \leqslant \tfrac{1}{2}{n^2} +
+\tfrac{3}{2}{n} + 1.
+\]
+This naturally raises the question as to whether the delay is more
+often closer to the lower bound or to the upper bound, because the
+former is linear whilst the latter is quadratic. (If the bounds were
+both linear or both quadratic, the issue would perhaps be a bit less
+critical when considering large values of~\(n\).) Let us assume that
+all integers have equal probability to be present at a given location
+in the input list and are pairwisely distinct. Let \(\ave{isort}{n}\)
+be the average delay of \erlcode{isort(\(L\))}, where the list~\(L\)
+is comprised of \(n\)~equiprobable distinct integers. Similarly, we
+write \(\ave{insert}{n}\). More specifically, the issue will hinge on
+the average number of times clause~\clause{\delta} is used for an
+initial list of length~\(n\), therefore let us
+call~\(\aveclause{\delta}{n}\) this important number. Let us recall
+here \input{i_sort_alpha} We deduce the following equations from
+them:\label{def:ave_isort}
+\begin{align*}
+\ave{isort}{0}   &\eqn{\beta} 1;\quad
+\ave{isort}{k+1} \eqn{\gamma} 1 + \ave{insert}{k} +
+              \ave{isort}{k},\,\; \text{with} \;\, k \geqslant 0;\\
+\ave{insert}{0} &= 1;\quad 
+\ave{insert}{k} = 1 + \aveclause{\delta}{k},
+\,\; \text{from clauses \clause{\delta} and \clause{\epsilon}}.
+\end{align*}
+The term~\(\ave{insert}{k}\) in equation~\((\eqn{\gamma})\) is
+justified because the length of \erlcode{isort(\(L\))}, for all
+lists~\(L\), equals the length of~\(L\)---here assumed to
+be~\(k\). Summing over~\(k\) on both sides of~\((\eqn{\gamma})\), we
+deduce
+\begin{align*}
+\sum_{k=0}^{n-1}{\ave{isort}{k+1}} &=
+  \sum_{k=0}^{n-1}{1} + \sum_{k=0}^{n-1}{\ave{insert}{k}}
+  + \sum_{k=0}^{n-1}{\ave{isort}{k}}.
+\end{align*}
+By cancelling identical terms on both sides, we draw
+\[
+\ave{isort}{n} = n + \!\sum_{k=0}^{n-1}{\!\!\ave{insert}{k}} +
+                    \ave{isort}{0}
+                 = 1 + n + \!\!\sum_{k=0}^{n-1}{\!\left(1 +
+                      \aveclause{\delta}{k}\right)}
+                 = 1 + 2n +\!\!\sum_{k=0}^{n-1}{\!\!\aveclause{\delta}{k}}.
+\]
+Let us determine now~\(\aveclause{\delta}{k}\) by first asking
+ourselves how many ways are there to insert a number into a list of
+length~\(k\). Clearly, there are~\(k+1\) possible locations: before
+the first item, before the second, etc., before the last \emph{and
+  after the last}. Secondly, assuming that the item is to be inserted
+at position~\(j\) (the head of the list is at position~\(0\)), that
+is, it is aimed at being placed between the \((j-1)\)th~and~\(j\)th
+element, how many times clause~\clause{\delta} is needed? If inserted
+at location~\(0\), clause~\clause{\delta} is not used. If
+location~\(1\), then it is used once etc. until location~\(k\), that
+is, after the last item, for which clause~\clause{\delta} is utilised
+\(k\)~times. Thirdly, each insertion position is equally likely
+because we posited the equal probability of occurrence for the
+integers in the list. Therefore, we can average the total number of
+times clause~\clause{\delta} is used for all insertion positions by
+the number of such positions. In other words:\label{ave_insert}
+\begin{equation}
+\aveclause{\delta}{k} = \frac{1}{k+1}\sum_{j=0}^{k}{j}
+                      = \frac{k}{2},\quad
+\ave{insert}{k}       = 1 + \aveclause{\delta}{k}
+                      = \frac{k}{2} + 1.\label{ave:insert}
+\end{equation}
+This value could have been expected by means of the following informal
+reasoning. When considering the location to insert a number, since the
+numbers in the list are equi\-probable, we should expect, in average,
+half of them to be lower than the number inserted. So, in average, the
+number of times clause~\clause{\delta} is used is~\(k/2\). We can now
+substitute~\(\aveclause{\delta}{k}\) by its simple closed form in the
+equation back and conclude\label{ave_isort}
+\begin{equation}
+\ave{isort}{n} = 1 + 2n + \sum_{k=0}^{n-1}{\frac{k}{2}}
+               = \frac{1}{4}{n^2} + \frac{7}{4}{n} + 1
+\mathrel{\sim} \frac{1}{4}n^2
+                 \mathrel{\sim} \frac{1}{2} \worst{isort}{n}.
+\label{ave:isort}
+\end{equation}
+This comes as a disappointment, though, because it means that the
+average delay is quadratic, just as the worst case, even if the
+multiplicative constant is twice as small, asymptotically, that is,
+\emph{the average delay \(\ave{isort}{n}\) is 50\% of the worst delay
+  \(\worst{isort}{n}\), for large values of \(n\).}
+
+We shall see later more asymptotically efficient sort algorithms, so
+it is worth wondering why insertion sort fails short to be a good
+algorithm, at least for large lists of integers. First, let us recall
+that items are inserted in reverse order because of
+clause~\clause{\gamma}. Thus, when clause~\clause{\delta} applies, it
+means that \erlcode{I}~was originally before~\erlcode{J} and it is
+found now to be greater. After the rewrite, \erlcode{J}~is located
+before~\erlcode{I}. All this means that \emph{one application of
+  clause~\clause{\delta} removes one inversion from the input.} In
+order to go faster, we need a sorting method that removes more than a
+linear number of inversions per rewrite. In the next section, we shall
+study such a faster method. As a corollary of this short analysis, the
+average number of inversions in a random permutation of \(n\)~objects
+is
+\[
+\sum_{k=0}^{n-1}{\aveclause{\delta}{k}} =
+\sum_{k=0}^{n-1}{\frac{k}{2}} = \frac{n(n-1)}{4}.
+\]
+
+\smallskip
+
+\paragraph{Tail form.}
+
+At this point, after so much mathematics, it is important to check our
+results. Another verification of the previously assessed delays can be
+done by modifying the definition of \erlcode{isort/1} such that it
+ends with the sorted list \emph{and} the number of performed
+rewrites. As we saw before, this addition is easily done if the
+original definition is already in tail form. Therefore, let us first
+transform \erlcode{isort/1} into tail form. Starting from
+\input{i_sort_alpha}
+we add a tuple accumulator to our functions and initialise it with the
+empty tuple (new clause~\clause{\alpha}):
+\begin{alltt}
+\textbf{isort_tf(L)                  \(\smashedrightarrow{\alpha}\) isort(L,\{\}).}
+isort(   [],\textbf{A})               \(\smashedrightarrow{\beta}\) [];\hfill% A \emph{unused yet}
+isort([I|L],\textbf{A})               \(\smashedrightarrow{\gamma}\) insert(I,isort(L,\textbf{A}),\textbf{A}).
+insert(I,[J|S],\textbf{A}) when I > J \(\smashedrightarrow{\delta}\) [J|insert(I,S,\textbf{A})];
+insert(I,    S,\textbf{A})            \(\smashedrightarrow{\epsilon}\) [I|S].\hfill% A \emph{unused yet}
+\end{alltt}
+We can now inspect each clause and, depending on its body shape (that
+is: expression in tail form, either with or without a call, or not in
+tail form), some transformation is done. First, the body of
+clause~\clause{\beta} is in tail form and does not contain any
+function call. Thus, we transform it by applying an auxiliary
+function \erlcode{appk/2}:
+\begin{alltt}
+isort(   [],A)               \(\smashedrightarrow{\beta}\) \textbf{appk(}[],\textbf{A)};
+\end{alltt}
+Next is clause~\clause{\gamma}, which is not in tail form. The first
+call to be evaluated is \erlcode{isort(L,A)}, whose control context is
+\erlcode{insert(I,\textvisiblespace,A)}. Let us keep the call whilst
+saving into the accumulator~\erlcode{A} the variable~\erlcode{I}
+needed to rebuild the control context later, in a new clause of
+function \erlcode{appk/2}. This variable needs a priori to be tagged
+by some unique atom, say~\erlcode{k1}:
+\begin{alltt}
+isort([I|L],A)               \(\smashedrightarrow{\gamma}\) isort(L,\textbf{\{k1,I,A\}}).
+\textbf{appk(V,\{k1,I,A\})             \(\rightarrow\) insert(I,V,A).}
+\end{alltt}
+The following clause is~\clause{\delta}, which is not in tail
+form. The sole call to be evaluated is \erlcode{insert(I,S,A)}, whose
+control context is~\erlcode{[J|\textvisiblespace]}. Let us
+associate~\erlcode{J} with a unique atom~\erlcode{k2}, then save both
+of them in the accumulator~\erlcode{A} and, dually, add a clause to
+\erlcode{appk/2} to reconstruct the erased control context:
+\begin{alltt}
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,\textbf{\{k2,J,A\}});
+\textbf{appk(V,\{k2,J,A\})             \(\rightarrow\) appk([J|V],A);}
+\end{alltt}
+The last clause is~\clause{\epsilon}, which is in tail form and
+contains no call, so we must apply its body to \erlcode{appk/2} in
+order to check whether there are pending control contexts to rebuild:
+\begin{alltt}
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) \textbf{appk(}[I|S],\textbf{A)}.
+\end{alltt}
+In order to complete the transformation, we must add a clause
+to \erlcode{appk/2} to process the case when the accumulator is empty,
+so the final result is found. Finally, the resulting program is (last
+step in bold)\label{isort_tf_appk}
+\begin{alltt}
+isort_tf(L)                  \(\smashedrightarrow{\alpha}\) isort(L,\{\}).
+isort(   [],A)               \(\smashedrightarrow{\beta}\) appk([],A);
+isort([I|L],A)               \(\smashedrightarrow{\gamma}\) isort(L,\{k1,I,A\}).
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,\{k2,J,A\});
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) appk([I|S],A).
+\textbf{appk(V,      \{\})             \(\smashedrightarrow{\zeta}\) V;}
+appk(V,\{k2,J,A\})             \(\smashedrightarrow{\eta}\) appk([J|V],A);
+appk(V,\{k1,I,A\})             \(\smashedrightarrow{\theta}\) insert(I,V,A).
+\end{alltt}
+We can remark that the atom~\erlcode{k1} is not necessary in the
+definition of \erlcode{isort\_tf/1}, since all other values in the
+accumulator are tagged~\erlcode{k2}:
+\begin{alltt}
+isort_tf(L)                  \(\smashedrightarrow{\alpha}\) isort(L,\{\}).
+isort(   [],A)               \(\smashedrightarrow{\beta}\) appk([],A);
+isort([I|L],A)               \(\smashedrightarrow{\gamma}\) isort(L,\textbf{\{I,A\}}).\hfill% \emph{Here}
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,\{k2,J,A\});
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) appk([I|S],A).
+appk(V,      \{\})             \(\smashedrightarrow{\zeta}\) V;
+appk(V,\{k2,J,A\})             \(\smashedrightarrow{\eta}\) appk([J|V],A);
+appk(V,   \textbf{\{I,A\}})             \(\smashedrightarrow{\theta}\) insert(I,V,A).\hfill% \emph{and here}
+\end{alltt}
+It becomes obvious now that \erlcode{isort/2} reverses its first
+argument in the accumulator, which is initialised in
+clause~\clause{\alpha} to the empty list. For instance,
+\erlcode{isort([3,8,2],\{\})}~\(\smashedrightarrow{3}\)
+\erlcode{appk([],\{2,\{8,\{3,\{\}\}\}\})}. Then it
+calls \erlcode{appk/2} with the same arguments, in
+clause~\clause{\beta}. Hence, we would like to conclude that
+\[
+\erlcode{isort(\(L\),[])} \mathrel{\equiv}
+\erlcode{appk([],rev(\(L\)))},
+\]
+which would allow us to cut out the definition of \erlcode{isort/2}
+entirely. The difficulty is that \(L\)~is not a list, but a tuple. Of
+course, we could write a function whose special purpose would be to
+reverse this particular accumulator, but this lacks a great deal of
+generality. We must realise that, by opting for an accumulator
+implemented as a tuple, instead of a list, we optimised too early in
+terms of memory, which impedes now our effort to legitimately optimise
+the delay. Let us remember this lesson and revert to a list
+accumulator. When we are done with our delay optimisations, we shall
+revert to tuples. Let us resume from the definition
+\begin{alltt}
+isort_tf(L)                  \(\smashedrightarrow{\alpha}\) isort(L,[]).
+isort(   [],A)               \(\smashedrightarrow{\beta}\) appk([],A);
+isort([I|L],A)               \(\smashedrightarrow{\gamma}\) isort(L,[I|A]).
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,[\{k2,J\}|A]);
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) appk([I|S],A).
+appk(V,        [])           \(\smashedrightarrow{\zeta}\) V;
+appk(V,[\{k2,J\}|A])           \(\smashedrightarrow{\eta}\) appk([J|V],A);
+appk(V,     [I|A])           \(\smashedrightarrow{\theta}\) insert(I,V,A).
+\end{alltt}
+Now we can proceed and remove \erlcode{isort/2} as follows:
+\begin{alltt}
+isort_tf(L)                  \(\smashedrightarrow{\alpha}\) \textbf{appk([],rev(L))}.
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,[\{k2,J\}|A]);
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) appk([I|S],A).
+appk(V,      \{\})             \(\smashedrightarrow{\zeta}\) V;
+appk(V,\{k2,J,A\})             \(\smashedrightarrow{\eta}\) appk([J|V],A);
+appk(V,   \{I,A\})             \(\smashedrightarrow{\theta}\) insert(I,V,A).
+\end{alltt}
+We expect that sorting a list or the same list reversed is the same:
+\begin{align*}
+\erlcode{isort\_tf(\(L\))} &\mathrel{\equiv}
+\erlcode{isort\_tf(rev(\(L\)))}.
+\intertext{By clause \clause{\alpha}, this implies}
+\erlcode{isort\_tf(\(L\))} &\mathrel{\equiv}
+\erlcode{appk([],rev(rev(\(L\))))},
+\end{align*}
+and since \(\erlcode{rev(rev(\(L\)))}~\mathrel{\equiv}~L\), we can
+replace the body of clause~\clause{\alpha} simply by
+\erlcode{appk([],\textbf{L})}. Note how clause~\clause{\theta} is
+still useful. We have now
+\begin{alltt}
+isort_tf(L)                  \(\smashedrightarrow{\alpha}\) appk([],\textbf{L}).
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,[\{k2,J\}|A]);
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) appk([I|S],A).
+appk(V,        [])           \(\smashedrightarrow{\zeta}\) V;
+appk(V,[\{k2,J\}|A])           \(\smashedrightarrow{\eta}\) appk([J|V],A);
+appk(V,     [I|A])           \(\smashedrightarrow{\theta}\) insert(I,V,A).
+\end{alltt}
+We can get a shorter program at the expense of more
+comparisons. Remark that when clause~\clause{\eta} applies,
+\erlcode{J}~is lower than the head of~\erlcode{V}, which exists
+because this clause is only used to compute the bodies of clauses
+\clause{\epsilon}~and~\clause{\eta}, where the first argument is not
+the empty list. Therefore,
+\erlcode{appl([J|V],A)}~\(\equiv\)~\erlcode{insert(J,V,A)}, because
+clause~\clause{\epsilon} would apply. Accordingly, let us change
+clause~\clause{\eta}:
+\begin{alltt}
+isort_tf(L)                  \(\smashedrightarrow{\alpha}\) appk([],L).
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,[\{k2,J\}|A]);
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) appk([I|S],A).
+appk(V,        [])           \(\smashedrightarrow{\zeta}\) V;
+appk(V,[\{k2,J\}|A])           \(\smashedrightarrow{\eta}\) \textbf{insert(J,V,A)};
+appk(V,     [I|A])           \(\smashedrightarrow{\theta}\) insert(I,V,A).
+\end{alltt}
+We can see clearly now that \erlcode{appk/2} calls \erlcode{insert/3}
+in the same way in clauses \clause{\eta}~and~\clause{\theta}, which
+means that it is useless to tag~\erlcode{J} with~\erlcode{k2} and we
+can get rid of clause~\clause{\theta}:
+\begin{alltt}
+isort_tf(L)                  \(\smashedrightarrow{\alpha}\) appk([],L).
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,[\textbf{J}|A]);\hfill% \emph{Here}
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) appk([I|S],A).
+appk(V,   [])                \(\smashedrightarrow{\zeta}\) V;
+appk(V,[\textbf{J}|A])                \(\smashedrightarrow{\eta}\) insert(J,V,A).\hfill% \emph{and here}
+\end{alltt}
+Perhaps it is clearer to get rid of \erlcode{appk/2} by integrating
+its two operations in \erlcode{isort\_tf/1} and
+\erlcode{insert/3}. Let us split clauses
+\clause{\alpha}~and~\clause{\epsilon} to manifest the cases where,
+respectively, \erlcode{L}~and~\erlcode{A} are empty:
+\newlength\duparrow \settowidth\duparrow{\(\alpha\sb{0}\)}
+\begin{alltt}
+isort_tf(   [])                  \(\MyArrow{\duparrow}{\alpha\sb{0}}\) appk([],[]);
+isort_tf([I|L])                  \(\MyArrow{\duparrow}{\alpha\sb{1}}\) appk([],[I|L]).
+insert(I,[J|S],    A) when I > J \(\MyArrow{\duparrow}{\delta}\) insert(I,S,[J|A]);
+insert(I,    S,[J|A])            \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) appk([I|S],[J|A]);
+insert(I,    S,   [])            \(\MyArrow{\duparrow}{\epsilon\sb{1}}\) appk([I|S],[]).
+appk(V,   [])                    \(\MyArrow{\duparrow}{\zeta}\) V;
+appk(V,[J|A])                    \(\MyArrow{\duparrow}{\eta}\) insert(J,V,A).
+\end{alltt}
+We can now replace the bodies of clauses
+\clause{\alpha_0}~and~\clause{\epsilon_1} by their value, as given by
+clause~\clause{\zeta}, and we can remove~\clause{\zeta}:
+\begin{alltt}
+isort_tf(   [])                  \(\MyArrow{\duparrow}{\alpha\sb{0}}\) \textbf{[]};
+isort_tf([I|L])                  \(\MyArrow{\duparrow}{\alpha\sb{1}}\) appk([],[I|L]).
+insert(I,[J|S],    A) when I > J \(\MyArrow{\duparrow}{\delta}\) insert(I,S,[J|A]);
+insert(I,    S,[J|A])            \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) appk([I|S],[J|A]);
+insert(I,    S,   [])            \(\MyArrow{\duparrow}{\epsilon\sb{1}}\) \textbf{[I|S]}.
+appk(V,[J|A])                    \(\MyArrow{\duparrow}{\eta}\) insert(J,V,A).
+\end{alltt}
+We saved one rewrite in case the input list is empty. Lastly, the
+bodies of clauses \clause{\alpha_1}~and~\clause{\epsilon_0} can be
+replaced by their value, as given by clause~\clause{\eta}, which can
+be, finally, erased. We rename the accumulator~\erlcode{A} as
+\erlcode{L}.\label{code:isort_tf}
+\begin{alltt}
+isort_tf(   [])                  \(\MyArrow{\duparrow}{\alpha\sb{0}}\) [];
+isort_tf([I|L])                  \(\MyArrow{\duparrow}{\alpha\sb{1}}\) \textbf{insert(I,[],L)}.
+insert(I,[J|S],    L) when I > J \(\MyArrow{\duparrow}{\delta}\) insert(I,S,[J|L]);
+insert(I,    S,[J|L])            \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \textbf{insert(J,[I|S],L)};
+insert(I,    S,   [])            \(\MyArrow{\duparrow}{\epsilon\sb{1}}\) [I|S].
+\end{alltt}
+It is important to remember that these last steps, relative to the
+removal of tag~\erlcode{k2} and so forth, make sense only because, in
+assessing the delay, we take into account only the number of function
+calls, not the number of comparisons, which is now greater for not
+using the control context~\erlcode{[J|\textvisiblespace]} in the
+original clause~\clause{\delta} of \erlcode{insert/3}. In other words,
+the items saved in the accumulator in the new clause~\clause{\delta}
+have to be re\hyp{}inserted in clause~\clause{\epsilon_0}. Note also
+that it makes no sense to use tuples instead of a list to accumulate
+\emph{single} items because the memory consumption would be exactly
+the same.
+
+The same analysis used for assessing the delay of \erlcode{isort/1}
+applies here as well, except that the items are inserted in their
+original order. So when the items are sorted increasingly, the delay
+is here \emph{maximum} (that is, clause~\clause{\delta} is used
+maximally) and when it is sorted non\hyp{}increasingly, the delay is
+\emph{minimum} (that is, clause~\clause{\delta} is never used).
+\label{best_worst_swapped}
+\emph{If items are not repeated, the best case of \erlcode{isort/1} is
+  the worst case of \erlcode{isort\_tf/1} and the worst case
+  of \erlcode{isort/1} is the best case of \erlcode{isort\_tf/1}.}
+
+This is true because ``nondecreasing'' means the same as ``increasing''
+when there is no repetition and ``non\hyp{}increasing'' means
+``decreasing'' under the same assumption. In order to find the lowest
+delay of the final version of \erlcode{isort\_tf/1}, it is helpful
+to get first a better understanding of the computational process by
+unfolding a simple example like sorting \erlcode{[4,3,2,1]}, which is
+a list sorted in decreasing order:
+\begin{alltt}
+\erlcode{isort\_tf([4,3,2,1])} \(\MyArrow{\duparrow}{\alpha\sb{1}}\) \erlcode{insert(4,\ \ \ \ \ [],[3,2,1])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(3,\ \ \ \ [4],\ \ [2,1])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(2,\ \ [3,4],\ \ \ \ [1])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(1,[2,3,4],\ \ \ \ \ [])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{1}}\) \erlcode{[1,2,3,4]}\textrm{.}
+\end{alltt}
+Let us note \(\best{isort\_tf}{n}\) the best case of \(n\)~items to be
+sorted. We have \(\best{isort\_tf}{0} = 1\) by
+clause~\clause{\alpha_0}. Let us assume next that \(n>0\). Then
+\begin{itemize}
+
+  \item clause~\clause{\alpha\sb{1}} is used once;
+
+  \item clause~\clause{\delta} is not used, since we assume here that
+    the items are already sorted non\hyp{}increasingly;
+
+  \item clause~\clause{\epsilon\sb{0}} is used once for each item in
+    its third argument, which, by clause~\clause{\alpha\sb{1}}, means
+    all items except the first, that is \(n-1\)~times;
+
+  \item clause~\clause{\epsilon\sb{1}} is used once.
+
+\end{itemize}
+In sum, the execution trace is \(\alpha_1\epsilon_0^{n-1}\epsilon_1\).
+The total delay is then \(\best{isort\_tf}{n} = 1 + (n-1) + 1 = n+1\),
+if~\(n>0\). Since we found that \(\best{isort\_tf}{0} = 1 = 0 + 1\),
+we can extend the previous formula to~\(n=0\). This result can be
+related directly to \(\worst{isort}{n} = (n^2 + 3n + 2)/2\), because
+the best case of \erlcode{isort\_tf/1} corresponds to the worst case
+of \erlcode{isort/1} when integers are not repeated. We can further
+reckon that this minimum delay for \erlcode{isort\_tf/1} is also an
+absolute minimum for a sorting algorithm when the input is sorted
+non\hyp{}increasingly, because it is simply the delay needed to
+reverse the input. If we follow the growth of the second and third
+arguments of \erlcode{insert(4,[],[3,2,1])}, we recognise the
+behaviour of the second and first argument, respectively, of
+\erlcode{rev\_join/2}, for which \(\comp{rev\_join}{n} = n + 1\) (see
+equation \eqref{delay:rev_join} \vpageref{delay:rev_join}). Given a
+list~\(L\) sorted non\hyp{}increasingly, we have
+\[
+\erlcode{isort(\(L\))} \mathrel{\equiv} \erlcode{rev(\(L\))}.
+\]
+Assuming now the worst case, let us note \(\worst{isort\_tf}{n}\) the
+delay of \erlcode{isort\_tf(\(L\))} where the list~\(L\) contains
+\(n\)~items in increasing order. For the empty list, the execution
+trace is~\(\alpha_0\). For singletons, for example, \erlcode{[5]}, it
+is~\(\alpha_1\epsilon_1\). To understand the general case \(n>1\), we
+can try
+\begin{alltt}
+\erlcode{isort\_tf([1,2,3,4])} \(\MyArrow{\duparrow}{\alpha\sb{1}}\) \erlcode{insert(1,\ \ \ \ \ [],[2,3,4])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(2,\ \ \ \ [1],\ \ [3,4])}
+                    \(\MyArrow{\duparrow}{\delta}\) \erlcode{insert(2,\ \ \ \ \ [],[1,3,4])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(1,\ \ \ \ [2],\ \ [3,4])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(3,\ \ [1,2],\ \ \ \ [4])}
+                    \(\MyArrow{\duparrow}{\delta}\) \erlcode{insert(3,\ \ \ \ [2],\ \ [1,4])}
+                    \(\MyArrow{\duparrow}{\delta}\) \erlcode{insert(3,\ \ \ \ \ [],[2,1,4])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(2,\ \ \ \ [3],\ \ [1,4])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(1,\ \ [2,3],\ \ \ \ [4])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(4,[1,2,3],\ \ \ \ \ [])}
+                    \(\MyArrow{\duparrow}{\delta}\) \erlcode{insert(4,\ \ [2,3],\ \ \ \ [1])}
+                    \(\MyArrow{\duparrow}{\delta}\) \erlcode{insert(4,\ \ \ \ [3],\ \ [2,1])}
+                    \(\MyArrow{\duparrow}{\delta}\) \erlcode{insert(4,\ \ \ \ \ [],[3,2,1])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(3,\ \ \ \ [4],\ \ [2,1])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(2,\ \ [3,4],\ \ \ \ [1])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) \erlcode{insert(1,[2,3,4],\ \ \ \ \ [])}
+                    \(\MyArrow{\duparrow}{\epsilon\sb{1}}\) \erlcode{[1,2,3,4]}\textrm{.}
+\end{alltt}
+Notice the interplay of clauses
+\clause{\delta}~and~\clause{\epsilon\sb{0}}. A series of application
+of clause~\clause{\delta} ends with the second argument to be the
+empty list. This is because the effect of clause~\clause{\delta} is to
+save the contents of this argument by reversing it on top of the third
+argument. In other words, in the worst case, clause~\clause{\delta} is
+equivalent to
+\begin{alltt}
+insert(I,[J|S],L) when I > J \(\rightarrow\)
+\hfill insert(I,\textbf{[]},\textbf{rev_join(S,[J|L])});
+\end{alltt}
+A sequence of~\clause{\delta} is followed by a series
+of~\clause{\epsilon\sb{0}} \emph{of same length}, followed by another
+\clause{\epsilon\sb{0}}~or~\clause{\epsilon\sb{1}}. The reason is that
+clause~\clause{\epsilon\sb{0}} restores on top of the second argument
+the items saved previously by clause~\clause{\delta}. Then, if there
+are some items left in the last argument (to be sorted), one more
+application of clause~\clause{\epsilon\sb{0}} is required, otherwise
+the program ends with clause \clause{\epsilon\sb{1}}, that is, the
+execution trace when \(n>1\) is
+\[
+\alpha_1\prod_{p=0}^{n-2}{\left(\delta^p\epsilon_0^{p+1}\right)} \cdot
+\delta^{n-1}\epsilon_0^{n-1} \cdot \epsilon_1
+= \alpha_1\prod_{p=0}^{n-2}{\left((\delta\epsilon_0)^p\epsilon_0\right)}
+\cdot (\delta\epsilon_0)^{n-1} \cdot \epsilon_1.
+\]
+This observation is the key for finding the exact delay in the worst
+case as it hints at counting the rewrite steps of
+clause~\clause{\delta} and of clause~\clause{\epsilon\sb{0}}
+\emph{together}, as evinced in the right\hyp{}hand side of the
+equality. We can now directly derive the worst delay:
+\begin{align*}
+\worst{isort\_tf}{n}
+  &= \left|\alpha_1\prod_{p=0}^{n-2}{\left((\delta\epsilon_0)^p\epsilon_0\right)}
+     \cdot (\delta\epsilon_0)^{n-1} \cdot \epsilon_1\right|\\
+  &= \abs{\alpha_1} +
+     \left|\prod_{p=0}^{n-2}{\left((\delta\epsilon_0)^p\epsilon_0\right)}\right|
+     + \left|(\delta\epsilon_0)^{n-1}\right| + \abs{\epsilon_1}\\
+  &= 1 + \sum_{p=0}^{n-2}{\left|(\delta\epsilon_0)^p\epsilon_0\right|}
+     + (n-1)\abs{\delta\epsilon_0} + 1\\
+\worst{isort\_tf}{n}
+  &= 1 + \sum_{p=0}^{n-2}{(2p+1)} + 2(n-1) + 1 = n^2 + 1.
+\end{align*}
+Since the worst case of \erlcode{isort\_tf/1} and
+\erlcode{isort/1} are identical, we can compare their delays in this
+case, for~\(n\geqslant{}0\),
+\[
+\worst{isort}{n}     = (n^2 + 3n + 2)/2,\qquad
+\worst{isort\_tf}{n} = n^2 + 1.
+\]
+Let us relate now the best and worst cases for both \erlcode{isort/1}
+and \erlcode{isort\_tf/1}, we have, for~\(n>3\),
+\[
+\best{isort\_tf}{n} < \best{isort}{n} < \worst{isort}{n} <
+\worst{isort\_tf}{n}.
+\]
+If we note \(\comp{isort}{n}\) the delay of \erlcode{isort/1} on an
+input of length~\(n\), these inequalities are equivalent to say
+\[
+\best{isort\_tf}{n} < \comp{isort}{n} < \worst{isort\_tf}{n}.
+\]
+This is the best we can do because we only have the obvious
+inequalities
+\[
+\best{isort\_tf}{n} \leqslant \comp{isort\_tf}{n} 
+\leqslant \worst{isort\_tf}{n},
+\]
+which do not allow us to compare \(\comp{isort}{n}\) and
+\(\comp{isort\_tf}{n}\). In order to obtain a stronger result, we need
+an average delay analysis so we can tell apart \erlcode{isort\_tf/1}
+from \erlcode{isort/1}. Indeed, it might be that, for a given input
+list of length~\(n\), most configurations of the input lead to a delay
+for \erlcode{isort\_tf/1} which is actually lower than for
+\erlcode{isort/1}. Let us note \(\ave{isort\_tf}{n}\) the average
+number of rewrites needed to compute \erlcode{isort\_tf}{(\(L\))},
+where the length of list~\(L\) is~\(n\). Similarly, we note
+\(\ave{insert}{p,q}\) for the average delay of the call
+\erlcode{insert(\(I\),\(P\),\(Q\))}, where list~\(P\) has length~\(p\)
+and list~\(Q\) has length~\(q\). The short story is this: because the
+numbers are random, the average number of times clause~\clause{\delta}
+is used is~\(p/2\). Since clause \clause{\epsilon_0} purpose, as
+observed before, is to put back the numbers previously moved by
+clause~\clause{\delta}, we expect, in average, the same number,
+\(p/2\), plus~\(1\), because clause~\clause{\epsilon_0} also prepares
+the possible following use of clause \clause{\delta}. In other words,
+the difference with the longest execution trace defining
+\(\worst{isort}{n}\) is that the subsequences~\(\delta\epsilon_0\) are
+expected to be 50\%~shorter in average, so the execution trace is, in
+average,
+\[
+\alpha_1\prod_{p=0}^{n-2}{\left((\delta\epsilon_0)^{p/2}\epsilon_0\right)}
+\cdot (\delta\epsilon_0)^{(n-1)/2} \cdot \epsilon_1,
+\]
+from which we deduce the average delay for~\(n>1\):
+\[
+\ave{isort\_tf}{n} = 1 + \sum_{p=0}^{n-2}{\left(2\cdot\frac{p}{2}+1\right)} 
+                       + \left(2\cdot\frac{n-1}{2}\right) + 1
+                     = \frac{1}{2}{n^2} + \frac{1}{2}{n} + 1.
+\]
+Elegantly, this formula extends to cope with~\(n=0,1\) and we can
+compare now \(\ave{isort\_tf}{n}\) to \(\ave{isort}{n}\),
+for~\(n\geqslant{}0\):
+\[
+\ave{isort\_tf}{n}
+  = \tfrac{1}{2}{n^2} + \tfrac{1}{2}{n} + 1
+  \mathrel{\sim} \tfrac{1}{2}{n^2} \mathrel{\sim} 2 \cdot
+\ave{isort}{n}, \,\; \text{as} \,\; n \rightarrow \infty.
+\]
+In other words, \erlcode{isort\_tf/1}, in spite of being optimised, is
+nevertheless 50\%~slower than the original function, \emph{in average
+  for large values of~\(n\)}.
+
+\medskip
+
+\paragraph{Adding a counter.}
+
+Anyway, it is always a good idea to test this kind of result also by
+means of a little experiment which consists simply in modifying the
+source code so the function returns its normal result paired with the
+number of function calls that have been needed to find it. Since
+\erlcode{isort\_tf/1} is, by definition, in tail form, this
+transformation is straightforward as it consists merely in adding a
+parameter (the call counter) to all function calls and incrementing it
+each time an arrow is crossed (note that we append to the function
+names the string~\erlcode{\_c}):
+\begin{alltt}
+isort_tf_c(   [])              -> \textbf{\{[],1\}};
+isort_tf_c([I|L])              -> insert(I,[],L,\textbf{1}).
+insert(I,[J|S],L,\textbf{C}) when I > J -> insert(I,S,[J|L],\textbf{C+1});
+insert(I,S,[J|L],\textbf{C})            -> insert(J,[I|S],L,\textbf{C+1});
+insert(I,S,   [],\textbf{C})            -> \textbf{\{[I|S],C+1\}}.
+\end{alltt}
+We can deduce in the same manner a version of \erlcode{isort/1}
+which computes the delay as well by recalling the result of the
+automatic transformation of \erlcode{isort/1} into tail form,
+\emph{before any improvement}, as shown \vpageref{isort_tf_appk}:
+\begin{alltt}
+isort_tf(L)                  \(\smashedrightarrow{\alpha}\) isort(L,\{\}).
+isort(   [],A)               \(\smashedrightarrow{\beta}\) appk([],A);
+isort([I|L],A)               \(\smashedrightarrow{\gamma}\) isort(L,\{k1,I,A\}).
+insert(I,[J|S],A) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,\{k2,J,A\});
+insert(I,    S,A)            \(\smashedrightarrow{\epsilon}\) appk([I|S],A).
+appk(V,        [])           \(\smashedrightarrow{\zeta}\) V;
+appk(V,\{k2,J,A\})             \(\smashedrightarrow{\eta}\) appk([J|V],A);
+appk(V,\{k1,I,A\})             \(\smashedrightarrow{\theta}\) insert(I,V,A).
+\end{alltt}
+Then we can add the counters and be cautious so as not to count the
+rewrites by \erlcode{appk/2}, which have no equivalent in the original
+definition:\label{code:isort_c}
+\begin{alltt}
+isort_c(L)                     \(\smashedrightarrow{\alpha}\) isort_c(L,[],\textbf{0}).
+isort_c(   [],A,\textbf{C})             \(\smashedrightarrow{\beta}\) appk([],A,\textbf{C+1});
+isort_c([I|L],A,\textbf{C})             \(\smashedrightarrow{\gamma}\) isort_c(L,\{k1,I,A\},\textbf{C+1}). 
+insert(I,[J|S],A,\textbf{C}) when I > J \(\smashedrightarrow{\delta}\) insert(I,S,\{k2,J,A\},\textbf{C+1});
+insert(I,    S,A,\textbf{C})            \(\smashedrightarrow{\epsilon}\) appk([I|S],A,\textbf{C+1}).
+appk(V,        [],\textbf{C})           \(\smashedrightarrow{\zeta}\) \textbf{\{V,C\}};
+appk(V,\{k2,J,A\},\textbf{C})             \(\smashedrightarrow{\eta}\) appk([J|V],A,\textbf{C});
+appk(V,\{k1,I,A\},\textbf{C})             \(\smashedrightarrow{\theta}\) insert(I,V,A,\textbf{C}).
+\end{alltt}
+
+\smallskip
+
+\paragraph{Two\hyp{}way insertion sort.}
+
+Let us consider again \erlcode{isort\_tf/1}, as defined
+\vpageref{code:isort_tf}:
+\begin{alltt}
+isort_tf(   [])                  \(\MyArrow{\duparrow}{\alpha\sb{0}}\) [];
+isort_tf([I|L])                  \(\MyArrow{\duparrow}{\alpha\sb{1}}\) insert(I,[],L).
+insert(I,[J|S],    L) when I > J \(\MyArrow{\duparrow}{\delta}\) insert(I,S,[J|L]);
+insert(I,    S,[J|L])            \(\MyArrow{\duparrow}{\epsilon\sb{0}}\) insert(J,[I|S],L);
+insert(I,    S,   [])            \(\MyArrow{\duparrow}{\epsilon\sb{1}}\) [I|S].
+\end{alltt}
+A source of inefficiency stems from clause~\clause{\delta} moving
+items from the output list, that is, the second argument of
+\erlcode{insert/3} in clause~\clause{\epsilon_0}, to the input list,
+that is, the third argument. After the item to be inserted has found
+its place, these items will be \emph{moved back} to the output
+list. One simple way to avoid this back and forth consists in keeping
+an auxiliary list onto which push and pop items while searching for
+the right location for insertion. This way, the input list will always
+strictly decrease. The technical difference is that we have two lists
+in which to insert. The first list holds the smaller items, sorted
+non\hyp{}increasingly, and the second one contains greater items,
+sorted nondecreasingly. The current sorted list would therefore be
+obtained by reversing the first list onto the second one. Technically,
+the first list is called a \emph{reversed prefix} of the current
+output and the second is a \emph{suffix}. For example,
+\erlcode{[5,3,1]} and \erlcode{[6,8,9]}, making the current
+\erlcode{[1,3,5,6,8,9]}. Conceptually, this couple of lists implements
+one list with constant\hyp{}time access to two successive, inner
+items. Alternatively, it can be thought as one list with a moving
+finger. Consider\label{code:unbalanced_i2w}
+\begin{alltt}
+i2w(L)                              \(\smashedrightarrow{\zeta}\) i2w([],[],L).
+i2w(   [],    Q,     [])            \(\smashedrightarrow{\alpha}\) Q;
+i2w([I|P],    Q,     [])            \(\smashedrightarrow{\beta}\) i2w(    P,[I|Q],[]);
+i2w(    P,[J|Q],L=[K|_]) when J < K \(\smashedrightarrow{\gamma}\) i2w([J|P],    Q, L);
+i2w([I|P],    Q,L=[K|_]) when K < I \(\smashedrightarrow{\delta}\) i2w(    P,[I|Q], L);
+i2w(    P,    Q,  [K|R])            \(\smashedrightarrow{\epsilon}\) i2w(    P,[K|Q], R).
+\end{alltt}
+Notice how this is a definition that comes out naturally in tail form
+because it is a refinement of a definition itself in tail
+form. Clauses \clause{\gamma}~and~\clause{\delta} are in charge of
+finding the right position for insertion, whilst
+clause~\clause{\epsilon} inserts the item. There are two possible
+places for that, because we have two lists and we chose to implement
+the insertion by pushing the item on top of the second list, that is,
+on the suffix. It would have been also correct to push it on the
+reversed prefix:
+\begin{alltt}
+i2w(    P,    Q,  [K|R]) \(\smashedrightarrow{\epsilon}\) i2w([K|P],   Q, R)
+\end{alltt}
+When the insertions are over, we must construct the final sorted list
+with the reversed prefix and the suffix. This situation is taken care
+of by clauses \clause{\alpha}~and~\clause{\beta}, because their third
+argument is the empty list (no more items left to be inserted). We
+could call \erlcode{rev\_join/2}, as defined on
+page~\pageref{code:rev_join}:
+\verbatiminput{rev_join.def} since it is exactly what we need, but,
+for didactic purposes, we prefer to keep the definition of
+\erlcode{i2w/3} self\hyp{}contained, whence clauses
+\clause{\alpha}~and~\clause{\beta}. Note that, because
+clause~\clause{\epsilon} grows the suffix of the result, we must
+reverse the first argument on top of the second to compute the
+result. Let us unroll a short example.
+\begin{alltt}
+\erlcode{i2w([2,3,1,4])} \(\smashedrightarrow{\zeta}\) \erlcode{i2w(\ \ \ \ \ [],\ \ \ \ \ \ \ [],[2,3,1,4])}
+               \(\smashedrightarrow{\epsilon}\) \erlcode{i2w(\ \ \ \ \ [],\ \ \ \ \ \ [2],\ \ [3,1,4])}
+               \(\smashedrightarrow{\gamma}\) \erlcode{i2w(\ \ \ \ [2],\ \ \ \ \ \ \ [],\ \ [3,1,4])}
+               \(\smashedrightarrow{\epsilon}\) \erlcode{i2w(\ \ \ \ [2],\ \ \ \ \ \ [3],\ \ \ \ [1,4])}
+               \(\smashedrightarrow{\delta}\) \erlcode{i2w(\ \ \ \ \ [],\ \ \ \ [2,3],\ \ \ \ [1,4])}
+               \(\smashedrightarrow{\epsilon}\) \erlcode{i2w(\ \ \ \ \ [],\ \ [1,2,3],\ \ \ \ \ \ [4])}
+               \(\smashedrightarrow{\gamma}\) \erlcode{i2w(\ \ \ \ [1],\ \ \ \ [2,3],\ \ \ \ \ \ [4])}
+               \(\smashedrightarrow{\gamma}\) \erlcode{i2w(\ \ [2,1],\ \ \ \ \ \ [3],\ \ \ \ \ \ [4])}
+               \(\smashedrightarrow{\gamma}\) \erlcode{i2w([3,2,1],\ \ \ \ \ \ \ [],\ \ \ \ \ \ [4])}
+               \(\smashedrightarrow{\epsilon}\) \erlcode{i2w([3,2,1],\ \ \ \ \ \ [4],\ \ \ \ \ \ \ [])}
+               \(\smashedrightarrow{\beta}\) \erlcode{i2w(\ \ [2,1],\ \ \ \ [3,4],\ \ \ \ \ \ \ [])}
+               \(\smashedrightarrow{\beta}\) \erlcode{i2w(\ \ \ \ [1],\ \ [2,3,4],\ \ \ \ \ \ \ [])}
+               \(\smashedrightarrow{\beta}\) \erlcode{i2w(\ \ \ \ \ [],[1,2,3,4],\ \ \ \ \ \ \ [])}
+               \(\smashedrightarrow{\alpha}\) \erlcode{[1,2,3,4]}\textrm{.}
+\end{alltt}
+In short, the execution trace is \((\zeta)(\epsilon)(\gamma\epsilon)
+(\delta\epsilon)(\gamma^3\epsilon)(\beta^3\alpha)\). Note how the
+number of times clause~\clause{\beta} is used is the number of items
+left on the left list. Clause~\clause{\alpha} is used exactly once.
+
+Let us find the delay in the best, worst and average delays for an
+input list of \(n\)~items, that is, counting the function calls
+instead of the comparisons. The best case will exert minimally clauses
+\clause{\gamma}~and~\clause{\delta} and this minimum number of calls
+turns out to be zero when the two comparisons are false. The first
+item inserted does not use clauses
+\clause{\gamma}~and~\clause{\delta}, but only
+clause~\clause{\epsilon}, so, right after, the reversed prefix is
+empty and the suffix contains this item. If we want to insert the
+second item without moving the contents of the lists, and go straight
+to use clause~\clause{\epsilon}, the second item must be smaller than
+the first. Based on the same argument, the third item must be smaller
+than the second etc. In the end, this means that \emph{the input, in
+  the best case, is a list sorted non\hyp{}increasingly.} This is the
+same best case as for \erlcode{isort\_tf/1}. The last steps consisting
+in the reversal of the prefix, such prefix being empty, we do not even
+use clause~\clause{\beta} at all---only clause~\clause{\alpha}
+once. In other words, if we note \(\best{i2w}{n}\) the delay when the
+input is a list of \(n\)~items in non\hyp{}increasing order, then,
+because the execution trace is~\(\zeta\epsilon^n\alpha\), we have
+\[
+\best{i2w}{n} = n + 2.
+\]
+Let us assume that the input list is noted
+\erlcode{[\(a_0, a_1, \dots, a_{n-1}\)]}. The worst case must
+exert clauses \clause{\gamma}~and~\clause{\delta}, on the one hand,
+and clauses \clause{\alpha}~and~\clause{\beta}, on the other hand,
+maximally. Let us focus first on maximising the use of
+\clause{\gamma}~and~\clause{\delta}. Since \(a_0\)~is the first item,
+it is always pushed on the suffix list by
+clause~\clause{\epsilon}. The second item,~\(a_1\), in order to travel
+the furthest, has to be inserted below~\(a_0\). By doing so,
+clause~\clause{\gamma} is used once and then~\clause{\epsilon},
+therefore, as a result, \(a_0\)~is on the left (the reversed prefix,
+which is the first argument) and \(a_1\)~on the right (the suffix,
+which is the second argument). In other words: we have
+\erlcode{[\(a_0\)]}~and~\erlcode{[\(a_1\)]}. Because of this symmetry,
+in pursuit of the worst case, we can now move either
+\(a_0\)~or~\(a_1\) to the facing list, that is, choose either to set
+\(a_2<a_0\) or \(a_1<a_2\).
+\begin{itemize}
+
+  \item If \(a_2<a_0\), clause~\clause{\delta} is used once, then
+    clause~\clause{\epsilon}. As a result, we have the configuration
+    \erlcode{[]} and \erlcode{[\(a_2\),\(a_0\),\(a_1\)]}. This
+    translates as \(a_2< a_0< a_1\). The fourth item,~\(a_3\), must
+    be inserted at the bottom of the right list, which must be first
+    reversed on top of the left list by clause~\clause{\gamma}: we
+    then have \erlcode{[\(a_1\),\(a_0\),\(a_2\)]} and
+    \erlcode{[\(a_3\)]}. In other words: \( a_2< a_0< a_1< a_3\).
+    Finally, the left list is reversed on top of the second by
+    clause~\clause{\beta} and clause~\clause{\alpha} is last. The
+    execution trace is
+    \((\zeta)(\epsilon)(\gamma\epsilon)(\delta\epsilon)(\gamma^3\epsilon)
+    (\beta^3\alpha)\), whose length is~\(14\).
+
+  \item If \(a_1<a_2\), we would have \erlcode{[\(a_1\),\(a_0\)]}
+    and \erlcode{[\(a_2\)]}, then the lists \erlcode{[]} and
+    \erlcode{[\(a_3\),\(a_0\),\(a_1\),\(a_2\)]}, that is, \(a_3<
+    a_0< a_1< a_2\). The complete execution trace:
+    \((\zeta)(\epsilon)(\gamma\epsilon)(\gamma\epsilon)(\delta^2\epsilon)
+    (\alpha)\). The length of this trace is~\(10\), which is shorter
+    than the previous trace.
+\end{itemize}
+As a conclusion, the choice \(a_2<a_0\) leads to a worse case. But
+what if the input list contains an odd number~\(n\) of items? To guess
+what happens, let us insert~\(a_4\) assuming either \(a_1<a_2\) or
+\(a_2<a_0\).
+\begin{itemize}
+
+  \item If \(a_2 < a_0\), we should move out all the items of the left
+    list, so we draw the configuration \erlcode{[\(a_4\)]} and
+    \erlcode{[\(a_2\),\(a_0\),\(a_1\),\(a_3\)]}: \(a_4< a_2< a_0< a_1<
+    a_3\), corresponding to the execution trace
+    \((\zeta)(\epsilon)(\gamma\epsilon)(\delta\epsilon)(\gamma^3\epsilon)
+    (\delta^3\epsilon)(\beta\alpha)\), whose length is~\(16\). 
+
+  \item If \(a_1 < a_2\), we want to insert~\(a_4\) at the bottom of
+    the second list, thus obtaining
+    \erlcode{[\(a_2\),\(a_1\),\(a_0\),\(a_3\)]} and
+    \erlcode{[\(a_4\)]}: \(a_3 < a_0 < a_1 < a_2 < a_4\),
+    corresponding to the execution trace \((\zeta)(\epsilon)
+    (\gamma\epsilon)(\gamma\epsilon)(\delta^2\epsilon)(\gamma^4\epsilon)
+    (\beta^4\alpha)\), whose length is~\(19\). It is
+    perhaps better visualised by means of oriented edges, revealing a
+    spiral in \fig~\vref{fig:spiral}.
+    \begin{figure}
+      \centering
+      \includegraphics[bb=71 671 174 715]{a3a0a1a2a4}
+      \caption{Worst case for \erlcode{i2w/1} if \(n=5\) (\(a_1 < a_2\))
+               \label{fig:spiral}}
+    \end{figure}
+
+
+\end{itemize}
+Therefore, it seems that when the number of items is odd, having
+\(a_1<a_2\) leads to the worst delay, whilst \(a_2<a_0\) leads to
+the worst delay when the number of items is even. Let us determine
+these delays for any~\(n\) and determine which is the greater. Let us
+note \(\worst{\(a_1\!\!<\!\!a_2\)}{2p+1}\) the former delay and
+\(\worst{\(a_2\!\!<\!\!a_0\)}{2p}\) the latter.
+\begin{itemize}
+
+  \item If \(n=2p+1\) and \(a_1<a_2\), then the execution trace is
+    \[
+    (\zeta)(\epsilon)(\gamma\epsilon)(\gamma\epsilon)
+    (\delta^2\epsilon)(\gamma^4\epsilon)(\delta^4\epsilon) \ldots
+    (\gamma^{2p-2}\epsilon)(\delta^{2p-2}\epsilon)(\gamma^{2p}\epsilon)
+    (\beta^{2p}\alpha),
+    \]
+    as a run with~\(p=3\) suggests:
+\settowidth\duparrow{\(\gamma^6\)}
+\begin{tabbing}
+\erlcode{i2w([\(a_0\),\(a_1\),\(a_2\),\(a_3\),\(a_4\)])} \=
+\(\MyArrow{\duparrow}{\zeta}\) \=\kill
+\erlcode{i2w([\(a_0\),\(a_1\),\(a_2\),\(a_3\),\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\zeta}\)
+\> \erlcode{i2w([],[],[\(a_0\),\(a_1\),\(a_2\),\(a_3\),\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\epsilon}\)
+\> \erlcode{i2w([],[\(a_0\)],[\(a_1\),\(a_2\),\(a_3\),\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\gamma}\)
+\> \erlcode{i2w([\(a_0\)],[],[\(a_1\),\(a_2\),\(a_3\),\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\epsilon}\)
+\> \erlcode{i2w([\(a_0\)],[\(a_1\)],[\(a_2\),\(a_3\),\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\gamma}\)
+\> \erlcode{i2w([\(a_1\),\(a_0\)],[],[\(a_2\),\(a_3\),\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\epsilon}\)
+\> \erlcode{i2w([\(a_1\),\(a_0\)],[\(a_2\)],[\(a_3\),\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\delta^2}\)
+\> \erlcode{i2w([],[\(a_0\),\(a_1\),\(a_2\)],[\(a_3\),\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\epsilon}\)
+\> \erlcode{i2w([],[\(a_3\),\(a_0\),\(a_1\),\(a_2\)],[\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\gamma^4}\)
+\> \erlcode{i2w([\(a_2\),\(a_1\),\(a_0\),\(a_3\)],[],[\(a_4\),\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\epsilon}\)
+\> \erlcode{i2w([\(a_2\),\(a_1\),\(a_0\),\(a_3\)],[\(a_4\)],[\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\delta^4}\)
+\> \erlcode{i2w([],[\(a_3\),\(a_0\),\(a_1\),\(a_2\),\(a_4\)],[\(a_5\),\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\epsilon}\)
+\> \erlcode{i2w([],[\(a_5\),\(a_3\),\(a_0\),\(a_1\),\(a_2\),\(a_4\)],[\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\gamma^6}\)
+\> \erlcode{i2w([\(a_4\),\(a_2\),\(a_1\),\(a_0\),\(a_3\),\(a_5\)],[],[\(a_6\)])}\\
+\> \(\MyArrow{\duparrow}{\epsilon}\)
+\> \erlcode{i2w([\(a_4\),\(a_2\),\(a_1\),\(a_0\),\(a_3\),\(a_5\)],[\(a_6\)],[])}\textrm{.}
+\end{tabbing}
+
+    \noindent If we omit clauses~\clause{\zeta}, \clause{\epsilon},
+    \clause{\alpha}~and~\clause{\beta}, we can see a pattern emerge
+    from the sub\hyp{}trace
+    \((\gamma^2\delta^2)(\gamma^4\delta^4)(\gamma^6\delta^6) \ldots
+    (\gamma^{2p-2}\delta^{2p-2})(\gamma^{2p})\). Clause~\clause{\epsilon}
+    is used \(n\)~times because it inserts the item in the right
+    place. So the total delay is
+    \begin{align*}
+      \worst{\(a_1\!\!<\!\!a_2\)}{2p+1}
+        &= \abs{\zeta} + \abs{\epsilon^{2p+1}}
+           + \sum_{k=1}^{p-1}{\left(\abs{\gamma^{2k}} + \abs{\delta^{2k}}\right)}
+           + \abs{\gamma^{2p}} + \abs{\beta^{2p}\alpha}\\
+        &= 1 + (2p + 1) + \sum_{k=1}^{p-1}{2(2k)} + (2p) + (2p + 1)
+         = 2p^2 + 4p + 3.
+    \end{align*}
+
+  \item If \(n=2p\), and \(a_2<a_0\), then the execution trace is
+    \[
+      (\zeta)(\epsilon)(\gamma\epsilon)(\delta\epsilon)
+      (\gamma^3\epsilon)(\delta^3\epsilon)
+      \ldots (\gamma^{2p-1}\epsilon)(\beta^{2p-1}\alpha),
+    \]
+    as the following run with~\(p=3\) suggests (first difference with
+    the previous case is in bold):%XXXXXXXXXXX
+\begin{alltt}
+\erlcode{i2w([\(a\sb{0}\),\(a\sb{1}\),\(a\sb{2}\),\(a\sb{3}\),\(a\sb{4}\),\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{}\)\,\erlcode{i2w(\ \ \ \ \ \ \ \ \ \ \ \ [],\ \ \ \ \ \ \ \ \ \ \ \ \ \ [],[\(a\sb{0}\!\),\(a\sb{1}\!\),\(a\sb{2}\!\),\(a\sb{3}\!\),\(a\sb{4}\!\),\(a\sb{5}\!\)])}
+\(\MyArrow{\duparrow}{\epsilon}\)\,\erlcode{i2w(\ \ \ \ \ \ \ \ \ \ \ \ [],\ \ \ \ \ \ \ \ \ \ \ \ [\(a\sb{0}\)],\ [\(a\sb{1}\),\(a\sb{2}\),\(a\sb{3}\),\(a\sb{4}\),\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\gamma}\)\,\erlcode{i2w(\ \ \ \ \ \ \ \ \ \ [\(a\sb{0}\)],\ \ \ \ \ \ \ \ \ \ \ \ \ \ [],\ [\(a\sb{1}\),\(a\sb{2}\),\(a\sb{3}\),\(a\sb{4}\),\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\epsilon}\)\,\erlcode{i2w(\ \ \ \ \ \ \ \ \ \ [\(a\sb{0}\)],\ \ \ \ \ \ \ \ \ \ \ \ [\(a\sb{1}\)],\ \ \ \ [\(a\sb{2}\),\(a\sb{3}\),\(a\sb{4}\),\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\delta}\)\,\(\boldsymbol{\erlcode{i2w(\ \ \ \ \ \ \ \ \ \ \ \ [],\ \ \ \ \ \ \ \ [\(a\sb{0}\),\(a\sb{1}\)],\ \ \ [\(a\sb{2}\),\(a\sb{3}\),\(a\sb{4}\),\(a\sb{5}\)])}}\)
+\(\MyArrow{\duparrow}{\epsilon}\)\,\erlcode{i2w(\ \ \ \ \ \ \ \ \ \ \ \ [],\ \ \ \ \ \ [\(a\sb{2}\),\(a\sb{0}\),\(a\sb{1}\)],\ \ \ \ \ \ \ [\(a\sb{3}\),\(a\sb{4}\),\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\gamma\sp{3}}\)\,\erlcode{i2w(\ \ \ \ [\(a\sb{1}\),\(a\sb{0}\),\(a\sb{2}\)],\ \ \ \ \ \ \ \ \ \ \ \ \ \ [],\ \ \ \ \ \ \ [\(a\sb{3}\),\(a\sb{4}\),\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\epsilon}\)\,\erlcode{i2w(\ \ \ \ [\(a\sb{1}\),\(a\sb{0}\),\(a\sb{2}\)],\ \ \ \ \ \ \ \ \ \ \ \ [\(a\sb{3}\)],\ \ \ \ \ \ \ \ \ \ [\(a\sb{4}\),\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\delta\sp{3}}\)\,\erlcode{i2w(\ \ \ \ \ \ \ \ \ \ \ \ [],\ \ \ [\(a\sb{2}\),\(a\sb{0}\),\(a\sb{1}\),\(a\sb{3}\)],\ \ \ \ \ \ \ \ \ \ [\(a\sb{4}\),\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\epsilon}\)\,\erlcode{i2w(\ \ \ \ \ \ \ \ \ \ \ \ [],[\(a\sb{4}\),\(a\sb{2}\),\(a\sb{0}\),\(a\sb{1}\),\(a\sb{3}\)],\ \ \ \ \ \ \ \ \ \ \ \ \ [\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\gamma\sp{5}}\)\,\erlcode{i2w([\(a\sb{3}\!\),\(a\sb{1}\!\),\(a\sb{0}\!\),\(a\sb{2}\!\),\(a\sb{4}\!\)],\ \ \ \ \ \ \ \ \ \ \ \ \ \;[],\ \ \ \ \ \ \ \ \ \ \ \ \ [\(a\sb{5}\)])}
+\(\MyArrow{\duparrow}{\epsilon}\)\,\erlcode{i2w([\(a\sb{3}\!\),\(a\sb{1}\!\),\(a\sb{0}\!\),\(a\sb{2}\!\),\(a\sb{4}\!\)],\ \ \ \ \ \ \ \ \ \ \ \;[\(a\sb{5}\)],\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ [])}
+\end{alltt}
+If we omit clauses~\clause{\zeta}, \clause{\epsilon},
+\clause{\alpha}~and~\clause{\beta}, we can see a pattern emerge from
+the sub\hyp{}trace
+\((\gamma^1\delta^1)(\gamma^3\delta^3)(\gamma^5\delta^5) \ldots
+(\gamma^{2p-3}\delta^{2p-3})(\gamma^{2p-1})\). Clause~\clause{\epsilon}
+is used \(n\)~times because it inserts the item in the right place. So
+the total delay is
+\begin{align*}
+\worst{\(a_2\!\!<\!\!a_0\)}{2p}
+   &= \abs{\zeta} + \abs{\epsilon^{2p}}
+           + \sum_{k=1}^{p-1}{\left(\abs{\gamma^{2k-1}} + \abs{\delta^{2k-1}}\right)}
+           + \abs{\gamma^{2p-1}} + \abs{\beta^{2p-1}\alpha}\\
+   &= 1 + (2p) + \sum_{k=1}^{p-1}{2(2k-1)} + (2p-1) + ((2p - 1) + 1)\\
+   &= 2p^2 + 2p + 2.
+\end{align*}
+\end{itemize}
+These formulas hold for all \(p\geqslant{}0\). We can now conclude
+this section about the worst case of \erlcode{i2w/1}:
+\begin{itemize}
+
+  \item If \(n = 2p\), the worst case happens when the items satisfy
+    the total order \(a_{2p} < a_{2p-2} < \dots < a_0 < a_1 < a_3 <
+    \dots < a_{2p-3} < a_{2p-1}\) and \(\worst{i2w}{2p} = 2p^2 + 2p +
+    2\), that is, \(\worst{i2w}{n} = \frac{1}{2}{n^2} + n + 2\).
+
+  \item If \(n = 2p+1\), they satisfy \(a_{2p-1} < a_{2p-3} < \dots <
+    a_3 < a_0 < a_1 < a_2 < \dots < a_{2p-2} < a_{2p}\) and
+    \(\worst{i2w}{2p+1} = 2p^2 + 4p + 3\), that is, \(\worst{i2w}{n} =
+    \frac{1}{2}{n^2} + n + \frac{3}{2}\).
+
+\end{itemize}
+These two delays are asymptotically equivalent to the worst delay of
+\erlcode{isort/1}, which is quadratic:
+\[
+\worst{i2w}{n} \mathrel{\sim} \frac{1}{2}{n^2} \mathrel{\sim}
+\worst{isort}{n},\,\; \text{as} \,\; n \rightarrow \infty.
+\]
+Despite our efforts, the two\hyp{}way insertion sort does not beat the
+one\hyp{}way insertion sort in the worst case. Could it be better in
+average, though?
+
+Let us opt for a direct approach, based on an enumeration, which
+avoids recurrence equations. Let \(\ave{i2w}{n}\) be the average delay
+of \erlcode{i2w(\(L\))}, where \(L\)~is a list of \(n\)~distinct
+integers uniformly chosen at random. Let
+\(\ave{\(\gamma\delta\epsilon\)}{n}\) be the average number of times
+clauses~\clause{\gamma}, \clause{\delta}~and~\clause{\epsilon} are
+used, that is, it represents the average delay required to insert a
+random number into two random lists of \(n\)~numbers in total. Let
+\(\ave{\(\alpha\beta\)}{n}\) the average number of times clauses
+\clause{\alpha}~and~\clause{\beta} are used, that is, it denotes the
+average delay for reversing the final reversed prefix. This
+decomposition of delays comes from the observation that the evaluation
+first makes one step in order to set the initial values of the two
+lists. Then each item from the input list is inserted. Finally, the
+left list is reversed on top of the second. %We have,
+\[
+\ave{i2w}{0} := 2;\quad
+\ave{i2w}{n}
+  := 1 + \sum_{k=0}^{n-1}{\ave{\(\gamma\delta\epsilon\)}{k}}
+       + \frac{1}{n}\sum_{k=0}^{n-1}{\ave{\(\alpha\beta\)}{k}},\quad
+       \text{for} \,\; n > 0.
+\]
+The summation bounds of \(\ave{\(\alpha\beta\)}{k}\) deserve some
+precise justification. Summing from \(0\)~to~\(n-1\) means that we
+know that the result of a random insertion may lead to configurations
+where the left list contains a number of items ranging from
+\(0\)~to~\(n-1\). Actually, it means more than that, as it supposes
+that each post\hyp{}insertion configuration is unique. Examining
+clause~\clause{\epsilon} reminds us that we always insert on the right
+list. Is this going to tip the scale in favour of the right list? Or
+does that mean that, since we could also choose to insert on the left
+list, the problem is perfectly symmetric and, therefore, it does not
+matter in the end?
+\begin{figure}[h]
+\centering
+\includegraphics{two-way_unbalanced}
+\caption{Unbalanced two\hyp{}way insertions of integers \(a\), \(b\)
+  and \(c\)
+\label{fig:two-way_unbalanced}}
+\end{figure}
+
+If intuition deserts us, let us turn to
+\fig~\vref{fig:two-way_unbalanced} where a small, albeit not too
+small, example is fully detailed. We see how all permutations of three
+objects are generated once.  A longer example would give us more
+confidence in concluding that, after an insertion in a configuration
+whose two lists contain a total of \(k\)~numbers, all configurations
+of \(k+1\)~numbers are present exactly once, except the one where the
+second list is empty, which is missing. This last point had to be
+expected because the insertion always takes place on the second
+list. Therefore the summation bounds of \(\ave{\(\alpha\beta\)}{k}\)
+must be \(0\)~and~\(n-1\) (but not~\(n\) because the second list
+cannot be empty by construction) and the sum must be averaged by~\(n\)
+because the result of \(n\)~insertions on an empty configuration leads
+to \(n\)~unique configurations of \(n\)~numbers. Let us resume our
+calculations by noting that \(\ave{\(\alpha\beta\)}{k} = k + 1\) and
+\(\ave{\(\gamma\delta\epsilon\)}{0} = 1\):
+\begin{align*}
+\ave{i2w}{n} &=
+  1 + \left(\ave{\(\gamma\delta\epsilon\)}{0} +
+  \sum_{k=1}^{n-1}{\ave{\(\gamma\delta\epsilon\)}{k}}\right)
+  + \frac{1}{n}\sum_{k=0}^{n-1}{(k+1)}\\
+ &= 1 + 1
+    + \sum_{k=1}^{n-1}{\ave{\(\gamma\delta\epsilon\)}{k}}
+    + \frac{1}{n}\sum_{k=1}^{n}{k}
+  = \frac{1}{2}{n} + \frac{5}{2} +
+    \sum_{k=1}^{n-1}{\ave{\(\gamma\delta\epsilon\)}{k}}.
+\end{align*}
+Let us note \(\ave{\(\gamma\delta\epsilon\)}{p,q}\) the average delay
+for inserting one number in a configuration where the left list is
+made of \(p\)~numbers and the right list contains \(q\)~numbers, all
+of them being unique. Given the total number~\(k\) of numbers in the
+two lists, all the possible values for \(p\)~and~\(q\) must satisfy
+\(p+q=k\), with \(p\geqslant{}0\) and \(q>0\) (the second list can
+never be empty). So we have
+\begin{align*}
+\ave{\(\gamma\delta\epsilon\)}{k}
+  &:= \frac{1}{k}
+              \sum_{p+q=k}^{q>0}{\ave{\(\gamma\delta\epsilon\)}{p,q}}
+   = \frac{1}{k}\sum_{q=1}^{k}{\ave{\(\gamma\delta\epsilon\)}{k-q,q}}.
+\end{align*}
+The reason for the division by~\(k\) is that there are \(k\)~possible
+configurations with a total of \(k\)~numbers shared over the two
+lists. In order to compute \(\ave{\(\gamma\delta\epsilon\)}{p,q}\),
+given a configuration with \(p\)~and~\(q\) numbers, we have to
+enumerate all the places between two numbers where we can insert
+another one. Bear in mind that no number is actually slipped in, since
+insertion always occurs on the top of the second list by
+clause~\clause{\epsilon}; what we really mean is that these places are
+possible locations for insertion in the total order corresponding to
+the configuration at hand.
+
+For example, if the two lists are \erlcode{[6,4,0]} and
+\erlcode{[8,9]}, target locations for an insertion are evinced by a
+place\hyp{}holder \erlcode{\textvisiblespace} in the left list as
+\erlcode{[6,\textvisiblespace,4,0]},
+\erlcode{[6,4,\textvisiblespace,0]} and
+\erlcode{[6,4,0,\textvisiblespace]}; in the right list, we have the
+possibilities \erlcode{[\textvisiblespace,8,9]},
+\erlcode{[8,\textvisiblespace,9]} and
+\erlcode{[8,9,\textvisiblespace]}. There are \(p+q+1\) such locations
+in general: bottom of the second list up to its top, accounting for
+\(q+1\), then bottom of the first list up to the place after the first
+item (if any), accounting for~\(p\). The location on top of the first
+list cannot be accounted for since it corresponds to the same position
+in the total order as the top of the second list; in the previous
+example, there can only be one location for
+\erlcode{\textvisiblespace} in \(\erlcode{0}< \erlcode{4}<
+\erlcode{6}< \erlcode{\textvisiblespace}< \erlcode{8}< \erlcode{9}\),
+which consists in having \erlcode{[6,4,0]} and
+\erlcode{[\textvisiblespace,8,9]}, \emph{not}
+\erlcode{[\textvisiblespace,6,4,0]} and \erlcode{[8,9]}.
+
+The cumulated delay \(\ave{\(\delta\epsilon\)}{p}\) of targeting all
+the valid locations in a first list of length~\(p\) is
+\(\sum_{j=1}^{p}{(j+1)}\), where the index~\(j\) ranges over the
+locations, \(1\)~meaning ``after the item at position \(1\),'' the
+summed~\(j\) is the number of times clause \clause{\delta} is used and
+the summed~\(1\) accounts for the use of
+clause~\clause{\epsilon}. Similarly, the cumulated delay
+\(\ave{\(\gamma\epsilon\)}{q}\) of targeting all the valid locations
+in the second list of length~\(q\) is \(\sum_{j=0}^{q}{(j+1)}\),
+using~\(j\) times clause~\clause{\gamma} instead
+of~\clause{\delta}. Thus, we have\label{A_pq}
+\begin{align*}
+\ave{\(\gamma\delta\epsilon\)}{p,q}
+  &:= \frac{\ave{\(\delta\epsilon\)}{p} +
+     \ave{\(\gamma\epsilon\)}{q}}{p+q+1}
+   = \frac{1}{p+q+1}{\left(\sum_{j=1}^{p}{(j+1)}
+     + \sum_{j=0}^{q}{(j+1)}\!\right)}\\
+  &= \frac{1}{p+q+1}{\left(\sum_{j=2}^{p+1}{j} +
+     \sum_{j=1}^{q+1}{j}\!\right)}
+   = \frac{p^2 + 3p + q^2 + 3q + 2}{2p + 2q + 2}.
+\intertext{Notice the complete symmetry of the expression:
+  \(\ave{\(\gamma\delta\epsilon\)}{p,q} =
+  \ave{\(\gamma\delta\epsilon\)}{q,p}\). Anyway,}
+\ave{\(\gamma\delta\epsilon\)}{k-q,q}
+  &= \frac{(k-q)^2 + 3(k-q) + q^2 + 3q + 2}{2(k-q) + 2q + 2}
+  = \frac{q^2}{k+1} - \frac{kq}{k+1} + \frac{k+2}{2}.
+\intertext{We can now replace
+  \(\ave{\(\gamma\delta\epsilon\)}{k-q,q}\) in the definition of
+  \(\ave{\(\gamma\delta\epsilon\)}{k}\):}
+\ave{\(\gamma\delta\epsilon\)}{k}
+  &= \frac{1}{k}\left(\frac{1}{k+1}\sum_{q=1}^{k}{q^2} -
+\frac{k}{k+1}\sum_{q=1}^{k}{q} +
+\frac{k+2}{2}\sum_{p=1}^{k}{1}\!\right)
+  = \frac{1}{3}{k} + \frac{7}{6}.
+\end{align*}
+Finally, we can substitute \(\ave{\(\gamma\delta\epsilon\)}{k}\) for
+its newly found value in the definition of \(\ave{i2w}{n}\):
+\begin{equation*}
+\ave{i2w}{0} = 2;\quad
+\ave{i2w}{n}
+  = \frac{1}{2}{n} + \frac{5}{2} + \frac{1}{3}\sum_{k=1}^{n-1}{k}
+     + \frac{7}{6}\sum_{k=1}^{n-1}{1}
+   = \frac{1}{6}{n^2} + \frac{3}{2}{n} + \frac{4}{3}
+   \mathrel{\sim} \frac{1}{6}{n^2}.
+\end{equation*}
+The bad news is that the average delay of \erlcode{i2w/1} is
+quadratic, just as the other versions of insertion sort, but the good
+news is that the coefficient is smaller. Compare with
+\[
+\ave{isort}{n}     = \tfrac{1}{4}{n^2} + \tfrac{7}{4}{n} + 1
+\,\; \text{and} \,\;
+\ave{isort\_tf}{n} = \tfrac{1}{2}{n^2} + \tfrac{1}{2}{n} + 1.
+\]
+Another remark is that the average delay becomes closer to~33\% of the
+worst case as~\(n\) grows, since we proved
+\[
+\worst{i2w}{n} \mathrel{\sim} \tfrac{1}{2}{n^2},\;\, \text{as}
+\,\; n \rightarrow \infty.
+\]
+
+\medskip
+
+\paragraph{Balanced two\hyp{}way insertion sort.}
+
+Is there a way to improve on the previous two\hyp{}way insertion? One
+source of inefficiency stems from the fact that we wanted to retain
+the tail form, therefore an insertion in one of the two lists
+required, in general, to move some items to the other list. This
+results often in unbalanced lists, so subsequent insertions in the
+longest list will incur a greater delay. Let us design a
+\emph{balanced two\hyp{}way insertion}, where the lengths of the two
+lists differ by one at most and where we use the control context to
+hold the items during the one\hyp{}way insertion phase in each of the
+two lists. To understand how this could work, let us imagine that we
+already have a configuration with two lists of same length. If we
+insert a number in the first list, the first list will jut over the
+second and, symmetrically, if we insert in the second, the second will
+stand higher than the first. In order to have some regularity and a
+shorter definition later, let us assume that, in this case, we want
+the second list to always be taller after the insertion. This enables
+dealing with only two situations instead of three, which are (1)~the
+two lists have same length, (2)~the second list is longer by one. Let
+us assume now that we insert a number when the second list is longer
+than the first one. Then, if the integer has to be inserted in the
+first list, the resulting lists will have equal lengths, which means
+we go back to case (1), otherwise, we move the top of the second list
+to the top of the first list in addition to the insertion itself, and
+we go back to case (1) as well. If we are in case~(1) and the
+insertion takes place in the second stack, no rebalancing has to be
+done; otherwise, the top of the first stack is moved to the top of the
+second: in both events, we are in case~(2). But what if the item to
+insert has to be simply pushed on top of one of the two lists? If the
+two lists have same length, let us push the number on top of the
+second one, otherwise it means that the second exceeds the first by
+one, so it is best to push it on the first list, so, as a result, the
+lists have equal lengths and we are back to case (1).
+
+To implement this design, we shall need an additional parameter, which
+represents the difference in length between the lists. Since we opt
+for never having the first list jut over the second, this parameter
+will range just over two values exactly, more precisely, it will
+toggle between these two values: after an insertion, if the two lists
+had equal lengths, then the second one will be taller, otherwise, they
+will be of equal length. Usually, this type of parameter should be
+bound to two axioms, with explicit names telling the story, like
+\erlcode{balanced} and \erlcode{unbalanced}, but here it is simple and
+quite meaningful to give a numeric interpretation of this parameter as
+the length of the second list minus the length of the first, so this
+difference is an integer whose value is either
+\erlcode{0}~or~\erlcode{1}. Because the first list is the reversed
+prefix and the second is the suffix of the current sorted list, we
+need two one\hyp{}way insertions: \erlcode{ins\_dn(\(I\),\(S\))}
+inserts the number~\(I\) into the list~\(S\) which is sorted
+non\hyp{}increasingly; \erlcode{ins\_up(\(I\),\(S\))} inserts~\(I\)
+into~\(S\) sorted non\hyp{}decreasingly. These two functions are
+easily defined, as the latter is none other than \erlcode{insert/2}
+\vpageref{code:insert} in disguise:
+\begin{alltt}
+insert(I,[J|S]) when I > J -> [J|insert(I,S)];
+insert(I,    S)            -> [I|S].
+
+ins_up(I,[J|S]) when I > J \(\smashedrightarrow{\iota}\) [J|ins_up(I,S)];
+ins_up(I,    S)            \(\smashedrightarrow{\kappa}\) [I|S].
+\end{alltt}
+and the former is derived by inverting the comparison in the guard:
+\begin{alltt}
+ins_dn(I,[J|S]) when J > I \(\smashedrightarrow{\lambda}\) [J|ins_dn(I,S)];
+ins_dn(I,    S)            \(\smashedrightarrow{\mu}\) [I|S].
+\end{alltt}
+Now we add the difference parameter, which is initialised
+with~\erlcode{0} because the two lists are initially empty:
+\begin{alltt}
+i2wb(L) -> i2wb([],[],L,\textbf{0}).
+\end{alltt}
+Function \erlcode{i2wb/3} \vpageref{code:unbalanced_i2w} consists of
+two groups of clauses: clauses from~\clause{\gamma}
+to~\clause{\epsilon} perform the comparisons, moving around the
+numbers until the insertion, properly speaking, takes place (a simple
+push on the right list); clauses \clause{\alpha}~and~\clause{\beta}
+perform the final steps consisting in reversing the first list on top
+of the second and returning it as the result. The definition of
+\erlcode{i2wb/4} will contain one more group of rules, stemming from
+the splitting of the group dedicated to comparisons into two
+subgroups, depending on the difference of lengths of the two lists,
+named~\erlcode{D} in the following code schema:
+\begin{alltt}
+i2wb(   [],    Q,   [],_)            \(\smashedrightarrow{\alpha}\) Q;
+i2wb([I|P],    Q,   [],D)            \(\smashedrightarrow{\beta}\) i2wb(P,[I|Q],[],D);
+
+i2wb(    P,[J|Q],[K|R],\textbf{0}) when J < K \(\smashedrightarrow{\gamma}\) \fbcode{HHHHHHHHHHHHH};
+i2wb([I|P],    Q,[K|R],\textbf{0}) when K < I \(\smashedrightarrow{\delta}\) \fbcode{HHHHHHHHHHHHH};
+i2wb(    P,    Q,[K|R],\textbf{0})            \(\smashedrightarrow{\epsilon}\) \fbcode{HHHHHHHHHHHHH};
+
+i2wb(    P,[J|Q],[K|R],\textbf{1}) when J < K \(\smashedrightarrow{\zeta}\) \fbcode{HHHHHHHHHHHHH};
+i2wb([I|P],    Q,[K|R],\textbf{1}) when K < I \(\smashedrightarrow{\eta}\) \fbcode{HHHHHHHHHHHHH};
+i2wb(    P,    Q,[K|R],\textbf{1})            \(\smashedrightarrow{\theta}\) \fbcode{HHHHHHHHHHHHH}.
+\end{alltt}
+Clauses~\clause{\gamma}, \clause{\delta}~and~\clause{\epsilon} are
+respectively dual of~\clause{\zeta},
+\clause{\eta}~and~\clause{\theta}, although details due to the
+difference in length will lead to small differences in the bodies. Let
+us start with the patterns matching the case when both lists have the
+same length, that is, \erlcode{D}~is~\erlcode{0}. Let us consider
+clause~\clause{\gamma}. It matches the case when the item to
+insert,~\erlcode{K}, belongs to the second list \erlcode{[J|Q]}, so
+\erlcode{ins\_up/2} must be called. Since the second list will exceed
+the first by one, the recursive call must be done with a difference
+of~\erlcode{1}. Notice how~\erlcode{J} is already at the right place
+and does no need to be included in the call to \erlcode{ins\_up/2}.
+\begin{alltt}
+i2wb(P,[J|Q],[K|R],0) when J < K \(\smashedrightarrow{\gamma}\)
+\hfill i2wb(P,[J|ins_up(K,Q)],R,\textbf{1});
+\end{alltt}
+At this point it may appear more obviously that our new design is
+based both on one\hyp{}way insertion and unbalanced, two\hyp{}way
+insertion. Clause~\clause{\delta} processes the situation in
+which~\erlcode{K} has to be inserted in the first list. Because we
+decided to always have the second list of greater or equal length than
+the first, we need, in addition to a one\hyp{}way insertion into a
+non\hyp{}increasing list, to move the top of the first
+list,~\erlcode{I}, to the second list. The recursive call is
+subsequentially performed with a difference of length equal to
+\erlcode{1}.
+\begin{alltt}
+i2wb([I|P],Q,[K|R],0) when K < I \(\smashedrightarrow{\delta}\)
+\hfill i2wb(ins_dn(K,P),[I|Q],R,\textbf{1});
+\end{alltt}
+Clause~\clause{\epsilon} handles the case when~\erlcode{K} lays
+between the two lists. Following the same design principle to favour
+the second list in case of equal lengths, we push it on~\erlcode{Q}
+and call recursively with a difference of~\erlcode{1}.
+\begin{alltt}
+i2wb(P,Q,[K|R],0) \(\smashedrightarrow{\epsilon}\) i2wb(P,[K|Q],R,\textbf{1});
+\end{alltt}
+Let us turn to the dual clauses where the difference of lengths
+is~\erlcode{1} instead of~\erlcode{0}. The difference between clauses
+\clause{\gamma}~and~\clause{\zeta} is that the latter must reinstate
+the balance by moving the top of the second list, \erlcode{J}~to the
+top of the first,~\erlcode{P}. The recursive call is performed,
+consistently, with a difference of~\erlcode{0}, that is, the lists are
+balanced after insertion.
+\begin{alltt}
+i2wb(P,[J|Q],[K|R],1) when J < K \(\smashedrightarrow{\zeta}\)
+\hfill i2wb([J|P],ins_up(K,Q),R,\textbf{0});
+\end{alltt}
+The difference between clauses \clause{\delta}~and~\clause{\eta} is
+that we do not move the topmost item of the first list because the
+second list is already taller. Therefore, we insert~\erlcode{K} in it,
+and that's it. The recursive call indicates that the lists are now
+balanced.
+\begin{alltt}
+i2wb([I|P],Q,[K|R],1) when K < I \(\smashedrightarrow{\eta}\)
+\hfill i2wb([I|ins_dn(K,P)],Q,R,\textbf{0});
+\end{alltt}
+Finally, the difference between clauses
+\clause{\epsilon}~and~\clause{\theta} is that we insert~\erlcode{K} on
+the first list because it is shorter by one, achieving thus the
+balance.
+\begin{alltt}
+i2wb(P,Q,[K|R],1) \(\smashedrightarrow{\theta}\) i2wb([K|P],Q,R,\textbf{0}).
+\end{alltt}
+As a summary, here is the full definition of
+\erlcode{i2wb/4}\label{code:i2wb}:
+\begin{alltt}
+i2wb(   [],    Q,   [],_)            \(\smashedrightarrow{\alpha}\) Q;
+i2wb([I|P],    Q,   [],D)            \(\smashedrightarrow{\beta}\) i2wb(P,[I|Q],[],D);
+i2wb(    P,[J|Q],[K|R],0) when J < K \(\smashedrightarrow{\gamma}\)
+\hfill i2wb(P,[J|ins_up(K,Q)],R,1);
+i2wb([I|P],    Q,[K|R],0) when K < I \(\smashedrightarrow{\delta}\)
+\hfill i2wb(ins_dn(K,P),[I|Q],R,1);
+i2wb(    P,    Q,[K|R],0)            \(\smashedrightarrow{\epsilon}\) i2wb(P,[K|Q],R,1);
+i2wb(    P,[J|Q],[K|R],1) when J < K \(\smashedrightarrow{\zeta}\)
+\hfill i2wb([J|P],ins_up(K,Q),R,0);
+i2wb([I|P],    Q,[K|R],1) when K < I \(\smashedrightarrow{\eta}\)
+\hfill i2wb([I|ins_dn(K,P)],Q,R,0);
+i2wb(    P,    Q,[K|R],1)            \(\smashedrightarrow{\theta}\) i2wb([K|P],Q,R,0).
+\end{alltt}
+Let us consider in \figs~\vrefrange{fig:balanced_ex}{fig:balanced_ex2}
+all the different configurations for the two lists after the insertion
+of~\(b\), \(c\)~and~\(d\).
+\begin{figure}[t]
+\centering
+\includegraphics{balanced_ex}
+\caption{Balanced two\hyp{}way insertions of \(b\) and
+  \(c\) in \erlcode{[],[\(a\)]}\label{fig:balanced_ex}
+}
+\end{figure}
+\begin{figure}[b]
+\centering
+\includegraphics{balanced_ex2}
+\caption{Balanced two\hyp{}way insertion of \(d\) in
+  \erlcode{[\(a\)],[\(b\),\(c\)]}\label{fig:balanced_ex2}}
+\end{figure}
+Let us wonder now what are the best, worst and average delays of
+\erlcode{i2wb/1}. Let us assume that we have the input
+\erlcode{[\(a_0, a_1, a_2, a_3, a_4\)]} and we want it to minimise the
+rewrites, which means not to use clauses~\clause{\gamma},
+\clause{\delta}, \clause{\zeta}~and~\clause{\eta}; also, the usage of
+clause~\clause{\beta} should be minimum. The latter clause is not an
+issue because it reverses the first list and, by design, the second
+list has the same length as the first, or exceeds it at most by one
+number. A simple diagram with the two lists initially empty suffices
+to convince us that the numbers must go alternatively to the right and
+then to the left, leading, for example, to \erlcode{[\(a_3 , a_1\)]}
+and \erlcode{[\(a_4, a_2, a_0\)]}. This is perhaps better visualised
+by means of oriented edges revealing a whirlpool in
+\fig~\vref{fig:whirlpool}, to be contrasted with the spiral in
+\fig~\vref{fig:spiral} for \erlcode{i2w/1}.
+\begin{figure}
+\centering
+\includegraphics[bb=71 671 174 715]{a1a3a4a2a0}
+\caption{Best case for \erlcode{i2wb/1} if \(n=5\)
+\label{fig:whirlpool}}
+\end{figure}
+
+The clause definining \erlcode{i2w/1} has to be used first. Then each
+number is inserted, alternatively by means of clause
+\clause{\epsilon}~and~\clause{\theta}. Finally, the first list is
+reversed by clauses \clause{\alpha}~and~\clause{\beta}, so the
+question hinges on determining the length of this list in the best
+case. By design, if the total number of items is even, then the two
+lists will end up containing, before using clause~\clause{\beta},
+exactly half of them, because the lists have the same length. If the
+total is odd, the first list contains the quotient of this number when
+halved. Technically, let us note \(\best{i2wb}{n}\) the delay of any
+call \erlcode{i2wb(\(L\))}, where the list~\(L\) contains
+\(n\)~numbers.
+\begin{align*}
+\best{i2wb}{2p}   &:= 1 +     2p + p = 3p + 1,\\
+\best{i2wb}{2p+1} &:= 1 + (2p+1) + p = 3p + 2,
+                      \,\; \text{with} \,\; p \geqslant 0. 
+\intertext{Another, more compact, way to put it is: for~\(n\geqslant{}0\),}
+\best{i2wb}{n} &= 1 + n + \floor{n/2}
+\mathrel{\sim} \tfrac{3}{2}{n},\,\; \text{as} \,\; n \rightarrow
+\infty.
+\end{align*}
+where \(\lfloor{x}\rfloor\), pronounced ``floor \(x\),'' is the
+greatest integer smaller than~\(x\). The equivalence is correct
+because \(n/2-1 < \floor{n/2} \leqslant n/2\).
+
+The worst case occurs when insertions are repeatedly performed at the
+bottom of the longest list. This case is left to the reader as an
+exercise.
+
+Let us focus on the average delay. Let us suppose first the easiest
+case in which \(n\)~is even. It is the easiest because, by design,
+both lists will have the same length after the insertions are
+done. Technically, this means that there exists an integer~\(p\) such
+that \(n=2p\). Then we have
+\[
+\ave{i2wb}{0} := 2;\quad
+\ave{i2wb}{2p}
+  := 1 + \sum_{k=0}^{2p-1}{\ave{}{k}}
+              + \ave{\(\alpha\beta\)}{p},
+              \,\; \text{for} \,\; p \geqslant 0,
+\]
+where \(\ave{}{k}\) is the average number of rewrites to insert a
+random number into a random configuration of two lists whose total
+number of items is~\(k\) and \(\ave{\(\alpha\beta\)}{p}\) is the
+number of rewrites to reverse \(p\)~numbers from the first list to the
+second and finally return the second list. The term
+\(\ave{\(\alpha\beta\)}{p}\) comes from the fact that, because
+\(n=2p\), there will be \(p\)~numbers left after all the insertions
+are over. Obviously, we have
+\[
+\ave{\(\alpha\beta\)}{p} := p + 1.
+\]
+The determination of \(\ave{}{k}\) requires the consideration of only
+two cases: either \(k\)~is even or it is odd. When analysing the
+average delay of \erlcode{i2w/1}, there were much more configurations
+to take into account because not all the insertions lead to balanced
+lists. If \(k\)~is even, then there exists an integer~\(j\) such that
+\(k=2j\) and
+\[
+\ave{}{2j} = \ave{}{j,j},
+\]
+where \(\ave{}{j,j}\) is the average number of rewrites to insert a
+random number into a configuration of two lists of length \(j\). We
+already computed \(\ave{}{p,q}\) \vpageref{A_pq} where we called it
+\(\ave{\(\gamma\delta\epsilon\)}{p,q}\) (we omit here the names of the
+clauses because there are too many involved):
+\[
+\ave{}{p,q} = \frac{p^2 + 3p + q^2 + 3q + 2}{2p + 2q + 2}.
+\]
+So we draw, by substitution and simplification,
+\[
+\ave{}{2j} = \frac{j^2 + 3j + 1}{2j+1} = \frac{1}{2}{j} - \frac{1}{4}
+\cdot \frac{1}{2j+1} + \frac{5}{4}.
+\]
+The remaining case is \(k\)~being odd, that is, \(k=2j+1\). By design,
+we know that the first list will hold \(j\)~numbers whilst the
+second~\(j+1\):
+\[
+\ave{}{2j+1} = \ave{}{j,j+1} = \tfrac{1}{2}{j} + \tfrac{3}{2}.
+\]
+Let us come back to our initial goal:
+\begin{align*}
+\ave{i2wb}{2p}
+  &= 1 + \sum_{k=0}^{2p-1}{\ave{}{k}} + (p+1).
+\intertext{In order to use \(\ave{}{2j}\) and \(\ave{}{2j+1}\), we
+  must group the terms \(\ave{}{k}\) pairwise, so we
+  explicitly see that we sum successive even and odd numbers (\(k=2j\)
+  and \(k=2j+1\)):}
+\ave{i2wb}{2p}
+  &= 2 + p + \sum_{j=0}^{p-1}{(\ave{}{2j} + \ave{}{2j+1})}
+   = 2 + p + \sum_{j=0}^{p-1}{\ave{}{2j}}
+           + \sum_{j=0}^{p-1}{\ave{}{2j+1}}.
+\intertext{Now we can make use of the values we found above for
+  \(\ave{}{2j}\) and \(\ave{}{2j+1}\):}
+\ave{i2wb}{2p}
+  &= 2 + p + \sum_{j=0}^{p-1}{\left(\frac{1}{2}{j} - \frac{1}{4}
+               \cdot \frac{1}{2j+1} + \frac{5}{4}\right)}
+           + \sum_{j=0}^{p-1}{\left(\frac{1}{2}{j} +
+             \frac{3}{2}\right)}\\
+  &= 2 + p + \left(\frac{1}{2}\sum_{j=0}^{p-1}{j} -
+             \frac{1}{4}\sum_{j=0}^{p-1}{\frac{1}{2j+1}} +
+             \frac{5}{4}{p}\right)
+           + \left(\frac{1}{2}\sum_{j=0}^{p-1}{j} +
+             \frac{3}{2}{p}\right)\\
+  &= \frac{1}{2}{p^2} + \frac{13}{4}{p} + 2 -
+             \frac{1}{4}\sum_{j=0}^{p-1}{\frac{1}{2j+1}}.
+\end{align*}
+We need to find the value of this sum. By definition, the \(n\)th
+\emph{harmonic number}, noted \(H_n\) for all \(n>0\), is
+\[
+H_n := \sum_{j=1}^{n}{\frac{1}{j}}.\,\; \text{So, obviously,}
+\,\; H_{2p} = \sum_{j=1}^{2p}{\frac{1}{j}}.
+\]
+Let us group in \(H_{2p}\), on the one hand, the inverses with an odd
+numerator and, on the other hand, the inverses with an even numerator:
+\[
+H_{2p} = \sum_{j=0}^{p-1}{\frac{1}{2j+1}} + \sum_{j=1}^{p}{\frac{1}{2j}}
+      = \sum_{j=0}^{p-1}{\frac{1}{2j+1}} + \frac{1}{2}{H_{p}}.
+\]
+We can express now our sum in terms of the harmonic series:
+\[
+\sum_{j=0}^{p-1}{\frac{1}{2j+1}} = H_{2p} - \frac{1}{2}{H_{p}}.
+\]
+We can now replace it in the latest equation defining
+\(\ave{i2wb}{2p}\):
+\begin{align*}
+\ave{i2wb}{2p}
+  &= \frac{1}{2}{p^2} + \frac{13}{4}{p} + 2 -
+     \frac{1}{4}\Big(H_{2p} - \frac{1}{2}{H_{p}}\Big)\\
+  &= \frac{1}{2}{p^2} + \frac{13}{4}{p} + \frac{1}{8}{H_p} 
+     - \frac{1}{4}{H_{2p}} + 2.
+\end{align*}
+We can check this formula for \(p=0\), looking forward to the expected
+result~\(2\). For the formula to work, we must extend~\(H_p\) so that
+\(H_0 = 0\). Then we indeed deduce \(\ave{i2wb}{0} = 2\). The
+remaining task consists in finding \(\ave{i2wb}{2p+1}\). Resuming
+the same line of thoughts, we deduce
+\begin{align}
+\ave{i2wb}{2p+1}
+  &= 1 + \sum_{k=0}^{2p}{\ave{}{k}}
+       + \ave{\(\alpha\beta\)}{p},
+         \,\; \text{for} \,\; p \geqslant 0,\notag
+\intertext{because we know that there will be \(p\)~numbers left in
+  the first list after the insertions are over. Instead of doing
+  calculations almost similar to the previous ones, it is wise to
+  reuse them:}
+\ave{i2wb}{2p+1}
+  &= 1 + \left(\sum_{k=0}^{2p-1}{\ave{}{k}} + \ave{}{2p}\right) 
+       + \ave{\(\alpha\beta\)}{p}
+   = \ave{i2wb}{2p} + \ave{}{2p}\notag\\
+  &= \left(\frac{1}{2}{p^2} + \frac{13}{4}{p} + \frac{1}{8}{H_p} 
+     - \frac{1}{4}{H_{2p}} + 2\right)
+     \!+\! 
+     \left(\frac{1}{2}{p} - \frac{1}{4} \!\cdot\! \frac{1}{2p+1} +
+     \frac{5}{4}\right)\notag\\
+  &= \frac{1}{2}{p^2} + \frac{15}{4}{p} + \frac{1}{8}{H_p} -
+     \frac{1}{4}{H_{2p+1}} + \frac{13}{4}.\notag
+\intertext{Let us try \(p=0\): \(\ave{i2wb}{1}
+  = -\frac{1}{4}{H_1} + \frac{13}{4} = 3\), which is
+  correct. Summarising, for all \(p \geqslant 0\):}
+\ave{i2wb}{2p}
+  &= \frac{1}{2}{p^2} + \frac{13}{4}{p} + \frac{1}{8}{H_p} 
+     - \frac{1}{4}{H_{2p}} + 2,\label{eq:A_i2wb_2p}\\
+\ave{i2wb}{2p+1}
+  &= \frac{1}{2}{p^2} + \frac{15}{4}{p} + \frac{1}{8}{H_p} -
+     \frac{1}{4}{H_{2p+1}} + \frac{13}{4}.\label{eq:A_i2wb_2p+1}
+\end{align}
+Let us determine the asymptotic behaviour of~\(H_n\). Perhaps the
+easiest way consists in proving that, for all nonzero real
+numbers~\(x\),
+\[
+1 + x < e^x,
+\]
+where \(e\) is an irrational constant whose approximate value is
+\[
+e = 2.718281828459045\ldots
+\]
+This is easily done by defining a real function~\(\phi\) such that
+\(\phi(x) = e^x - x - 1\), and demonstrating that its values increase
+from a positive value. The derivative is \(\phi'(x) = e^x - 1\), so
+\(\phi'(x) > 0\) for all \(x > 0\). Since \(\phi(0) = 0\), the
+inequality above follows. The next step makes use of it to find a
+lower bound for~\(H_n\). As a special case, for all integers
+\(i>0\),
+\begin{align*}
+1 + \frac{1}{i} &< e^{1/i}.
+\intertext{Since both sides of the inequality are positive, we can
+  multiply all its instances for~\(i\) ranging from~\(1\) to~\(n\):}
+\prod_{i=1}^{n}{\left(1 + \frac{1}{i}\right)}
+&<
+\prod_{i=1}^{n}{e^{1/i}}.
+\intertext{Equivalently and using the notation \(\exp(x) :=
+  e^x\):}
+n+1 = \frac{(n+1)!}{n!} = \prod_{i=1}^{n}{\frac{i+1}{i}}
+&<
+\exp\left(\sum_{i=1}^{n}{\frac{1}{i}}\right) = \exp(H_n).
+\intertext{Let \(\ln\) be the inverse function of~\(\exp\). The
+  number~\(\ln{p}\) is called the \emph{natural logarithm} (or
+  \emph{Napierian logarithm}) of \(p>0\). It is an increasing
+  function, so we can apply it to both sides of the inequation above
+  and}
+\ln(n+1) &< H_n.
+\intertext{An upper bound of~\(H_n\) can be similarly obtained by
+  replacing~\(x\) by~\(-x\) in the original inequation \(1 + x
+  \leqslant e^x\), since it is valid for all \(x~\neq~0\), which
+  yields \(1 - x~\leqslant e^{-x}\). Following now the same track as
+  before, we set \(x = 1/i\), for \(i>1\), and find, for \(n>1\),
+  the equivalent inequalities:}
+1 - \frac{1}{i} &< e^{-1/i},\\
+\frac{1}{n} = \frac{(n-1)!}{n!} = \prod_{i=2}^{n}{\frac{i-1}{i}}
+  &< \exp\left(-\sum_{i=2}^{n}{\frac{1}{i}}\right)
+= \frac{1}{\exp\left(H_n-1\right)},\\
+\exp\left(H_n-1\right) &< n,\\
+H_n &< 1 + \ln n.
+\intertext{Therefore, we established the following inequalities for
+  \(n>1\):}
+\ln(n+1) < H_n &< 1 + \ln n.
+\end{align*}
+We can now proceed with bounding \(\ave{i2wb}{2p}\) and
+\(\ave{i2wb}{2p+1}\):
+\begin{align*}
+\ln(p+1) - 2\ln(2p)
+&< 8 \cdot \ave{i2wb}{2p} - 4{p^2} - 26{p} - 14\\
+&\hphantom{8 \cdot \ave{i2wb}{2p} - 4{p^2} - 26p} 
+< \ln p - 2\ln(2p+1) + 3;\\
+\ln(p+1) - 2\ln(2p+1)
+&< 8 \cdot \ave{i2wb}{2p+1} - 4{p^2} - 30{p} - 24\\
+&\hphantom{8 \cdot \ave{i2wb}{2p+1} - 4{p^2} - 30{p}}
+< \ln{p} - 2\ln(2p+2) + 3.
+\end{align*}
+Setting \(n=2p\) and \(n=2p+1\) leads, respectively, to the
+following bounds:
+\begin{align*}
+-2\ln n + \ln(n+2) + 4 &< \varphi(n) < -2\ln(n+1) + \ln n + 7,\\
+-2\ln n + \ln(n+1)     &< \varphi(n) < -2\ln(n+1) + \ln(n-1) + 3,
+\end{align*}
+where \(\varphi(n) := 8 \cdot \ave{i2wb}{n} - n^2 - 13n - 10 + \ln
+2\). We retain the minimum of the lower bounds and the maximum of the
+upper bounds of \(\varphi(n)\) so, for all \(n>0\),
+\begin{equation*}
+\ln(n+1) - 2\ln n < \varphi(n) < -2\ln(n+1) + \ln n + 7.
+\end{equation*}
+We can weaken the bounds a little bit with \(\ln n < \ln(n+1)\) and
+simplify into
+\begin{equation*}
+0 < 8 \cdot \ave{i2wb}{n} - n^2 - 13n + \ln n - 10 + \ln 2 < 7.
+\end{equation*}
+In other words, for any \(n \in \mathbb{N}\), there exists
+\(\epsilon_n\) such that \(0 < \epsilon_n < 7/8\) and
+\begin{equation}
+\ave{i2wb}{n} = \tfrac{1}{8}(n^2 + 13n - \ln n + 10 - \ln 2) +
+\epsilon_n.\label{ineq:i2wb}
+\end{equation}
+Now we need bounds on~\(\ln n\). Let us start by proving that, for any
+\(x\geqslant 0, x^2 < e^x\). Let \(\psi(x) = e^x - x^2\). We have
+\(\psi'(x) = e^x - 2x > 0\) for all~\(x\) (see above how we dealt with
+\(1 + x < e^x\)) and \(\psi(0) = 1\), thus \(\psi(x)>0\) for
+\(x\geqslant{}0\). Next, we can replace~\(x\) by~\(\sqrt{y}\), when
+\(x>1\), yielding the inequalities
+\begin{align}
+1 < y < e^{\sqrt{y}} & \Rightarrow\,\; 0 < \ln y < \sqrt{y}
+\;\,\Rightarrow\;\, 0 < (\ln y)/y < 1/\sqrt{\smash[b]{y}}\notag\\
+                   & \Rightarrow\;\, (\ln y)/y \mathrel{\sim} 0.
+\label{ineq:ln}
+\end{align}
+We conclude
+\[
+\ave{i2wb}{n} \mathrel{\sim} \tfrac{1}{8}{n^2},\,\; \text{as} \,\; n
+\rightarrow \infty.
+\]
+This is the best, that is, lowest, asymptotic average delay we have
+found so far and we conjecture that this is the best we can hope for
+with two\hyp{}way insertion sort. Of course, the bad news is that we
+could not beat the quadratic delay in itself and, therefore, we shall
+study more efficient sorting algorithms in a later section.
+
+\medskip
+
+\paragraph{Proving correctness.}
+\label{par:insertion_correctness}
+
+Let us recall the original version of \erlcode{isort/1}:
+\verbatiminput{isort.erl} (We renamed~\erlcode{S} into~\erlcode{T} in
+the second clause of \erlcode{insert/2} to make the following proof
+easier to understand.) On page~\pageref{correctness} we introduced
+informally the concept of correctness as being the property of some
+function to compute what it is expected to compute and not to compute
+anything it is not expected to. Therefore, we should define precisely
+what it means for \erlcode{isort/1} to be correct. (In the following,
+we shall assume that ``sorted list'' means ``nondecreasingly sorted
+list.'' The same proof can be done for non\hyp{}increasingly sorted
+lists.) The function at hand is supposed to implement a sorting
+algorithm, so we could say that we want to make sure that the result
+is a sorted list and that it contains exactly the same items as the
+input. Let us make this statement more precise and reckon by induction
+on the length of the list.
+
+First, let us check that \erlcode{isort([])} is a sorted list: the
+first clause tells us that the result is~\erlcode{[]}, as expected.
+
+Now, let us posit the \emph{induction hypothesis} that
+\erlcode{isort/1} is correct for all lists of a given length~\(n>0\)
+and let us endeavour to prove the same for all lists of
+length~\(n+1\). If we succeed, the \emph{induction principle} would
+allow us to conclude that \erlcode{isort/1} is correct for all inputs.
+
+Let us suppose that we have an arbitrary list~\(L\) of
+length~\({n>0}\) and an arbitrary item~\(I\), comparable to all items
+in~\(L\). Then, the second clause defining \erlcode{isort/1} implies
+\erlcode{insert(\(I\),isort(\(L\)))}. The induction hypothesis applies
+to the call \erlcode{isort(\(L\))}, so it is correct; hence we only
+need to establish that the call to \erlcode{insert/2} is correct. But
+we have not defined yet what it precisely means for \erlcode{insert/2}
+to be correct. Let us say that it signifies that, given a sorted
+list~\(T\) and an item~\(I\) comparable to all items in~\(T\), the
+call \erlcode{insert(\(I\),\(T\))} results in a sorted list
+containing~\(I\) and all the items of~\(T\).
+
+We have to do a proof by \emph{complete induction} on this function,
+based on the length of~\(T\). The second clause defining
+\erlcode{insert/2} entails that \erlcode{insert(\(I\),[])} evaluates
+in the expected result \erlcode{[\(I\)]}: this is the base case. The
+complete induction hypothesis for \erlcode{insert/2} is that
+\erlcode{insert(\(I\),\(T\))} is correct for all lists~\(T\) whose
+length is lower or equal than a given \(n>0\) and for all items~\(I\)
+comparable with all the items in~\(T\).
+
+Let us prove that \erlcode{insert(\(I\),\(U\))} is correct, where the
+arbitrary sorted list~\(U\) has length~\(n+1\). If we succeed, the
+induction principle would imply that \erlcode{insert/1} is correct for
+all inputs. Let us suppose given an arbitrary list~\(T\) of length
+\(n>0\) and a totally comparable item \(I\). Because \(T\)~is not
+empty, it has a first item~\(J\) and an immediate sub\hyp{}list~\(S\),
+that is, \(T=\erlcode{[\(J\)|\(S\)]}\). Item~\(I\) is comparable
+to~\(J\), so two cases are possible: either \(I~\leqslant~J\) or
+\(I>J\). If the former, the second clause applies and ends with
+\erlcode{[\(I\)|\(T\)]}. This list has length~\(n+1\), it contains all
+the items it should, it is sorted because \(I<J\) and~\(T\) being
+sorted entail that~\(I\) is lower than all the items in~\(T\). In the
+latter case, that is, \(I>J\), the first clause applies and rewrites
+the call into \erlcode{[\(J\)|insert(\(I\),\(S\))]}. The complete
+induction hypothesis holds for the call \erlcode{insert(\(I\),\(S\))}
+because~\(S\) has length~\(n-1\). (This is why we needed the induction
+to be complete: the hypothesis has to apply to the case~\(n-1\). The
+correctness proof on \erlcode{isort/1} alone does not require it.)
+Therefore, its value is the correct expected sorted list of
+length~\(n\). Since \(I>J\) and \(J\)~is the smallest item of~\(T\),
+\(J\)~has to be the smallest item of the result, which it is, being
+the first one in \erlcode{[\(J\)|insert(\(I\),\(S\))]}. This closes
+the second case.
+
+Finally, the complete induction principle entails that
+\erlcode{insert/2} is correct, which allows us to apply the induction
+principle to \erlcode{isort/1} and conclude that it is correct as
+well. \textsc{qed}
+
+The keen reader may have remarked that the proof is incomplete,
+because we did not clearly established that the resulting list is a
+permutation of the original list. That is because we wanted to convey
+the main line of thought. Notice also how to one recursive call in the
+code corresponds one application of the induction hypothesis in the
+proof. This is not a coincidence and, on the contrary, exemplifies a
+duality between proof theory and programming language theory.
+
+\medskip
+
+\paragraph{Exercises.} (\emph{More playful variations on two\hyp{}way
+  insertion sort})
+\label{ex:insertion_sort}
+
+\noindent [See answers \vpageref{ans:insertion_sort}.]
+
+\begin{enumerate}
+
+  \item \label{ins:ex:1} When designing \erlcode{i2w/3},
+    \vpageref{code:unbalanced_i2w}, we chose to always push the item
+    to be inserted,~\erlcode{K}, in the right list in
+    clause~\clause{\epsilon}. Let us modify slightly this tactic and
+    push on the left when the left list is empty (in bold in the
+    following definition):
+\begin{alltt}
+i2w_a(L) -> i2w_a([],[],L).
+
+i2w_a(   [],    Q,     []) -> Q;
+i2w_a([I|P],    Q,     []) -> i2w_a(    P,[I|Q],[]);
+i2w_a(    P,[J|Q],L=[K|_]) when J < K 
+                           -> i2w_a([J|P],    Q, L);
+\textbf{i2w_a(   [],    Q,  [K|R]) -> i2w_a(  [K],    Q, R);}
+i2w_a([I|P],    Q,L=[K|_]) when K < I
+                           -> i2w_a(    P,[I|Q], L);
+i2w_a(    P,    Q,  [K|R]) -> i2w_a(    P,[K|Q], R).
+\end{alltt}
+Find the delay in the best and worst cases for an input list of \(n\)
+items. Prove that the average delay is
+\[
+\ave{i2w\_a}{n} = \frac{1}{6}{n^2} + \frac{3}{2}{n} - H_n +
+\frac{10}{3}.
+\]
+From which value of \(n\) do you have \(\ave{i2w\_a}{n} <
+\ave{i2w}{n}\)? Can you explain in simple terms why the delay is
+slightly lesser?
+
+\noindent (\emph{Hint.} Write down the examples similar to the ones
+found in \fig~\vref{fig:two-way_unbalanced} and observe that the
+difference with \erlcode{i2w/1} is that the configuration with an
+empty left list is replaced with a configuration with a singleton left
+list, that is, \(\ave{}{0,k}\) is replaced with \(\ave{}{1,k-1}\) in the
+definition of \(\ave{}{k}\).)
+
+  \item In clause~\clause{\epsilon} of \erlcode{i2w/3}, the
+    number~\erlcode{K} is inserted on the right list. Let us insert it
+    instead on the left list (change in bold):
+\begin{alltt}
+i2w_b(L) -> i2w_b([],[],L).
+
+i2w_b(   [],    Q,     []) -> Q;
+i2w_b([I|P],    Q,     []) -> i2w_b(    P,[I|Q],[]);
+i2w_b(    P,[J|Q],L=[K|_]) when J < K 
+                           -> i2w_b([J|P],    Q, L);
+i2w_b([I|P],    Q,L=[K|_]) when K < I
+                           -> i2w_b(    P,[I|Q], L);
+i2w_b(    P,    Q,  [K|R]) -> i2w_b(\textbf{[K|P]},    \textbf{Q}, R).
+\end{alltt}
+    Find the best and worst cases of \erlcode{i2w\_b/1}. Prove that
+    the average delay is
+    \[
+      \ave{i2w\_b}{n} = \frac{1}{6}{n^2} + \frac{3}{2}{n} + 
+      \frac{7}{3}.
+    \] 
+    How does that compare with \erlcode{i2w/1}? Explain why.
+
+  \item When designing \erlcode{i2wb/1}, we decided, in case the
+    number of items in a configuration is odd, to always maintain the
+    right list longer by one. What if we allowed the left list to be
+    longer by one as well? Extend the definition of \erlcode{i2wb/4}
+    so to cope with a difference in length ranging over~\(-1\),
+    \(0\)~and~\(1\). Find the best and worst cases. Find the average
+    delay. Do you expect it to be lower? Try guessing by drawing some
+    examples and building an argument and then do your calculations.
+
+\end{enumerate}

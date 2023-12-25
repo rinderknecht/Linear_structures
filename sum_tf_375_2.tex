@@ -1,0 +1,56 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\raisebox{-3pt}{\(=\)}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum\_tf}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{three3}{\erlcode{3}}}
+    \pstree{\TR{\rnode[r]{sevenRoot3}{\erlcode{|}}}}{
+      \erlnode{7}
+      \pstree{\TR{\rnode[r]{fiveRoot3}{\erlcode{|}}}}{
+        \erlnode{5}
+        \erlnode{\rnode[rt]{empty3}{[]}}
+      }
+    }
+  }
+}
+\hspace*{-18pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc4}{\rnode[rb]{arg4}{\erlnode{sum\_tf}}}}{
+  \Tn
+  \Tn
+}
+\hspace*{0pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc5}{\rnode[rb]{arg5}{\erlnode{sum\_tf}}}}{
+  \erlnode{10}
+  \Tn
+}
+\hspace*{0pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc6}{\rnode[rb]{arg6}{\erlbox{sum\_tf}}}}{
+  \psset{nodesepB=2pt}
+  \erlnode{15}
+  \Tn
+}
+\ncarc[arcangle=15,nodesepA=6pt]{->}{acc4}{three3}
+\nccurve[angleA=-45,angleB=20,nodesepA=6pt]{->}{arg4}{sevenRoot3}
+\nccurve[angleA=-45,angleB=20,ncurvA=1,nodesepA=6pt]{->}{arg5}{fiveRoot3}
+
+\nccurve[angleA=-45,angleB=20,ncurvA=1,nodesepA=7pt]{->}{arg6}{empty3}
+\endTeXtoEPS
+
+\end{document}

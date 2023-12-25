@@ -1,0 +1,27 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage{pst-tree,pst-eps}
+
+\begin{document}
+
+\input{commands}
+
+\TeXtoEPS
+%\psset{showbbox=true}
+\pstree[nodesep=2pt,levelsep=25pt,treesep=6pt,arrows=<-]{\TR{\(\sum_{i=0}^{r-1}{2^{e_i}}\)}}{
+  \TR{\(\Bcomp(2^{e_r})\)}
+  \pstree{\TR{\(\sum_{i=0}^{r-2}{2^{e_{i}}}\)}}{
+    \TR{\(\Bcomp(2^{e_{r-1}})\)}
+    \Tn
+    \psset{linestyle=dotted}
+    \pstree[linestyle=solid]{\TR{\(2^{e_0}\)}}{
+      \TR{\(\Bcomp(2^{e_1})\)}
+      \TR{\(\Bcomp(2^{e_0})\)}
+    }
+  }
+}
+\endTeXtoEPS
+
+\end{document}

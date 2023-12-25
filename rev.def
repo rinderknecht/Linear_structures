@@ -1,0 +1,3 @@
+rev(L)            -> rev_join(L,[]).
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).

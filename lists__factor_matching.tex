@@ -1,0 +1,1596 @@
+%%-*-latex-*-
+
+\chapter{Factor Matching}
+
+In chapter \vref{chap:filtering_out}, we introduced the basic
+algorithm of sequential search which consists in searching step by
+step for the occurrence of a given item into a given list. We can
+think of generalising it by searching for \emph{a series} of items
+into a list. By ``series'' we mean a shorter list whose items may
+occur consecutively in the larger list. For example, we say that the
+list \erlcode{[c,d]} occurs in the list \erlcode{[a,b,c,d,e]} or, more
+precisely, that the former is a \emph{factor} of the latter. Let us
+call this very common problem \emph{factor matching}. For instance,
+when using text editors, the need to search for a word in a text
+arises frequently. In bio\-informatics, it is fairly common to search
+a genome for a given sequence of base pairs. Of course, it is
+interesting to know where the factor is located and this information
+will be represented by an integer, called \emph{index}, corresponding
+to the position at which the head of the factor is first found, given
+that the head of a list has index \(0\). We are not concerned here
+with finding all the factors, only the first. For instance, if we look
+for the list \erlcode{[b,r]} in \erlcode{[a,b,r,a,c,a,d,a,b,r,a]}, we
+expect as a result the index~\(1\) only. Note that the lists can hold
+integers or any other kind of data. For the sake of clarity, we refer
+to parts of lists by means of the indexes delimiting them. For
+example, if~\(t\) is \erlcode{[a,b,r,a,c,a]}, then we write \({t[2] =
+  \erlcode{r}}\) and \(t[4] = \erlcode{c}\). The list
+\(w=\erlcode{[r,a,c]}\) is a factor of~\(t\) at index~\(2\) because
+\(t[2..4] = w\), which is a shortcut for the equalities \(t[2]=w[0]\),
+\(t[3]=w[1]\) and \(t[4]=w[2]\). Now we can capture the essence of
+factor matching in \fig~\vref{fig:naive},
+\begin{figure}[b]
+\centering
+\includegraphics[bb=75 647 331 717]{naive}
+\caption{Naive factor matching (failure in grey, then sliding)
+\label{fig:naive}}
+\end{figure}
+where \(t\) is the list in which \(x\) is sought and \(a_i :=
+t[i]\).
+\begin{enumerate}
+
+  \item \label{head_matches} First, let us suppose that an occurrence
+    of~\(a_0\) has been found at index~\({j-i}\) in~\(t\), that is,
+    \(x[0] = t[j-i]\).
+
+  \item \label{next} Next, it is checked that~\(a_1\), \(a_2\),
+    etc. till \(a_{i-1}\)~occur successively in~\(t\), that is,
+    \(x[0..i-1]\) is a factor of~\(t\) starting at
+    index~\({j-i}\). The failure happens at index~\(j\) in~\(t\) and
+    index~\(i\) in~\(x\), that is, \(t[j] \neq x[i]\). To express
+    this, we arbitrarily chose to set \(t[j] = \erlcode{b}\)
+    and~\(x[i] = \erlcode{a}\).
+
+  \item \label{sliding_step} If \(t[j-i+1]\) is undefined, then
+    \(x\)~is not a factor of \(t\). Otherwise, we compare
+    \(t[j-i+1..]\) to~\(x[0]\): if they match, we resume
+    step~\ref{next}, otherwise step~\ref{sliding_step}, in both cases
+    with~\({j-i+1}\) instead of~\(j-i\).
+
+\end{enumerate}
+We write \(t[j-i+1..]\) to mean the sub\hyp{}list of~\(t\) starting at
+index~\({j-i+1}\). This kind of sub\hyp{}list is called a
+\emph{suffix}, for example, \erlcode{[1,0,1]} is a suffix of
+\erlcode{[0,1,1,1,0,1]}. Suffix is just another name for
+sub\hyp{}list, just as stack is another name for list, and this is
+why, incidentally, it would be incorrect to claim that~\erlcode{[c,d]}
+is a sub\hyp{}list of \erlcode{[a,b,c,d,e]}. When a factor starts at
+index~\(0\), it is called a \emph{prefix}, for example,
+\erlcode{[0,1,1]} is a prefix of \erlcode{[0,1,1,1,0,1]}. A prefix
+which is not identical to the whole list is said to be a \emph{proper
+  prefix}. The same is said for \emph{proper suffixes}. A list can be
+both a prefix and a suffix of another, for example, \erlcode{[0,1]}~is
+both a prefix and a suffix of \erlcode{[0,1,1,1,0,1]}. If a proper
+prefix is a suffix, then it is called a
+\emph{side}. Step~\ref{sliding_step} above can be thought of as
+if~\(x\) is slided along~\(t\) of one index before it is checked
+whether it is a prefix of the current suffix of~\(t\). The algorithm
+we just described can be implemented in \Erlang as
+\begin{alltt}
+\label{code:naive}
+find(Word,Text) \(\smashedrightarrow{\alpha}\) find(Word,Text,0).\hfill% \emph{First index is 0}
+
+find(_,     [],_) \(\smashedrightarrow{\beta}\) absent;         \hfill% \emph{Failure}
+find(X,T=[_|U],J) \(\smashedrightarrow{\gamma}\) case prefix(X,T) of
+                       yes \(\smashedrightarrow{\delta}\) \{factor,J\};    \hfill% \emph{Success}
+                       no  \(\smashedrightarrow{\epsilon}\) find(X,U,J+1) \hfill% \emph{Sliding}
+                     end.
+
+prefix(   [],    _) \(\smashedrightarrow{\zeta}\) yes;                 \hfill% \emph{Success}
+prefix([A|Y],[A|T]) \(\smashedrightarrow{\eta}\) prefix(Y,T);\hfill% \emph{Match}
+prefix(    _,    _) \(\smashedrightarrow{\theta}\) no.                  \hfill% \emph{Mismatch}
+\end{alltt}
+Notice how function \erlcode{find/3} returns either the atom
+\erlcode{absent} if \erlcode{Word} is not in \erlcode{Text}, or the
+pair \erlcode{\{factor,N\}}, where \erlcode{N}~is the index in
+\erlcode{Text} at which \erlcode{Word} occurs. This implementation can
+be considered as the interleaving of a sequential search and a prefix
+check. Actually, we can make the code shorter by tightening further
+this relationship because clause~\clause{\zeta} is always immediately
+followed by clause~\clause{\delta} and clause~\clause{\theta} is
+followed by \clause{\epsilon}. Therefore, we could get rid of the
+\erlcode{case} construct and let \erlcode{prefix/2} continue with what
+is left to be done, at the cost of passing more arguments to
+\erlcode{prefix/2}. The result is definitions in tail form.
+\begin{alltt}
+find(Word,Text) -> find(Word,Text,0).\hfill% \emph{First index is 0}
+
+find(_,     [],_) -> absent;\hfill% \emph{Failure}
+find(X,T=[_|U],J) -> prefix(X,T,\textbf{X,U,J}).
+
+prefix(   [],    _,\textbf{_,_,J}) -> \{factor,J\};\hfill% \emph{Success}
+prefix([A|Y],[A|T],\textbf{X,U,J}) -> prefix(Y,T,\textbf{X,U,J});\hfill% \emph{Match}
+prefix(    _,    _,\textbf{X,U,J}) -> find(X,U,J+1).\hfill% \emph{Sliding}
+\end{alltt}
+In our delay model we do not count the time to execute a
+\erlcode{case} construct, so these two versions have the same
+delay. On the other hand, a \erlcode{case} must take some real
+time. Also, passing more arguments should increase the delay, but we
+do not take this into account neither. So, following our assumptions,
+the differences between the two pieces of code are merely stylistic,
+which does not mean that they do not matter. For instance, the mind
+finds it more difficult to remember many parameters when writing the
+function bodies. Also, the first version, although longer, makes
+evident the discarded information: when returning from a call to
+\erlcode{prefix/2}, only \erlcode{yes} or \erlcode{no} matter. In the
+former case, it is fine, but we may wonder later if we could not use
+the partial match of \erlcode{prefix/2} to speed up
+\erlcode{find/3}. In the mean time, we can shorten the code above by
+noting that we can expand the definition of \erlcode{find/3} call
+\erlcode{find(X,U,J+1)} and get rid of \erlcode{find/3} altogether:
+\begin{verbatim}
+find(Word,Text) -> prefix(Word,Text,Word,Text,0).
+
+prefix(   [],    _,_,    _,J) -> {factor,J};
+prefix(    _,   [],_,    _,_) -> absent;
+prefix([A|Y],[A|T],X,    U,J) -> prefix(Y,T,X,U,J);
+prefix(    _,    _,X,[_|U],J) -> prefix(X,U,X,U,J+1).
+\end{verbatim}
+Notice that we actually improved the delay if we reach the end of the
+text whilst the word is not exhausted yet: in other words, when the
+word does not occur in the text.
+
+In the following discussion about delays, remember that the delay
+attached to arrows clauses \clause{\delta}~and~\clause{\epsilon}
+is~\(0\) because we assume that they are compiled differently and more
+efficiently than a function call. (Formally, \(\len{\delta} =
+\len{\epsilon} = 0\).)  Also, we shall call \emph{word} a list when it
+is written using the lighter notation consisting in stripping the
+opening and closing square brackets and the commas of the \Erlang
+lists, so, for instance, \word{abc} is the word corresponding to the
+list \erlcode{[a,b,c]} (note also the different typeface to avoid
+confusion between the atom \erlcode{abc} and the word
+\word{abc}). This notation proves to be very useful when the items are
+atoms or integers, which we may call \emph{letters}. In the current
+context of factor matching, it is convenient to distinguish between
+the word whose occurrence is being searched and the one in which it is
+looked for. Following the analogy of text editing, we shall call the
+latter \emph{text}. Let \(m\)~be the length of the word
+\(x\)~and~\(n\) the length of the text~\(t\).
+
+\medskip
+
+\paragraph{Best Delay.}
+
+The best case happens when the word is a prefix of the text. The
+execution trace corresponding to the best case is
+\(\alpha\gamma\eta^m\zeta\delta\), so the best delay is
+\(\best{find}{m,n} = m+3\) (\(\delta\) is not counted
+in).\label{naive_best}
+
+\medskip
+
+\paragraph{Worst Delay.}
+
+Let us make three cases, depending on the relative lengths of the
+word~(\(m\)) and the text~(\(n\)).
+\begin{enumerate}
+
+  \item \label{1} \emph{We have \({m > n}\).} The worst case occurs
+    then when \(t\)~is a prefix of~\(x\), so \erlcode{prefix/2} always
+    fails because the text is exhausted. Consider \(t=\word{a}^{n}\)
+    and \(x=\word{a}^m\). The corresponding execution trace has length
+    \[
+    \left\lvert\alpha \cdot
+    \prod_{i=0}^{n-1}{(\gamma\eta^{n-i}\theta\epsilon)}
+    \cdot \beta\right\rvert
+    =
+    1 + \sum_{i=1}^{n}{(1+i+1)} + 1 = \frac{1}{2}{n^2} +
+    \frac{5}{2}{n} + 2.
+    \]
+
+  \item \emph{We have \({m=n}\).} In this case, the worst case is when
+    \erlcode{prefix/2} fails on the last letter of the arguments and
+    subsequent calls fail because the text is exhausted (so the proper
+    suffixes of~\(t\) are completely traversed). This means that
+    \(x[0..m-1]\) is the longest prefix of~\(t\) which is also a
+    suffix. For example, consider \(t=\word{a}^{n}\) and
+    \(x=\word{a}^{m-1}\word{b}\). The corresponding execution trace
+    has the length
+    \[
+    \left\lvert\alpha \cdot (\gamma\eta^{n-1}\theta\epsilon) \cdot
+    \prod_{i=1}^{n-1}{(\gamma\eta^{n-i}\theta\epsilon)} \cdot
+    \beta\right\rvert
+    = \frac{1}{2}{n^2} + \frac{5}{2}{n} + 1.
+    \]
+    We already see that the case~\ref{1} (\({m > n}\)) leads to a
+    slightly worse worst delay. One more case remains.
+
+  \item \emph{We have \({m < n}\).} Two subcases can be made,
+    depending whether the word occurs or not in the text.
+    \begin{enumerate}
+
+    \item \label{2a} \emph{Let us assume that there is an occurrence
+      of~\(x\) in~\(t\).} The worst case is when \(x\)~is a suffix
+      of~\(t\), therefore the word is matched unsuccessfully at all
+      the indexes in the text from~\(0\) to~\(n-m-1\), both included,
+      and successfully starting at index~\(n-m\) in~\(t\). The delay
+      for a word mismatch is maximum when the failure happens at the
+      last letter of the word. An example is \(t =
+      \word{a}^{n-1}\word{b}\) and \(x = \word{a}^{m-1}\word{b}\),
+      where \(\word{a}^i\)~denotes the list of length~\(i\) containing
+      only~\erlcode{a} and~\({u \cdot v}\) or, in short, \(uv\),
+      denotes the list resulting from appending list~\(v\) to
+      list~\(u\). The execution trace corresponding to this case is
+      thus \(\alpha(\gamma\eta^{m-1}\theta\epsilon)^{n-m}
+      (\gamma\eta^m\zeta\delta)\). The total delay is thus
+      \(1+(1+(m-1)+1)(n-m)+(1+m+1)\), that is, \((m+1)n-m^2+3\).
+
+  \item \emph{Let us suppose that there is no occurrence of~\(x\)
+    in~\(t\).} The word~\(x\) is not the prefix of any suffix
+    of~\(t\). More precisely, from indexes~\(0\) to~\(n-m\) in~\(t\),
+    the mismatch happens at the last letter of~\(x\). Indexes
+    from~\({n-m+1}\) to~\(n-1\) in~\(t\) are tried unsuccessfully with
+    failure occurring at indexes~\({m-1}\) to~\(0\) in~\(x\). The
+    final failure is then due to the text being exhausted (see
+    clause~\clause{\beta} above). An example of match failure in the
+    worst case is \(t = \word{a}^{n}\) and \(x =
+    \word{a}^{m-1}\word{b}\). The corresponding execution trace is
+    hence
+    \[
+    \alpha
+    (\gamma\eta^{m-1}\theta\epsilon)^{n-m+1} \cdot
+    \prod_{i=1}^{m}(\gamma\eta^{m-i}\theta\epsilon) \cdot
+    \beta,
+    \]
+    whose length is
+    \[
+      (m+1)n - \frac{1}{2}{m^2} + \frac{3}{2}{m} + 1.
+    \]
+    This delay is strictly greater than in case~\ref{2a}, that is,
+    \((m+1)n-m^2+3\), for any~\({m>1}\). They are equal if, and only
+    if, \(m=1\) (the other root is \({m=-4}\), which makes no
+    sense). Since here \({m < n}\), we derive a simple upper bound
+    \[
+     (m+1)n - \frac{1}{2}{m^2} + \frac{3}{2}{m} + 1
+     < \frac{1}{2}{n^2} + \frac{5}{2}{n} + 1,
+    \]
+    therefore the worst case is case~\ref{1}, that is, when \({m>n}\),
+    hence
+    \[
+    \worst{find}{m,n} = \frac{1}{2}{n^2} + \frac{5}{2}{n} + 2.
+    \]
+    \end{enumerate}
+\end{enumerate}
+
+\medskip
+
+\paragraph{Average Delay.} Let us suppose that \({m < n}\) and that the
+letters of \(x\)~and~\(t\) are chosen from the same finite set, called
+\emph{alphabet}, whose cardinal is~\(\breve{a}\). More precisely, we
+shall assume that the letters are randomly picked in a uniform and
+independent manner, that is to say, all letters are equally likely to
+be chosen and the selection of one letter is independent of the other
+choices. This implies that letters may be repeated. Unfortunately,
+this also entails that these assumptions are not realistic if we think
+of editing a text in English or processing a DNA strand, but it is
+easily amenable to analysis and therefore has a real theoretical
+value, in particular in order to compare the naive search with
+improved versions of it. Let us start by investigating the behaviour of
+\erlcode{prefix/2}.
+
+First, let us consider an erroneous reckoning. Because the delay of
+\erlcode{prefix/2} is \(\comp{prefix}{m,n,k} = k+1\), where \(k\)~is
+the index where a mismatch happens, assuming that \({k=n}\)~means that
+no mismatch happened. Then the average delay is the average of the
+delays for all possible~\(k\), ranging from~\(0\) to~\(n-1\) if we are
+interested in the case of a failure:
+\[
+\ave{prefix}{m,n}
+= \frac{1}{n}\sum_{k=0}^{n-1}{\comp{prefix}{m,n,k}}.
+\]
+This is what we did to obtain equation \eqref{eq:ave_rm_fst}
+\vpageref{eq:ave_rm_fst} but it is here incorrect. The reason is that
+the variable~\(k\) does not represent a randomly uniform choice
+because it represents a \emph{series} of letter choices, as it is the
+end of a prefix.
+
+Here is the correct approach. The informal and intuitive use of
+probability theory above can be avoided and the reckoning made formal
+in the following manner. Let us suppose that \(x\)~is given. We need
+to compute and add the delays of the calls to \erlcode{prefix/2} for
+all the possible choices of \(t[0..m-1]\), which is matched
+against~\(x\), and divide the total by the number of choices. In
+\fig~\vref{fig:ave_prefix}
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 673 237 721]{ave_prefix}
+\caption{All words of length \(2\) over the alphabet \(\{\word{a},
+  \word{b}, \word{c}\}\)
+\label{fig:ave_prefix}}
+\end{figure}
+we represent all possible choices as a tree when the alphabet is
+\(\{\word{a}, \word{b}, \word{c}\}\) and~\({m=2}\). The root is at
+level~\(0\), the children of the root make up level~\(1\)
+etc. Level~\({k>0}\) represents the set of all prefixes \(x[0..k-1]\),
+whose number is thus \(\breve{a}^k\). For example, level~\(1\)
+represents the~\(\breve{a}\) possible values for~\(t[0]\), whereas
+level~\(2\) stands for the \(\breve{a}^2\)~possible words
+\(t[0..1]\). Graphically, a letter annotates each edge in the tree and
+a prefix of length~\(k\) is a path from the root to a node in
+level~\(k\) or, equivalently, a path from the root of
+length~\(k\). For instance, the word \(x=\word{ba}\) is distinguished
+in the figure with black nodes. What is the average delay of
+\erlcode{prefix/2}? The total number of words of length~\(2\) is the
+number of leaves in the tree, here~\(3^2\). In general, this would be
+\(\breve{a}^m\). Now, let us compute the sum of the delays of
+\erlcode{prefix(\(x\),\(t\))}, where \(t\)~ranges over all the texts
+in the tree~\(T\). Then the average delay is formally defined as
+\[
+\ave{prefix}{m,n} := \frac{1}{\breve{a}^m}
+                    \sum_{t \in T}{\delay{prefix(\(x\),\(t[0..m-1]\))}},
+\]
+Notice that this value is independent of \(n\), because the hypotheses
+we made imply that \(\ave{prefix}{m,n}\) does not depend on the
+current suffix of the original text. We shall come back on this when
+finally expressing \(\ave{find}{m,n}\). In the meantime, considering
+the instance in \fig~\vref{fig:ave_prefix}, this expression becomes,
+enumerating the texts \word{aa}, \word{ab}, \word{ac}, \word{ba},
+\word{bb}, \word{bc}, \word{ca}, \word{cb}, \word{cc}:
+\[
+\ave{prefix}{2,n} = \frac{1}{9}(\delay{prefix([b,a],[a,a])} 
++ \dots + \delay{prefix([b,a],[c,c])}).
+\]
+These texts are paths of two kinds: either paths corresponding to a
+mismatch, that is, a result \erlcode{no}, or the only path
+corresponding to a success, that is, a result \erlcode{yes}, which is
+distinguished in bold in \fig~\vref{fig:ave_prefix}. The delay of the
+latter is \(\delay{prefix([b,a],[b,a])}\), which is the length of the
+execution trace \(\eta^2\zeta\), that is,~\(3\). In general, this
+would be~\({m+1}\). The delays in case of mismatch are the other paths
+in the tree. Let us compute them top\hyp{}down, that is, starting from
+the root and ending at the leaves. First, we see that the subtrees
+after following the edges \word{a}~and~\word{c} have the exact same
+shape, so they denote the same number of texts. There are~\(2\) of
+these subtrees and, in general \({\breve{a}-1}\). The number of texts
+in each of them is~\(3\) and, in general, \(\breve{a}^{m-1}\). The
+delay of \erlcode{prefix/2} for all these texts is the same:
+\({\len{\theta} = 1}\). The same observation holds after following the
+edge corresponding to the second letter of~\word{ba}: \(\breve{a}-1\)
+subtrees containing each \(\breve{a}^{m-2}\) texts, each of them
+leading to a delay for \erlcode{prefix/2} equal to \({\len{\eta\theta}
+  = 2}\). In general,
+\begin{align*}
+\breve{a}^m  \cdot \ave{prefix}{m,n}
+&= (\breve{a}-1) \sum_{p=0}^{m-1}{(m-p)\breve{a}^p} + (m+1)\\
+&= \sum_{p=0}^{m-1}{(m-p)\breve{a}^{p+1}}
+   - \sum_{p=0}^{m-1}{(m-p)\breve{a}^p} + m + 1\\
+&= \sum_{p=1}^{m}{(m-p+1)\breve{a}^p}
+   - \sum_{p=0}^{m-1}{(m-p)\breve{a}^p} + m + 1
+ = \sum_{p=0}^{m}{\breve{a}^p}.
+\intertext{Supposing that the alphabet contains at least two
+  letters, that is, \(\breve{a} > 1\),}
+\ave{prefix}{m,n}
+ &= \sum_{p=0}^{m}{\frac{1}{\breve{a}^p}}
+  = \frac{1}{\breve{a}-1} \left(\breve{a} -
+                                \frac{1}{\breve{a}^m}\right)
+  < \frac{\breve{a}}{\breve{a}-1} \leqslant 2.
+\end{align*}
+We can derive \(\ave{find}{m,n}\) if we consider that
+clause~\clause{\alpha} is always called once and, in the worst case,
+\begin{itemize}
+
+  \item the word~\(x\) is tried at every index of~\(t\) from~\(0\)
+    to~\(m-n\), that is, \erlcode{prefix/2} is called \(m-n+1\) times;
+
+  \item all the proper prefixes of~\(x\) are tried at indexes in~\(t\)
+    from indexes~\(n-m+1\) to~\(n-1\);
+
+  \item clause~\clause{\beta} is called once.
+
+\end{itemize}
+Reusing the upper bound \(\ave{prefix}{m,n} \leqslant 2\), this
+analysis entails
+\begin{align*}
+\ave{find}{m,n}
+  &= 1 + (n-m+1) \ave{prefix}{m,n}
+       + \sum_{k=1}^{m-1}{\ave{prefix}{k,n}} + 1\\
+  &\leqslant 1 + 2(n-m+1) + 2 (m-1) + 1 
+   = 2n + 2.
+\end{align*}
+The naive factor matching algorithm is hence quite efficient in
+average. (Notice that, although writing \(\ave{find}{m,n} \in
+\bachmann{n}\) is correct, it is less informative than our result
+because we give explicitly the coefficients.)
+
+\medskip
+
+\paragraph{Morris\hyp{}Pratt Algorithm.}
+
+The slowness of the naive algorithm in the worst case is due to the
+fact that, in case of mismatch in \erlcode{prefix/2}, it starts again
+to compare the first letters of~\(x\) \emph{without using the
+  information of the partial success of the previous attempt.} Indeed,
+if the mismatch occurred at index~\(i\) in~\(x\) and index~\(j\)
+in~\(t\), as featured in \fig~\vref{fig:naive}, we know
+\[
+x[0..i-1] = t[j-i..j-1],\qquad x[i] \neq t[j],
+\]
+but this information is forgotten. Instead, any subsequent search in
+the factor \(t[j-i+1..j-1]\) could reuse the information that it is a
+factor of \(x\): since the previous partial success tells us that
+\(t[j-i+1..j-1] = x[1..i-1]\), it compares \(x[0..i-2]\) to
+\(x[1..i-1]\), that is, \emph{\(x\)~is compared to a part of itself.}
+If we know an index~\(k\) such that \(x[0..k-1]=x[i-k..i-1]\), that
+is, \(x[0..k-1]\)~is a \emph{side} of \(x[0..i-1]\), then we can
+resume comparing \(t[j..]\) with \(x[k..]\), so, the greater~\(k\),
+the more comparisons we skip.
+
+The side of a non\hyp{}empty list~\(x\) is a proper prefix of~\(x\)
+which is also a suffix, or, equivalently, a proper suffix which is
+also a prefix. For example, the \emph{word} \word{abacaba} has the
+three sides \(\varepsilon\), \word{a}~and~\word{aba}. Let us note
+\(\Border{}{x}\) the longest side of a non\hyp{}empty word~\(x\). We
+shall call it \emph{maximum side} of~\(x\). For instance, in
+\fig~\vref{fig:max_sides_table} is the table of the maximum sides for
+the prefixes~\(y\) of the word \(x=\word{abacabac}\).
+\begin{figure}
+\centering
+\includegraphics{max_sides_table}
+\caption{Maximum sides for the prefixes~\(y\) of the word
+\(x=\word{abacabac}\)
+\label{fig:max_sides_table}}
+\end{figure}
+``\(y\) is a prefix of \(x\)'' is noted~\({y \preccurlyeq x}\) and
+``\(y\) is a proper prefix of \(x\)'' is noted~\({y \prec x}\). Each
+column corresponds to a prefix~\(y\) of~\(x\), not just to a
+\emph{letter}, that is, an item of the corresponding list. So, at
+index~\(6\), we should read
+\(\Border{}{\underline{\word{aba}}\word{c}\underline{\word{aba}}} =
+\word{aba}\), at index~\(3\), \(\Border{}{\word{abac}} =
+\varepsilon\), where \(\varepsilon\)~is the empty word, that is, the
+empty list, because \(\word{abac} =
+\underline{\varepsilon}\word{abac}\underline{\varepsilon}\). Also,
+note that maximum sides can overlap, for example, \(\word{aaaa} =
+\underline{\word{aaa}}\word{a} = \word{a}\underline{\word{aaa}}\),
+so~\(\Border{}{\word{aaaa}} = \word{aaa}\).
+
+The optimisation brought by Morris and Pratt to the naive search
+is depicted in \fig~\vref{fig:mp}.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=75 640 343 716]{mp}
+\caption{Morris\hyp{}Pratt algorithm (failure in grey, then sliding)
+\label{fig:mp}}
+\end{figure}
+We see how, in case of a mismatch, \(x\)~is slided of
+\({i-k}\)~indexes, where \(k\)~is the length of the maximum side of
+the longest prefix of~\(x\) such that \(x[i] \neq t[j]\). Therefore,
+it is a mistake to think that the greater the slide, the more
+comparisons are skipped. In fact, the opposite is true: the greater
+the side is, the more comparisons are saved and, in the best case, the
+slide is~\(1\) and the maximum side length is~\({i-1}\). The letters
+of~\(t\) which have been matched successfully against a letter
+in~\(x\) will not be compared again, contrary to the naive approach we
+described earlier; in other words, the indexes in~\(t\) are considered
+increasingly. Also, notice that, for the sake of simplicity, the
+figure shows non\hyp{}overlapping sides, which may not be accurate in
+general (think again about \word{aaaa}). Consider the example in
+\fig~\vref{fig:mp_example} where, in the end, \(x\)~is not found to be
+a factor of~\(t\). The cells in grey correspond to mismatches.
+\begin{figure}
+\centering
+\includegraphics[bb=74 605 341 718]{mp_example}
+\caption{Morris\hyp{}Pratt algorithm at work (no match found)
+\label{fig:mp_example}}
+\end{figure}
+
+Let us wonder how to compute the maximum side of a word. It is clear
+that \(\Border{}{a} = \varepsilon\), for all letter~\(a\). In case the
+word contains more than one letter, that is, it has the shape~\({a
+  \cdot y}\), where \(y\)~is a word, we want to know \(\Border{}{a
+  \cdot y}\). For example, this value is found to be \(a \cdot
+\Border{3}{y}\) in \fig~\vref{fig:max_sides}. The idea is,
+recursively, to consider \(a \cdot \Border{}{y}\). If~\({a \cdot
+  \Border{}{y}}\) is a suffix of~\(y\), then \(\Border{}{ay} = a \cdot
+\Border{}{y}\). Otherwise, we must consider the maximum side of the
+maximum side of~\(y\), that is, \(a \cdot \Border{2}{y}\) instead of
+\(a \cdot \Border{}{y}\), and iterate this process until \(a \cdot
+\Border{q}{y}\) is a suffix of~\(y\), or else \(\Border{q}{y}\)
+is~\(\varepsilon\). This can be formally summarised as follows. For
+all words~\({x \neq \varepsilon}\) and all letters~\(a\):
+\begin{equation}
+\begin{aligned}
+  \Border{}{a}         &:= \varepsilon;\\
+  \Border{}{a \cdot y} &:= \left\{
+    \begin{aligned}
+      & a \cdot \Border{}{y},
+      && \text{if} \; a \cdot \Border{}{y} \; \text{is a suffix of} \;
+         y;\\
+      & \Border{}{a \cdot \Border{}{y}},
+      && \text{otherwise.}
+    \end{aligned}
+  \right.
+\end{aligned}
+\label{eq:B}
+\end{equation}
+Consider the following examples where \(y\)~and~\(\Border{}{y}\) are
+given:
+\begin{align*}
+  y             &= \word{abaabb},
+& \Border{}{y}  &= \varepsilon,
+& \Border{}{\word{a} \cdot y}
+                &= \Border{}{\word{a} \cdot \Border{}{y}}
+                 = \Border{}{\word{a}} = \varepsilon;\\
+  y             &= \word{baaaba},
+& \Border{}{y}  &= \word{ba},
+& \Border{}{\word{a} \cdot y}
+                &= \word{a} \cdot \Border{}{y}
+                 = \word{aba};\\
+  y             &= \word{baabba},
+& \Border{}{y}  &= \word{ba},
+& \Border{}{\word{a} \cdot y}
+                &= \Border{}{\word{a} \cdot \Border{}{y}}
+                 = \word{a} \cdot \Border{2}{y}
+                 = \word{a}.
+\end{align*}
+\begin{figure}[b]
+\centering
+\includegraphics[bb=76 647 332 722]{max_sides}
+\caption{\(\Border{}{a \cdot y}
+   = \Border{}{a \cdot \Border{}{y}}
+   = \Border{}{a \cdot \Border{2}{y}}
+   = a \cdot \Border{3}{y}\).
+\label{fig:max_sides}}
+\end{figure}
+\noindent This recursive definition is straightforwardly translated in
+\Erlang as
+\begin{verbatim}
+side(  [_]) -> [];
+side([A|Y]) -> Z = [A|side(Y)], case suffix(Z,Y) of
+                                  yes -> Z;
+                                  no  -> side(Z)
+                                end.
+\end{verbatim}
+Remains to define the function \erlcode{suffix/2}. We already have a
+definition for \erlcode{prefix/2}, would it be possible to reuse it? A
+sheet of paper and a pencil are enough to see that
+\[
+\erlcode{suffix(\(U\),\(V\))}
+\mathrel{\equiv}
+\erlcode{prefix(rev(\(U\)),rev(\(V\)))},
+\]
+where \erlcode{rev/1} is the function reversing a list, efficiently
+defined as
+\verbatiminput{rev.def}
+Therefore
+\begin{verbatim}
+suffix(U,V) -> prefix(rev(U),rev(V)).
+\end{verbatim}
+If we look back again at \fig~\vref{fig:mp}, we see that we are not
+really interested in knowing the maximum side of \(x[0..i-1]\) but,
+instead, its length~\(k\), because the purpose is to discard the first
+\(k\)~letters of~\(x\) before resuming the comparisons. By means of a
+simple modification of \erlcode{prefix/2}, it is possible to
+compute~\(i\):
+\begin{alltt}
+\textbf{prefix(X,T)           -> prefix(X,T,0).}
+prefix(   [],    _,_) -> yes;\hfill% \(i\) \emph{useless if match}
+prefix([A|Y],[A|T],\textbf{I}) -> prefix(Y,T,\textbf{I+1});
+prefix(    _,    _,\textbf{I}) -> \textbf{\{no,I\}}.\hfill% I \emph{is} \(i\)
+\end{alltt}
+Since it is easy to compute~\(i\), we should think of a direct way to
+compute the length of \(\Border{}{x[0..i-1]}\) directly in terms
+of~\(i\). We could resume the derivation from the definition
+\eqref{eq:B} \vpageref{eq:B}, but it is actually going to be easier to
+work on a slightly different, equivalent definition based on the
+prefixes, not the suffixes. We used suffixes because we had in mind an
+implementation of a function matching lists, so having
+\(\Border{}{ay}\) made sense as \erlcode{side([A|Y])}, whereas
+\(\Border{}{ya}\) would have not. Here, we do not have the concern of
+producing \Erlang code which computes the side, so we should stick to
+the usage of the maximum side in \fig~\vref{fig:mp}: we are interested
+to check the letter \emph{after} the side, not before, so it makes
+more sense to wonder about \(\Border{}{ya}\), where \(y :=
+x[0..i-1]\). Moreover, this allows us to work solely with the concept
+of prefix instead of having to strive with both prefixes and suffixes
+(for which we do not have a notation, by the way). An alternate
+definition for \(\BorderName\) is: for any word~\({y \neq \varepsilon}\)
+and any letter~\(a\),
+\begin{equation}
+\begin{aligned}
+  \Border{}{a}         &:= \varepsilon;\\
+  \Border{}{y \cdot a} &:= \left\{
+    \begin{aligned}
+      & \Border{}{y} \cdot a,
+      && \text{if} \; \Border{}{y} \cdot a \preccurlyeq y;\\
+      & \Border{}{\Border{}{y} \cdot a},
+      && \text{otherwise.}
+    \end{aligned}
+  \right.
+\end{aligned}
+\label{eq:B_pref}
+\end{equation}
+The rationale for it can be seen in \fig~\vref{fig:max_sides_pref},
+which is the dual of \fig~\vref{fig:max_sides}.
+\begin{figure}
+\centering
+\includegraphics[bb=76 647 332 722]{max_sides_pref}
+\caption{\(\Border{}{y \cdot a} 
+   = \Border{}{\Border{}{y} \cdot a}
+   = \Border{}{\Border{2}{y} \cdot a}
+   = \Border{3}{y} \cdot a\).
+\label{fig:max_sides_pref}}
+\end{figure}
+Basically, instead of checking the letter before the suffix, we check
+the letter after the prefix. Let us note~\(\len{y}\) the length of a
+word~\(y\). For a given word~\(x\), let us define a function
+\(\MPfailureName_{x}\) on all its prefixes as
+\begin{align}
+  \MPfailure{x}{}{\len{y}}
+&:= \len{\Border{}{y}},\,\; \text{for
+  all} \,\; x \,\; \text{and} \,\; y \neq \varepsilon \,\; \text{such
+    that} \,\; y \preccurlyeq x.\label{eq:MP_failure}
+\intertext{For reasons which will be clear latter, this function is
+  called the \emph{failure function} of~\(x\). An equivalent
+  definition is}
+  \MPfailure{x}{}{i}
+&= \len{\Border{}{x[0..i-1]}}, \,\;
+\text{for all} \,\; x \,\; \text{and} \,\; i \,\; \text{such that}
+\,\; 0 < i \leqslant \len{x}.\notag
+\end{align}
+For example, \fig~\vref{fig:mp_failure} shows the table of the maximum
+sides for the prefixes of the word \(x=\word{abacabac}\), this time
+with their lengths only.
+\begin{figure}[b]
+\centering
+\includegraphics{mp_failure}
+\caption{Morris\hyp{}Pratt failure function of \word{abacabac}
+\label{fig:mp_failure}}
+\end{figure}
+In \fig~\vref{fig:mp}, the length of the maximum side is~\(k\), so
+\(k=\MPfailure{x}{}{i}\) and \(x[\MPfailure{x}{}{i}]\) is the first
+letter to be compared with~\(t[j]\) after the slide. Also, the figure
+assumes that~\({i>0}\), so the side in question is defined. What if
+the mismatch happens between \(t[j]\)~and~\(x[0]\)?  Then this is the
+same as if a failure happened with the naive algorithm and \(x\)~is
+slided of one index, so \(x[0]\)~is compared again but
+with~\(t[j+1]\). But this does \emph{not} mean that we should
+extend~\(\MPfailureName\) such that \(\MPfailure{x}{}{0} = 0\),
+because this equation denotes a comparison between
+\(x[0]\)~and~\(t[j]\) again, so we would be looping. In order to
+express the small step, we set
+\begin{equation}
+\MPfailure{x}{}{0} = -1.\label{eq:beta_0}
+\end{equation}
+In other words, \({k=-1}\), so the next index to the right is~\(0\),
+which is what we wanted for the start of~\(x\) after the slide. Of
+course, in the implementation, we will have to check whether
+\(\MPfailure{x}{}{i} = -1\) before taking
+\(x[\MPfailure{x}{}{i}]\). Let us continue on this track and reach a
+definition of~\(\MPfailureName\) which relies only on numerical
+values, without computing the maximum sides. The equations
+\eqref{eq:B} \vpageref{eq:B} defining the maximum side can be unfolded
+as follows:
+\begin{align*}
+   \Border{}{ya}
+&= \Border{}{\Border{}{y} \cdot a},
+& \Border{}{y} \cdot a \npreccurlyeq y,\\
+   \Border{}{\Border{}{y} \cdot a}
+&= \Border{}{\Border{2}{y} \cdot a},
+&  \Border{2}{y} \cdot a \npreccurlyeq \Border{}{y},\\
+&\;\;\vdots
+& \\
+   \Border{}{\Border{p-2}{y} \cdot a}
+&= \Border{}{\Border{p-1}{y} \cdot a},
+& \Border{p-1}{y} \cdot a \npreccurlyeq \Border{p-2}{y},
+\end{align*}
+and \(\varepsilon \not\in \{y,\Border{}{y}, \dots,
+\Border{p-2}{y}\}\). By transitivity, the equations entail
+\(\Border{}{ya} = \Border{}{\Border{p-1}{y} \cdot a}\). Two cases are
+possible: either \(\Border{p-1}{y} = \varepsilon\), yielding
+\(\Border{}{ya} = \Border{}{a} := \varepsilon\), or the
+unfolding keeps going on until we find the smallest \({q \geqslant p}\)
+such that \(\Border{}{\Border{q-1}{y} \cdot a} =
+\Border{}{\Border{q}{y} \cdot a}\) with \(\Border{q}{y} \cdot a
+\preccurlyeq \Border{q-1}{y}\). Because a side is a proper prefix,
+that is, \(\Border{}{y} \prec y\), we have \(\Border{2}{y} =
+\Border{}{\Border{}{y}} \prec \Border{}{y}\), which, repeated, yields
+\[
+\Border{q-1}{y} \preccurlyeq \dots \preccurlyeq \Border{p-1}{y} \prec
+\dots \prec \Border{}{y} \prec y.
+\]
+Therefore \(\Border{q}{y} \cdot a \preccurlyeq y\), since~\({q > 0}\),
+and \(\Border{}{ya} = \Border{q}{y} \cdot a\). This reasoning
+establishes that
+\begin{equation}
+\Border{}{ya} = 
+\left\{
+  \begin{aligned}
+   & \Border{q}{y} \cdot a,
+   && \text{if} \,\; \exists q>0 \,\; \text{such that} \,
+    \Border{q}{y} \cdot a \preccurlyeq y,\\
+   & \varepsilon 
+   && \text{otherwise;}
+  \end{aligned}
+\right.
+\label{eq:B_p}
+\end{equation}
+with the additional constraint that \(q\) must be as small as
+possible. This is the formal derivation whose intuition was already
+present in the example of \fig~\vref{fig:max_sides_pref},
+where~\({q=3}\). This form of the definition of~\(\BorderName\) is
+simpler because it does not contain an embedded call like
+\(\Border{}{\Border{}{y} \cdot a}\). We can now take the lengths of
+each sides of the equations, leading to
+\begin{equation*}
+\len{\Border{}{ya}} = 
+\left\{
+  \begin{aligned}
+   & \len{\Border{q}{y} \cdot a} = 1 + \len{\Border{q}{y}},
+   && \text{if} \,\; \exists q \,\; \text{such that} \,
+    \Border{q}{y} \cdot a \preccurlyeq y,\\
+   & \len{\varepsilon} = 0
+   && \text{otherwise;}
+  \end{aligned}
+\right.
+\end{equation*}
+If~\({ya \preccurlyeq x}\), then\(\len{\Border{}{ya}} =
+\MPfailure{x}{}{\len{ya}} = \MPfailure{x}{}{\len{y}+1}\). Let
+\({\len{y} := i > 0}\). Then
+\begin{equation*}
+\MPfailure{x}{}{i+1} =
+\left\{
+  \begin{aligned}
+   & 1 + \len{\Border{q}{y}},
+   && \text{if} \,\; \exists q>0 \,\; \text{such that} \,
+    \Border{q}{y} \cdot a \preccurlyeq y,\\
+   & 0
+   && \text{otherwise;}
+  \end{aligned}
+\right.
+\end{equation*}
+We need to work on~\(\len{\Border{q}{y}}\) now. From the definition
+of~\(\MPfailureName\) \eqref{eq:MP_failure} \vpageref{eq:MP_failure},
+we deduce
+\begin{equation}
+\MPfailure{x}{q}{\len{y}} = \len{\Border{q}{y}},
+\,\; \text{with} \,\; y \preccurlyeq x,
+\label{eq:MP_failure_p}
+\end{equation}
+which we can prove by complete induction on \(q\). Let us call this
+property \(\mathcal{P}(q)\). Trivially, we have
+\(\mathcal{P}(0)\). Let us suppose \(\mathcal{P}(r)\) for all \(r
+\leqslant q\): this is the \emph{induction hypothesis}. Let us prove
+now \(\mathcal{P}(r+1)\):
+\[
+  \MPfailure{x}{r+1}{\len{y}}
+= \MPfailure{x}{r}{\MPfailure{x}{}{\len{y}}} 
+:= \MPfailure{x}{r}{\len{\Border{}{y}}}
+\doteq \len{\Border{r}{\Border{}{y}}}
+= \len{\Border{r+1}{y}},
+\]
+where \((\doteq)\)~is a valid application of the induction hypothesis
+because \(\Border{}{y} \prec y\). We proved that \(\mathcal{P}(r+1)\)
+and the induction principle entails that \(\mathcal{P}(q)\) holds for
+all~\({q \geqslant 0}\). Therefore, equation \eqref{eq:MP_failure_p}
+allows us to refine our definition as follows, with~\({i>0}\):
+\begin{equation*}
+\MPfailure{x}{}{i+1} =
+\left\{
+  \begin{aligned}
+   & 1 + \MPfailure{x}{q}{i},
+   && \text{if} \,\; \exists q>0 \,\; \text{such that} \, 
+      \Border{q}{y} \cdot a \preccurlyeq y,\\
+   & 0
+   && \text{otherwise.}
+  \end{aligned}
+\right.
+\end{equation*}
+There is one last equation in the definition of \(\MPfailureName\)
+\eqref{eq:B_pref} on page \pageref{eq:B_pref} which we did not use
+yet: \({\Border{}{a} := \varepsilon}\). It implies that
+\(\MPfailure{x}{}{1} = \MPfailure{x}{}{\len{a}} := \len{\Border{}{a}}
+:= \len{\varepsilon} = 0\). If we try to see what happens to the
+previous equation defining~\(\MPfailureName\) when~\({i=0}\), we find
+that \(\MPfailure{x}{}{1} = 1 + \MPfailure{x}{q}{0}\). This equality
+is satisfied if~\({q=1}\) because of equation \eqref{eq:beta_0}
+\vpageref{eq:beta_0}, that is, \(\MPfailure{x}{}{0} :=
+-1\). Therefore, we do not need to carry separately the
+case~\(\MPfailure{x}{}{1}\). Now remains to find a numerical
+interpretation of the condition of existence of \(q\) in terms of
+indexes. Property ``\(\Border{q}{y} \cdot a \preccurlyeq y\) and \({ya
+  \preccurlyeq x}\) and \({\len{y} = i}\)'' imply any of the following
+equalities:
+\[
+y[\len{\Border{q}{y}}] = a
+\Leftrightarrow
+y[\MPfailure{x}{q}{i}] = a
+\Leftrightarrow
+x[\MPfailure{x}{q}{i}] = x[\len{y}]
+\Leftrightarrow
+x[\MPfailure{x}{q}{i}] = x[i].
+\]
+We can now gather everything we know about~\(\MPfailureName\),
+with~\({i \geqslant 0}\):
+\[
+\begin{aligned}
+ \MPfailure{x}{}{0}   &= -1;\\
+ \MPfailure{x}{}{i+1} &=
+   \left\{
+     \begin{aligned}
+       & 1 + \MPfailure{x}{q}{i},
+       && \text{if} \,\; \exists q>0 \,\; \text{such that} \, 
+          x[\MPfailure{x}{q}{i}] = x[i],\\
+       & 0
+       && \text{otherwise.}
+     \end{aligned}
+   \right.
+\end{aligned}
+\]
+where \(q\)~is the smallest nonzero integer satisfying the
+condition. This can be further simplified into
+\begin{equation}
+\MPfailure{x}{}{0} = -1,
+\quad
+\MPfailure{x}{}{i+1} = 1 + \MPfailure{x}{q}{i},
+\label{eq:MPfailure}
+\end{equation}
+where~\({i \geqslant 0}\) and \({q>0}\)~is the smallest integer such
+that one of the two following conditions hold:
+\begin{itemize}
+
+  \item \(1 + \MPfailure{x}{q}{i} = 0\);
+
+  \item \(1 + \MPfailure{x}{q}{i} \neq 0\) and
+    \(x[\MPfailure{x}{q}{i}] = x[i]\).
+
+\end{itemize}
+Before implementing~\(\MPfailureName\), let us start modifying the
+naive implementation \vpageref{code:naive} so it dovetails the
+improvement by Morris and Pratt. First, we need to retrieve some
+useful information about the partial successes of \erlcode{prefix/2},
+namely, \(i\)~and~\(t[j..]\) as seen in \fig~\vref{fig:mp}. All we
+need is (1)~to add a counter to \erlcode{prefix/2}, initialised
+to~\(0\), so it allows the caller to know where the mismatch, if any,
+occurred; (2)~to return the current counter and text in case of
+mismatch (changes in bold):
+\begin{alltt}
+find(_,     [],_) -> absent;
+find(X,T=[_|U],J) ->
+  case prefix(X,T,\textbf{0}) of
+    yes      -> \{factor,J\};
+    \textbf{\{no,V,I\}} -> \fbox{find(X,U,J+1)}\hfill% V \emph{is} \(t[j..]\)
+  end.
+
+prefix(   [],    _,_) -> yes;
+prefix([A|Y],[A|T],\textbf{I}) -> prefix(Y,T,\textbf{I+1});
+prefix(    _,    \textbf{T},\textbf{I}) -> \textbf{\{no,T,I\}}.
+\end{alltt}
+The next step is make some use of the newly introduced
+\erlcode{V}~and~\erlcode{I}. The key idea of Morris and Pratt is to
+avoid if possible to retry matching~\erlcode{X} as a whole (see framed
+code above) and instead use \(x[\MPfailure{x}{}{i}..]\), which means
+that we need to implement, besides~\(\MPfailureName\), a function
+returning the suffix of a word. In the following, the call
+\erlcode{suffix(\(x\),\(i\))} evaluates in~\(x[i..]\), assuming
+that~\({i \geqslant 0}\):
+\begin{alltt}
+suffix(    X,0) -> X;
+suffix([_|X],I) -> suffix(X,I-1).
+\end{alltt}
+Let us not be hasty and replace the framed call above
+\erlcode{find(X,U,J+1)} by \erlcode{find(suffix(X,fail(X,I)),V,J+1)},
+because the call \erlcode{fail(X,I)} implements \(\MPfailure{x}{}{i}\)
+and might evaluates in~\erlcode{-1}. Therefore, we need a
+\erlcode{case} construct:
+\begin{alltt}
+find(_,     [],_) -> absent;
+find(X,T=[_|U],J) ->
+  case prefix(X,T,0) of
+    yes      -> \{factor,J\};
+    \{no,V,I\} -> \textbf{case fail(X,I) of}\hfill% fail(X,I) \emph{is} \(\MPfailure{x}{}{i}\)
+                  \textbf{-1 -> \fbox{find(X,U,J+1);}
+                   B -> find(suffix(X,B),V,J+1)
+                 end}
+  end.
+\end{alltt}
+We can simplify this a little bit because \(i = 0 \Rightarrow
+\MPfailure{x}{}{i} = -1\), hence:
+\begin{alltt}
+find(_,     [],_) -> absent;
+find(X,T=[_|U],J) ->
+  case prefix(X,T,0) of
+    yes      -> \{factor,J\};
+    \{no,_,0\} -> find(X,U,J+1);
+    \textbf{\{no,V,I\} -> find(suffix(X,fail(X,I)),V,J+I)}
+  end.
+\end{alltt}
+We clearly see now, in bold typeface, the improvement proposed by
+Morris and Pratt. Unfortunately, this definition is wrong because,
+when adding a new recursive call, we should have checked that any
+invariant on the parameters is preserved. The problem here is the
+first argument,~\erlcode{X}, which was invariant before the addition
+of the improvement. Now, it changes sometimes into
+\erlcode{suffix(X,fail(X,I))} and this breaks the correct behaviour of
+the other recursive call, corresponding to the case when the mismatch
+happens at the first letter and the \emph{original} word
+(not~\erlcode{X} anymore) must be slided of one index. Therefore, we
+must thread a copy of \erlcode{Word} in all the calls to
+\erlcode{find/3}, which becomes \erlcode{find/4}:
+\begin{alltt}
+find(Word,Text) -> find(Word,Text,0,\textbf{Word}).\hfill% \emph{Copy of} Word
+
+find(_,     [],_,_) -> absent;
+find(X,T=[_|U],J,\textbf{W}) ->\hfill% W \emph{is the original} Word
+  case prefix(X,T,0) of
+    yes      -> \{factor,J\};
+    \{no,_,0\} -> find(\textbf{W},U,J+1,\textbf{W});\hfill% \emph{Sliding} W \emph{by one}
+    \{no,V,I\} -> find(suffix(X,fail(X,I)),V,J+I,\textbf{W})
+  end.
+\end{alltt}
+Now remains to write a definition for \erlcode{fail/2}. We need
+another function to compute \(\MPfailure{x}{q}{i}\), which we shall
+call~\erlcode{fp/3}, because it calculates a ``fixed point'' or, in
+short, a \emph{fixpoint}. In mathematics, a fixpoint~\(X\) of a
+function~\(F\), if it exists, satisfies the equation \({F(X) =
+  X}\). Generally speaking, the fixpoint \(X\) is found by starting
+with an appropriate value~\(X_0\) and composing \(F(X_0)\),
+\(F^2(X_0)\) etc. until \(F^n(X_0) = F^{n-1}(X_0)\), which means that
+\(X = F^{n-1}(X_0)\). In imperative programming languages, the
+constructs implementing fixpoint calculations are loops whose exit
+conditions may be arbitrary, like \erlcode{while} in \C or
+\erlcode{repeat} in \Pascal, but not the \erlcode{for}
+iteration. Resuming our argument, the calls to \erlcode{fp/3} have the
+shape \erlcode{fp(\(x\),\(x[i-1]\),\(\MPfailure{x}{}{b}\))}, where the
+first value of~\(b\) is~\({i-1}\):
+\begin{alltt}
+fail(_,0) -> -1;
+fail(X,I) -> 1 + fp(X,\(x[i-1]\),fail(X,I-1)).
+\end{alltt}
+The purpose of~\erlcode{fp/3} is to accumulate by iteration calls
+to~\(\MPfailureName_{x}\) in the last argument, starting
+from~\({i-1}\), until one of the two conditions of the definition
+of~\(\MPfailureName\) (equations \eqref{eq:MPfailure}
+\vpageref{eq:MPfailure}) are satisfied. We know that \(q > 0\), that
+is why we start with the argument \erlcode{fail(X,I-1)} (at least one
+call is necessary). We also need an \Erlang function to
+compute~\(x[i-1]\), that is, a function accessing the \(n\)th~item in
+a list~\(x\):
+\begin{verbatim}
+nth([A|_],0) -> A;
+nth([_|X],N) -> nth(X,N-1).
+\end{verbatim}
+So we have now 
+\begin{alltt}
+fail(_,0) -> -1;\hfill% \(\MPfailure{x}{}{0} = -1\)
+fail(X,I) -> 1 + fp(X,\textbf{nth(X,I-1)},fail(X,I-1)).\hfill% \(1+\MPfailure{x}{q}{i-1}\)
+\end{alltt}
+The first two arguments of~\erlcode{fp/3} are invariant:
+\begin{alltt}
+fp(_,_,  -1) -> -1;\hfill% \(1 + \MPfailure{x}{q}{i} = 0\)
+fp(X,B,Fail) -> case nth(X,Fail) of\hfill% \(1 + \MPfailure{x}{q}{i} \neq 0\)
+                  B -> Fail;\hfill% \(x[\MPfailure{x}{q}{i}] = x[i]\)
+                  _ -> fp(X,B,fail(X,Fail))\hfill% \emph{Try} \(\MPfailure{x}{}{\MPfailure{x}{q}{i}}\)
+                end.
+\end{alltt}
+We see here an aspect of the semantic of the \erlcode{case} construct
+which is specific to \Erlang: variable~\erlcode{B} appears both as a
+parameter of~\erlcode{fp/3} in \erlcode{fp(X,B,Fail)} and as a
+case~\erlcode{B}. In Erlang, this means that the latter must evaluate
+in the same value as the former. This should be contrasted with the
+semantics of the \erlcode{fun} constructs, which allows
+\emph{shadowing}, for example, \erlcode{fun(X) -> fun(X,Y) -> X end
+  end} is valid and the body~\erlcode{X} refers to the~\erlcode{X} in
+\erlcode{fun(X,Y)}, not in \erlcode{fun(X)}. There is no shadowing
+with the \erlcode{case} construct. In other functional programming
+languages, this behaviour is likely to be different, for instance, in
+\OCaml, each variable occuring in a case (the construct is actually
+called \erlcode{match}) shadows any other identical variable in the
+scope.
+
+In summary, the \Erlang module implementing the algorithm of Morris
+and Pratt for factor matching is
+\verbatiminput{mp.erl}
+
+\medskip
+
+\paragraph{Improvement.}
+                                   
+A look back at the definition of~\(\MPfailureName\) makes us realise
+that it does not depend on the text, so it is worth pre\-computing the
+values of~\(\MPfailure{x}{}{i}\) for~\(0 \leqslant i \leqslant n\),
+that is, for all prefixes of~\(x\). Moreover, we do not want to lose
+time in accessing the value of~\(\MPfailure{x}{}{i}\), so it would be
+efficient to pair it with the letter~\(x[i]\). For example, the table
+in \fig~\vref{fig:mp_failure} would be implemented as the list
+\begin{center}
+\erlcode{[\{a,-1\},\{b,0\},\{a,0\},\{c,1\},\{a,0\},\{b,1\},\{a,2\},\{c,3\}]}.
+\end{center}
+Then the programs uses this list instead of the original word. Notice
+that we do not need to record the value
+of~\(\MPfailure{x}{}{\len{x}}\), as this would be only needed if there
+was a failure \emph{after}~\(x\), which makes no sense. (In fact, this
+case would precisely mean the opposite: \erlcode{prefix/3} succeeded,
+that is, \(x\)~is a factor.) Let us call \erlcode{mk\_fail/1} a
+function such that \erlcode{mk\_fail(\(x\))}, where~\({\len{x} = m}\),
+evaluates in the list
+\begin{center}
+\erlcode{[\{\(x[0]\),\(\MPfailure{x}{}{0}\)\}, \{\(x[1]\),\(\MPfailure{x}{}{1}\)\},  \(\ldots\), \{\(x[m-1]\),\(\MPfailure{x}{}{m-1}\)\}]}.
+\end{center}
+This operation is a map (see page~\pageref{maps}):
+\begin{alltt}
+mk_fail(X)         -> mk_fail(X,X,0).\hfill% X \emph{copied for} \(\MPfailure{x}{}{i}\)
+mk_fail(   [],_,_) -> [];
+mk_fail([A|Y],X,I) -> [\{A,fail(X,I)\}|mk_fail(Y,X,I+1)].
+\end{alltt}
+This preprocessing on the input word is implemented now by a single
+call, at the beginning, whose value is shared with the copy:
+\begin{alltt}
+find(Word,Text) -> \textbf{W=mk_fail(Word)}, find(W,Text,0,W).
+\end{alltt}
+Now we need to modify \erlcode{prefix/3} so that, in case of mismatch,
+it also returns the failure index~\(\MPfailure{x}{}{i}\):
+\begin{alltt}
+prefix(       [],    _,_) -> yes;
+prefix([\textbf{\{A,_\}}|X],[A|T],I) -> prefix(X,T,I+1);
+prefix(\textbf{[\{_,F\}|_]},    T,I) -> \{no,T,I,\textbf{F}\}.\hfill% F \emph{is} \(\MPfailure{x}{}{i}\)
+\end{alltt}
+Now \erlcode{find/3} becomes (differences in bold typeface):
+\begin{alltt}
+find(_,     [],_,_) -> absent;
+find(X,T=[_|U],J,W) ->
+  case prefix(X,T,0) of
+    yes        -> \{factor,J\};
+    \{no,_,0,\textbf{_}\} -> find(W,U,J+1,W);\hfill% \emph{Here}
+    \{no,V,I,\textbf{F}\} -> find(suffix(X,\textbf{F}),V,J+I,W)\hfill% \emph{and here}
+  end.
+\end{alltt}
+A closer look back at \erlcode{mk\_fail/3} and \erlcode{fail/2} gives
+us a clue on how to improve further the efficiency. On the one hand,
+we see that the call \erlcode{fail(X,I)} relies on the value of the
+recursive call \erlcode{fail(X,I-1)}. On the other hand, we observe
+that \erlcode{mk\_fail/3} computes \erlcode{fail(X,I)} for increasing
+values of~\erlcode{I}. The loss of efficiency comes thus from
+\erlcode{mk\_fail/3} not reusing the prior value of
+\erlcode{fail(X,I)}, that is, \erlcode{fail(X,I-1)}, and not passing
+it along to~\erlcode{fp/3} as the third argument, that is, the
+original value to compute the fixpoint. Here is the modified version
+of \erlcode{mk\_fail/1} and \erlcode{mk\_fail/3}, the latter becoming
+\erlcode{mk\_fail/4}:
+\begin{alltt}
+mk_fail(X)              -> mk_fail(X,X,0,\textbf{none}).
+mk_fail(   [],_,_,   _) -> [];
+mk_fail([A|Y],X,I,\textbf{Prev}) -> 
+  Fail = case I of
+           0 -> -1;
+           _ -> 1 + fp(X,nth(X,I-1),\textbf{Prev})
+         end,
+  [\{A,Fail\}|mk_fail(Y,X,I+1,Fail)].
+\end{alltt}
+Notice how we had to initialise the new last argument of
+\erlcode{mk\_fail/4} with a dummy value \erlcode{none} because there
+is no prior value of a call to \erlcode{fail/2} at this point. The
+value of the argument~\erlcode{I} is~\erlcode{0} if, and only if,
+\erlcode{Prev} is~\erlcode{none}, thus we could have chosen any value
+other than~\erlcode{none} since we discriminate on the
+index~\erlcode{I} only. The \erlcode{case} construct shows how we
+duplicated one rewrite step of a call to \erlcode{fail/2}, in order to
+sneak \erlcode{Prev} instead of \erlcode{fail(X,I-1)}
+to~\erlcode{fp/3}. This was the whole point of this transformation.
+
+Another look to the brand new \erlcode{mk\_fail/4} reveals that
+\erlcode{nth(X,I-1)} could be avoided because it evaluates in the
+letter in~\erlcode{X} just before~\erlcode{A}. Just like we kept the
+value of the call to \erlcode{fail/2} on the previous index,
+\erlcode{Prev}, we could keep the corresponding letter as well. In
+other words, instead of
+\begin{center}
+\erlcode{[\{A,Fail\}|mk\_fail(Y,X,I+1,Fail)].}
+\end{center}
+we would write something equivalent to
+\begin{center}
+\erlcode{[\{A,Fail\}|mk\_fail(Y,X,I+1,\{A,Fail\})].}
+\end{center}
+Here is how:
+\begin{alltt}
+mk_fail(   [],_,_,   _) -> [];
+mk_fail([A|Y],X,I,Prev) ->
+  Cur = case Prev of
+          none     -> \{A,-1\};
+          \{B,Fail\} -> \{A,1 + fp(X,B,Fail)\}
+        end,
+  [Cur|mk_fail(Y,X,I+1,Cur)].
+\end{alltt}
+Notice how we discriminate now on \erlcode{Prev} in the \erlcode{case}
+construct, instead of~\erlcode{I}. Furthermore, since the call to
+\erlcode{nth/2} disappeared, as intended, there is no use
+for~\erlcode{I} anymore. Just let get rid of it:
+\begin{verbatim}
+mk_fail(   [],_,   _) -> [];
+mk_fail([A|Y],X,Prev) ->
+  Cur = case Prev of
+          none     -> {A,-1};
+          {B,Fail} -> {A,1 + fp(X,B,Fail)}
+        end,
+  [Cur|mk_fail(Y,X,Cur)].
+\end{verbatim}
+After several code transformations, it is important to look back and
+make sure that they are correct and, if so, whether better
+alternatives are possible. In our case, a fresh look at the result of
+the last transformation may bring to the fore something quite obvious,
+actually: that the \erlcode{case} construct is evaluated for each
+letter in the word, whilst the case of \erlcode{Prev} evaluating to
+\erlcode{none} happens only once, at the first call when the word is
+not empty. In other words, the test conveyed by the \erlcode{case} is
+useless \(m-1\)~times. Even if in our time model we do not take into
+account the delay of a \erlcode{case}, but only function calls, it
+surely matters in practice. The way to avoid this situation is simple:
+let us move the burden of handling the special situation leading
+to~\erlcode{none} to \erlcode{mk\_fail/1}. Since the latter actually
+introduces \erlcode{none}, let us simply avoid doing so:
+\begin{verbatim}
+mk_fail(     []) -> [];
+mk_fail(X=[A|Y]) -> Fst={A,-1}, [Fst|mk_fail(Y,X,Fst)].
+
+mk_fail(   [],_,       _) -> [];
+mk_fail([A|Y],X,{B,Fail}) -> Cur = {A,1 + fp(X,B,Fail)},
+                             [Cur|mk_fail(Y,X,Cur)].
+\end{verbatim}
+Now \erlcode{mk\_fail/1} handles the first letter and
+\erlcode{mk\_fail/3} processes all the remaining letters. The final
+improved version is then \verbatiminput{mp_opt.erl}
+
+\medskip
+
+\paragraph{Best Delay.}
+
+Of course, the last improvement results in the best case being slower
+because this algorithm now features two stages, the preprocessing of
+the word (\erlcode{mk\_fail/1}) and the proper matching
+(\erlcode{find/4}), and we just made the preprocessing a prerequisite
+in all circumstances. First, let us note \(\comp{mk\_fail/1}{m}\) the
+delay of the calls \erlcode{mk\_fail(\(x\))}, where the word~\(x\) has
+length~\(m\). If we only count the calls to \erlcode{mk\_fail/1} and
+\erlcode{mk\_fail/3}, then \(\comp{mk\_fail/1}{0} = 1\) and~\({m>0}\)
+imply \(\comp{mk\_fail/1}{m} > m + 1\), because the word is always
+processed in its entirety. Now remain to be accounted for the calls to
+\erlcode{fp/3}, which number at least~\({m-1}\), that is, one for each
+letter in the word. Because we are in pursuit of the best case and
+\erlcode{fp/3} is recursive, we should think first about a class of
+inputs which lead to minimise or avoid altogether recursive calls. A
+look back at the definition of~\erlcode{fp/3} reveals that this is
+possible in two cases: either the third argument \erlcode{Fail}
+is~\erlcode{-1} or \erlcode{nth(X,Fail)} evaluates in the second
+argument~\erlcode{B}. For instance, the first call to~\erlcode{fp/3}
+has the shape \erlcode{fp(\(x\),\(x[0]\),-1)}, so it results in one
+rewrite in the value~\erlcode{-1}. In other words, this situation
+corresponds to \({i=0}\)~and~\(q=1\) and \(1 + \MPfailure{x}{q}{i} =
+0\) in equation \eqref{eq:MPfailure} \vpageref{eq:MPfailure}. The
+following calls to~\erlcode{fp/3} are the quickest when the first call
+to \erlcode{nth/2} results in~\erlcode{B} \emph{with the shortest
+  delay}. First, what does it mean that the first call results
+in~\erlcode{B}? This situation corresponds to the condition \(q=1\)
+and \(1 + \MPfailure{x}{q}{i} \neq 0\) and \(x[\MPfailure{x}{q}{i}] =
+x[i]\) in equation \eqref{eq:MPfailure} \vpageref{eq:MPfailure},
+if~\(x[i]\) corresponds to \erlcode{B} and \(\MPfailure{x}{q}{i}\) to
+\erlcode{Fail}. In other words, when examining the letters of~\(x\)
+from left to right, we find that each letter extends the maximum side
+of the previous prefix. This means that \(x\)~is made of the
+repetition of the same letter, for example, \(x=\word{a}^m\), which
+results in
+\begin{center}
+\erlcode{mk\_fail(\(x\)) \(\twoheadrightarrow\)
+  [\{a,-1\},\{a,0\},\{a,1\},\(\ldots\),\{a,\(m-1\)\}].}
+\end{center}
+But we forgot to check the constraint that the calls
+\erlcode{nth(X,Fail)} have the minimum delay individually or in
+sum. The delay of \erlcode{nth(\(x\),\(j\))} is~\(j+1\) and the calls
+are performed on the previous letter's failure index, thus~\(j\), that
+is, \erlcode{Fail}, varies from~\(0\) (failure index of~\(x[1]\))
+to~\(m-3\) (failure index of~\(x[m-2]\)). Therefore the problem with
+the previous example is that the additional delay of all the calls to
+\erlcode{nth/2} is \(\sum_{j=0}^{m-3}(j+1) = (m-2)(m-1)/2\). This
+quadratic delay is enough ground to look for a better solution. The
+best total delay for the calls to \erlcode{nth/2} is achieved when all
+the calls have their best delay, which is~\(1\). This means that
+\erlcode{Fail} is always~\erlcode{0} and the total additional delay
+is~\(m-2\). This happens when the first letter of the word differs
+from all the following, for example, \(x=\word{abbcbd}\) and
+\begin{center}
+\erlcode{mk\_fail(\(x\)) \(\twoheadrightarrow\)
+  [\{a,-1\},\{b,0\},\{b,0\},\{c,0\},\{b,0\},\{d,0\}].}
+\end{center}
+Now that the minimality condition on \erlcode{nth/2} is satisfied,
+what becomes of the delay of the rest of~\erlcode{fp/3}? We cannot
+have \erlcode{nth(X,Fail)} to evaluate in~\erlcode{B} because this
+would entail in \erlcode{mk\_fail/3} the next value of \erlcode{Fail}
+to be \(1+0=1\), breaking our minimality condition on the next call to
+\erlcode{fp/3}. Therefore, a recursive call to~\erlcode{fp/3} is
+unavoidable: \erlcode{fp(X,B,fail(X,Fail))}, where \erlcode{Fail} is
+actually~\erlcode{0}. The value of the call \erlcode{fail(X,0)}
+is~\erlcode{-1}, with a delay of~\(1\), so we have to consider
+\erlcode{fp(X,B,-1)} in turn. This is also easy: this is~\erlcode{-1}
+in one rewrite too. Therefore the recursive call has the delay~\(2\),
+so the total delay of~\erlcode{fp/3} is \(2(m-2)+1=2m-3\), the~\(1\)
+coming from the first call to \erlcode{fp/3} always being equivalent
+to \erlcode{fp(X,B,-1)}, entailing no call to \erlcode{nth/2}. This is
+a linear delay, thus a definite improvement over our prior attempt. As
+a summary, the best case happens when the first letter of the word of
+length~\(m\) is unique and the delay for the preprocessing is then
+\[
+\best{mk\_fail/1}{m} = (m + 1) + (2m-3) = 3m - 2.
+\]
+We can now shift our focus on the second stage of the algorithm, that
+is, the search itself by means of the call
+\erlcode{find(W,Text,0,W)}. To reach the best delay, we can, as usual,
+first look to minimise the number of recursive calls. While examining
+the definition of \erlcode{find/4}, we must take care not to conclude
+that the best case is when the text is empty. Indeed, let us remember
+that we must assume that the size of the input, here the text, is
+given and we have no way to know what it is, in particular, whether it
+is~\(0\) or not. The other interpretation of ending with the atom
+\erlcode{absent} is, obviously, when all the text has been searched
+for an occurrence of the word, which is not what we are seeking for in
+the best case. The other way to minimise the number of recursive calls
+is to have the first call \erlcode{prefix(X,T,0)} evaluate in the atom
+\erlcode{yes}, that is, the word is a prefix of the text. So let us
+turn our attention to \erlcode{prefix/3} and determine its delay when
+its final value is \erlcode{yes}. There must be exactly one recursive
+call for each letter in the word before \erlcode{yes} is final. If we
+note \(\best{prefix}{m,n}\) the best delay of the call
+\erlcode{prefix(\(x\),\(t\))}, where \({\len{x}=m}\) and
+\({\len{t}=n}\), we have
+\[
+\best{prefix}{m,n} = m + 1.
+\]
+As a conclusion, if we note \(\best{find}{m,n}\) the best delay of the
+the call \erlcode{find(\(x\),\(t\))},
+\[
+\best{find}{m,n} = 1 + \best{mk\_fail/1}{m} + \best{find/4}{m,n}
+                 = 1 + (3m-2) + (1 + \best{prefix}{m,n})
+                 = 4m + 1.
+\]
+This happens when the first letter of the word differs from all the
+following and the word is a prefix of the test. We can see that,
+without the preprocessing of the word, the best delay of the
+Morris\hyp{}Pratt would be~\({m+3}\), which is precisely the best
+delay of the naive algorithm (see page~\pageref{naive_best}).
+
+What if we want to compare both algorithms in more abstract terms by
+comparing the number of comparisons they perform, in the best case or
+otherwise?  This question is equivalent to compare the number of times
+the second clause of \erlcode{prefix/2} is used against the number of
+times the second clause of \erlcode{prefix/3} is used plus the number
+of times the \erlcode{case} construct is executed during the
+preprocessing, because it relies on letter comparisons as well. If we
+ignore the latter, in the best case, these numbers must be equal, as
+the best cases for both algorithms agree on the word being a prefix of
+the text; more precisely, \(m\)~comparisons are needed. As we already
+know, in the best case, \erlcode{nth/2} is called \(m-2\)~times in the
+\erlcode{case}, so the total number of comparisons in the best case is
+\(m+(m-2)=2m-2\) for the Morris\hyp{}Pratt algorithm, versus~\(m\) for
+the naive algorithm.
+
+\medskip
+
+\paragraph{Exercise.}
+\label{ex:factore_matching}
+
+Prove that the Morris\hyp{}Pratt algorithm makes at most \(2(n+m-2)\)
+comparisons to find a word or fail.
+
+%% \medskip
+
+%% \paragraph{Worst Delay.}
+
+%% Just like with the best case, we consider separately the preprocessing
+%% of the word and the search itself, and, here, we aim at slowing them
+%% down as much as possible. First, let us turn our attention towards
+%% \erlcode{mk\_fail/1}. 
+
+%% \medskip
+
+%% \paragraph{Average Delay.}
+
+\medskip
+
+\paragraph{Knuth\hyp{}Morris\hyp{}Pratt Algorithm.}
+
+The algorithm we present now is an improvement due to Knuth, Morris
+and Pratt (1977), based on avoiding situations which lead to certain
+letter comparison failures. Consider again figure \fig~\vref{fig:mp}.
+The key observation is that if \(x[k] = \word{a}\) then the slide
+would lead to an immediate mismatch because \(t[j] \neq x[k]\). In
+order to avoid it, we need to use the longest side of \(x[0..i-1]\)
+\emph{which is not followed by \word{a}}. It is called the
+\emph{maximum tagged side} of \(x[0..i-1]\) in \(x\). Let us note
+\(\DBorder{x}{}{y}\) the maximum tagged side of any proper prefix
+\(y\) of \(x\). If \(ya \preccurlyeq x\), the letter \(a\) constrains
+the definition of the tagged side, as we must have \(\DBorder{x}{}{y}
+\cdot a \npreccurlyeq y\). What if \(y = x\), then?  In this case,
+there is no right-context, like the letter \(a\) above, to constrain
+the maximum tagged side. In this case, we still can take the maximum
+side, that is, \(\DBorder{y}{}{y} = \Border{}{y}\). More precisely, if
+the maximum side of \(y\) is not followed by \(a\), then it is also
+the maximum tagged side we are looking for. In other words:
+\[
+\DBorder{x}{}{y} = \Border{}{y},\,\; \text{if} \;\, ya \preccurlyeq x
+\;\, \text{and} \;\, \Border{}{y} \cdot a \npreccurlyeq y.
+\]
+If the maximum side of \(y\) is followed by \(a\) we must take the
+maximum tagged side of the maximum side:
+\[
+\DBorder{x}{}{y} = \DBorder{x}{}{\Border{}{y}},\,\; \text{if} \,\; ya
+\preccurlyeq x \;\, \text{and} \,\; \Border{}{y} \cdot a \preccurlyeq
+y.
+\]
+By extension, if \(x = y\), we take the maximum side:
+\[
+\DBorder{y}{}{y} = \Border{}{y}.
+\]
+In summary, assuming \(ya \preccurlyeq x\) and \(y \neq \varepsilon\)
+\[
+\begin{aligned}
+   \DBorder{y}{}{y}
+&:= \Border{}{y};\\
+   \DBorder{x}{}{y}
+&:= \left\lbrace
+   \begin{aligned}
+    &  \DBorder{x}{}{\Border{}{y}},
+    && \text{if} \;\, \Border{}{y} \cdot a \preccurlyeq y,\\
+    &  \Border{}{y},
+    && \text{otherwise.}
+   \end{aligned}
+   \right.
+\end{aligned}
+\]
+\Fig~\vref{fig:kmp} summarises the improvement of Knuth, Morris and
+Pratt.
+\begin{figure}
+\centering
+\includegraphics{kmp}
+\caption{Rationale for Knuth\hyp{}Morris\hyp{}Pratt algorithm
+\label{fig:kmp}}
+\end{figure}
+Consider the example in \fig~\vref{fig:mp_example} and compare it with
+\fig~\vref{fig:kmp_example}, where the same word is searched in the
+same text taking into account the improvement on the sides: \(14\)
+comparisons are performed, instead of \(17\).
+\begin{figure}[!h]
+\centering
+\includegraphics{kmp_example}
+\caption{Knuth\hyp{}Morris\hyp{}Pratt algorithm at work
+(no match found)
+\label{fig:kmp_example}}
+\end{figure}
+The table comparing the values of the two failure functions for the
+same word \word{abacabac} can be found in
+\fig~\vref{fig:fail_cmp}.
+\begin{figure}[b]
+\centering
+\includegraphics{fail_cmp}
+\caption{Failure functions of \word{abacabac}
+compared \label{fig:fail_cmp}}
+\end{figure}
+By taking the length of each side of the equations,
+\[
+  \len{\DBorder{x}{}{y}}
+= \left\lbrace
+  \begin{aligned}
+    &  \len{\Border{}{y}}
+    && \text{if} \; x = y \; \text{or} 
+       \; \Border{}{y} \cdot a \npreccurlyeq y\\
+    &  \len{\DBorder{x}{}{\Border{}{y}}}
+    && \text{otherwise}
+  \end{aligned}
+  \right.
+\]
+Let \(\KMPfailure{x}{}{i}\) be the length of the tagged maximum
+side of \(x[1 \dots i]\):
+\[
+\KMPfailure{x}{}{i} = \len{\DBorder{x}{}{x[1...i]}} 
+\qquad 1 \leqslant i \leqslant \len{x}
+\]
+or, equivalently,
+\[
+\KMPfailure{x}{}{\len{y}} = \len{\DBorder{x}{}{y}} 
+\qquad y \preccurlyeq x
+\]
+Therefore
+\[
+  \KMPfailure{x}{}{\len{y}}
+= \left\lbrace
+  \begin{aligned}
+    &  \MPfailure{x}{}{\len{y}}
+    && \text{if} \; x = y \; \text{or} 
+       \; \Border{}{y} \cdot a \npreccurlyeq y\\
+    &  \KMPfailure{x}{}{\len{\Border{}{y}}}
+    && \text{otherwise}
+  \end{aligned}
+  \right.
+\]
+that is to say
+\[
+  \KMPfailure{x}{}{\len{y}}
+= \left\lbrace
+  \begin{aligned}
+    &  \MPfailure{x}{}{\len{y}}
+    && \text{if} \; x = y \; \text{or} 
+       \; \Border{}{y} \cdot a \npreccurlyeq y\\
+    &  \KMPfailure{x}{}{\MPfailure{x}{}{\len{y}}}
+    && \text{otherwise}
+  \end{aligned}
+  \right.
+\]
+If \(\len{y} = i\), we can write instead
+\[
+  \KMPfailure{x}{}{i}
+= \left\lbrace
+  \begin{aligned}
+    &  \MPfailure{x}{}{i}
+    && \text{if} \; x = y \; \text{or} 
+       \; \Border{}{y} \cdot a \npreccurlyeq y\\
+    &  \KMPfailure{x}{}{\MPfailure{x}{}{i}}
+    && \text{otherwise}
+  \end{aligned}
+  \right.
+\]
+\label{gamma_ref_def}
+The condition can also be rewritten in terms of \(\MPfailureName_{x}\)
+and \(i\), just as we did with the Morris-Pratt algorithm, in
+\fig~\pageref{fig:mp}. Let \(\len{y} = i\), then
+\begin{align*}
+  \Border{}{y} \cdot a \npreccurlyeq y
+& \Leftrightarrow x [\MPfailure{x}{}{i} + 1] \neq x [i + 1]\\
+  x = y
+& \Leftrightarrow \len{x} = i
+\end{align*}
+So, finally, for \(1 \leqslant i \leqslant \len{x}\),
+\[
+  \KMPfailure{x}{}{i}
+= \left\lbrace
+  \begin{aligned}
+    &  \MPfailure{x}{}{i}
+    && \text{if} \; i = \len{x} \; \text{or} 
+       \; x [\MPfailure{x}{}{i} + 1] \neq x [i + 1]\\
+    &  \KMPfailure{x}{}{\MPfailure{x}{}{i}}
+    && \text{otherwise}
+  \end{aligned}
+  \right.
+\]
+which allows us to naturally extends \(\KMPfailureName_{x}\) on \(0\): 
+\(\KMPfailure{x}{}{0} = \MPfailure{x}{}{0} = -1\).
+
+Before going further, let us check by hand the following values of
+\(\KMPfailure{x}{}{i}\) and compare them to \(\MPfailure{x}{}{i}\): we must
+always have \(\KMPfailure{x}{}{i} \leqslant \MPfailure{x}{}{i}\), since we
+plan an optimisation. 
+\[
+\begin{array}{c|ccccccccccc|}
+x & & \erlcode{a} & \erlcode{b} & \erlcode{c} & \erlcode{a} 
+  & \erlcode{b} & \erlcode{a} & \erlcode{b} & \erlcode{c}
+  & \erlcode{a} & \erlcode{c}\\
+\hline
+                  i  &  0 & 1 & 2 &  3 & 4 & 5 & 6 & 7 &  8 & 9 & 10\\
+   \MPfailure{x}{}{i} & -1 & 0 & 0 &  0 & 1 & 2 & 1 & 2 &  3 & 4 &  0\\
+  \KMPfailure{x}{}{i} & -1 & 0 & 0 & -1 & 0 & 2 & 0 & 0 & -1 & 4 &  0\\
+\hline
+\end{array}
+\]
+One difference between \(\MPfailureName_{x}\) and
+\(\KMPfailureName_{x}\) is that, in the worst case, there is always an
+empty maximum side \(\varepsilon\), that is, \(\MPfailure{x}{}{i} = 0\),
+whereas there may be no maximum tagged side at all,
+that is, \(\KMPfailure{x}{}{i} = -1\). For instance, the prefix
+\erlcode{abc} of \(x\) has an empty maximum side,
+that is, \(\MPfailure{x}{}{3}=0\), but has no maximum tagged side,
+that is, \(\KMPfailure{x}{}{3} = -1\), since \(x[1] = x[4]\).
+
+This definition of \(\KMPfailureName_{x}\) relies on
+\(\MPfailureName_{x}\), more precisely, the computation of
+\(\KMPfailure{x}{}{i}\) requires \(\MPfailure{x}{p}{i}\), that is,
+values \(\MPfailure{x}{}{j}\) with \(j < i\), since
+\[
+\MPfailure{x}{}{0} = -1 
+\qquad \MPfailure{x}{}{i} = 1 + \MPfailure{x}{k}{i-1}
+\qquad 1 \leqslant i
+\]
+where \(k\) is the smallest non-zero integer such that
+\begin{itemize}
+
+  \item either \(1 + \MPfailure{x}{k}{i-1} = 0\) or
+    \(x[1+\MPfailure{x}{k}{i-1}] = x[i]\)
+
+\end{itemize}
+or, equivalently,
+\[
+\Border{}{ya} = 
+\left\{
+  \begin{aligned}
+   & \Border{k}{y} \cdot a 
+   && \text{if} \; \Border{k}{y} \cdot a \preccurlyeq y\\
+   & \varepsilon 
+   && \text{if} \; \Border{k-1}{y} = \varepsilon
+  \end{aligned}
+\right. 
+\]
+where \(k\) is the smallest non-zero integer such that \(\Border{k}{y}
+\cdot a \preccurlyeq y\) or \(\Border{k-1}{y} = \varepsilon\).
+
+Therefore, let us find another definition of \(\Border{}{ya}\) which
+relies on \(\Border{}{y}\) but \emph{not} on
+\(\Border{q}{y}\) with \(2 \leqslant q\). This can be
+achieved by considering again the figure
+\begin{center}
+\includegraphics{border_y}
+\end{center}
+Indeed, if \(a = b\) then \(\Border{}{ya} = \Border{}{y}\). Else, \(a
+\neq b\), and thus the maximum side can be found among the tagged
+sides of \(\Border{}{y}\), otherwise \(\Border{}{ya} = \varepsilon\).
+\[
+\Border{}{ya} = \left\{
+\begin{aligned}
+ & \DBorder{x}{q}{\Border{}{y}} \cdot a
+ &&\text{if} \;\, \DBorder{x}{q}{\Border{}{y}} \cdot a
+ \preccurlyeq y\\
+ & \varepsilon
+ &&\text{if} \; y = \varepsilon \;\text{or}\;
+    \DBorder{x}{q-1}{\Border{}{y}} = \varepsilon
+\end{aligned}
+\right.
+\]
+where \(ya \preccurlyeq x\) and \(q\) is the smallest integer such
+that \(\DBorder{x}{q}{\Border{}{y}} \cdot a \preccurlyeq y\) or
+\(\DBorder{x}{q-1}{\Border{}{y}} = \varepsilon\).
+
+By taking the lengths and letting \(0 \leqslant i \leqslant \len{x} -
+1\) and \(\len{y} = i\),
+\begin{align*}
+\MPfailure{x}{}{0} &= -1\\
+\MPfailure{x}{}{i + 1} &=
+\left\lbrace
+\begin{aligned}
+  & \KMPfailure{x}{q}{\MPfailure{x}{}{i}} + 1
+  && \text{if} \; x[\KMPfailure{x}{q}{\MPfailure{x}{}{i}} + 1]=x[i + 1]\\
+  & 0
+  && \text{if} \; i = 0 \; \text{or} \;
+     \KMPfailure{x}{q-1}{\MPfailure{x}{}{i}} = 0
+\end{aligned}
+\right.
+\end{align*}
+where \(q\) is the smallest integer such that
+\begin{itemize}
+
+  \item either \(x[\KMPfailure{x}{q}{\MPfailure{x}{}{i}} + 1]=x[i+1]\) 
+
+  \item or \(\KMPfailure{x}{q-1}{\MPfailure{x}{}{i}} = 0\)
+
+\end{itemize}
+Since \(\KMPfailure{x}{}{i} = -1\) if and only if \(i=0\), we have
+\begin{align*}
+\KMPfailure{x}{q-1}{\MPfailure{x}{}{i}} = 0
+&\Leftrightarrow
+\KMPfailure{x}{}{\KMPfailure{x}{q-1}{\MPfailure{x}{}{i}}} =
+\KMPfailure{x}{}{0}
+\Leftrightarrow
+\KMPfailure{x}{q}{\MPfailure{x}{}{i}} = -1\\
+&\Leftrightarrow
+\KMPfailure{x}{q}{\MPfailure{x}{}{i}} + 1 = 0
+\end{align*}
+Therefore we can simplify the new definition of \(\MPfailureName_{x}\)
+as
+\begin{align*}
+\MPfailure{x}{}{0} &= -1\\
+\MPfailure{x}{}{1} &= 0\\
+\MPfailure{x}{}{i + 1} &= \KMPfailure{x}{q}{\MPfailure{x}{}{i}} + 1
+\qquad 1 \leqslant i \leqslant \len{x} - 1
+\end{align*}
+where \(q\) is the smallest integer such that
+\begin{itemize}
+
+  \item either \(x[\KMPfailure{x}{q}{\MPfailure{x}{}{i}} + 1]=x[i+1]\)
+  
+  \item or \(\KMPfailure{x}{q}{\MPfailure{x}{}{i}} + 1 = 0\)
+
+\end{itemize}

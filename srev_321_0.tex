@@ -1,0 +1,73 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+\usepackage{amsmath}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesepA=0pt,levelsep=20pt,treesep=14pt]{\erlbox{srev}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \erlnode{3}
+    \pstree{\erlnode{|}}{
+      \erlnode{2}
+      \pstree{\erlnode{|}}{
+        \erlnode{1}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\hspace{8pt}
+\pstree[nodesepA=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+  \psset{nodesepB=0pt}
+  \pstree[nodesepB=2pt]{\erlbox{srev}}{
+    \psset{nodesepA=0pt}
+    \pstree[nodesepA=2pt]{\erlnode{|}}{
+      \erlnode{2}
+      \pstree{\erlnode{|}}{
+        \erlnode{1}
+        \erlnode{[]}
+      }
+    }
+  }
+  \psset{nodesepB=2pt}
+  \pstree{\erlnode{|}}{
+    \erlnode{3}
+    \erlnode{[]}
+  }
+}
+\hspace{14pt}\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\hspace{-5pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+  \pstree{\erlnode{join}}{
+    \psset{nodesepB=0pt}
+    \pstree[nodesepA=0pt]{\erlbox{srev}}{
+      \psset{nodesepB=2pt}
+      \pstree[nodesepA=2pt]{\erlnode{|}}{
+        \erlnode{1}
+        \erlnode{[]}
+      }
+    }
+    \psset{nodesepB=2pt}
+    \pstree{\erlnode{|}}{
+      \erlnode{2}
+      \erlnode{[]}
+    }
+  }
+  \pstree{\erlnode{|}}{
+    \erlnode{3}
+    \erlnode{[]}
+  }
+}
+\endTeXtoEPS
+
+\end{document}

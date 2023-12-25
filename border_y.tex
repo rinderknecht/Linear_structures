@@ -1,0 +1,40 @@
+%%-*-latex-*-
+
+\documentclass{article}
+
+\usepackage{pst-eps}
+
+% Color in tables 
+%
+\usepackage{colortbl}
+\definecolor{mygrey}{gray}{0.5}
+
+% Tables
+%
+\usepackage{array}
+
+% AMS Maths
+%
+\usepackage{amssymb,amsmath}
+
+\input{commands}
+
+\begin{document}
+
+\TeXtoEPS
+\(
+\begin{array}{r@{}>{\,}cccccc@{\,}c}
+\cline{2-8}
+    \multicolumn{1}{r|}{y \cdot a:}
+  & \multicolumn{2}{c|}{\Border{}{y}}
+  & \multicolumn{1}{c|}{b}
+  & \phantom{HHHHHHHH}
+  & \multicolumn{2}{|c}{\Border{}{y}}
+  & \multicolumn{1}{|>{\columncolor{mygrey}}c|}{\textcolor{white}{a}}\\
+\cline{2-8}
+\end{array}
+\)
+\endTeXtoEPS
+
+\end{document}
+

@@ -1,0 +1,35 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pstricks,pst-eps}
+\usepackage{booktabs}
+\usepackage{amsmath}
+
+\renewcommand\arraystretch{0.95}
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\ave[2]{\mathcal{A}_{#2}^{\erlcode{#1}}}
+
+\begin{document}
+
+\TeXtoEPS
+\(
+\begin{array}{rcccccc}
+\toprule
+                         n = &  3    &  5    &  6    & 7 & 9 & 10\\
+\erlcode{mean(\(n\))} \simeq & 16.66 & 29.46 & 34.93
+                             & 40.73 & 56.62 & 62.84\\
+\midrule
+\text{lower} \; \ave{sort}{n} \simeq
+                             & 14.70 & 23.17 & 28.91 & 34.64
+                             & 41.11 & 47.85\\
+\text{upper}  \; \ave{sort}{n} =
+                             & 21.00 & 36.00 & 43.00 & 50.00
+                             & 67.00 & 75.00\\
+\bottomrule
+\end{array}
+\)
+\endTeXtoEPS
+
+\end{document}

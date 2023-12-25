@@ -1,0 +1,525 @@
+%%-*-latex-*-
+
+\chapter{Queues}
+
+A list can only be augmented with new items on only one of its ends,
+called the \emph{top}. A \emph{queue} is like a list where items are
+pushed on one end but popped \emph{at the other end}. Adding an item
+to a queue is called \emph{enqueuing}, whereas removing one is called
+\emph{dequeuing}. The end of the queue used for input is called the
+\emph{rear} and the other end is the \emph{front}. Compare the
+following figures, where the arrows~\((\rightsquigarrow)\) indicate
+the way the items move:
+\[
+\begin{array}{@{}l@{}r@{\;}cc|c|c|c|c|c|cc@{\;}l@{}}
+\cline{4-10}
+\textsf{Queue:} & \text{Enqueue (rear)} 
+                & \rightsquigarrow & & a & b & c & d & e &
+& \rightsquigarrow & \text{Dequeue (front)}\\
+\cline{4-10}\\
+\cline{4-9}
+\textsf{List:} & \text{Push, Pop (top)} 
+               & \leftrightsquigarrow & & a & b & c & d & e &&&\\
+\cline{4-9}
+\end{array}
+\]
+\noindent Let \erlcode{enqueue/2} be a function such that the call
+\erlcode{enqueue(I,Q)} is rewritten into a queue whose last item in
+was~\erlcode{I} and remaining queue \erlcode{Q}. Dually, let
+\erlcode{dequeue/1} be a function such that the call
+\erlcode{dequeue(Q)} is rewritten into the pair \erlcode{\{R,I\}}
+where \erlcode{I}~is the first item out of queue~\erlcode{Q} (if there
+is none, \erlcode{dequeue(Q)} is undefined) and \erlcode{R}~is the
+remaining queue.
+\[
+\begin{array}{c@{\;\,}c@{\,\;}cc|c|c|c|ccc|c|c|c|c|cc@{}}
+\cline{4-8}
+\cline{10-15}
+\erlcode{enqueue} & a & \text{in} & \phantom{c} & b & c & d &
+\phantom{c} 
+& \text{results in} & \phantom{c} & a & b & c & d & \phantom{c}\\
+\cline{4-8}
+\cline{10-15}\\
+\cline{4-8}
+\cline{10-13}
+\erlcode{dequeue} &   & \text{from} & & b & c & d & 
+& \text{results in} & & b & c & \multicolumn{1}{c}{} &
+\multicolumn{2}{c@{}}{\text{and} \,\; d.}\\
+\cline{4-8}
+\cline{10-13}
+\end{array}
+\]
+
+\medskip
+
+\paragraph{One\hyp{}list implementation.}
+
+Let us first try to implement these functions on queues by means of
+the usual functions on one list. Let us rename \erlcode{enqueue/2}
+into \erlcode{enq1/2} and \erlcode{dequeue/1} into \erlcode{deq1/2} to
+remind that they rely on a single list. In this case, \erlcode{enq1/2}
+is simply a push operation and \erlcode{deq1(Q)} is a \emph{pair} made
+of the last item in the list~\erlcode{Q} and the longest prefix
+of~\erlcode{Q} excluding it (that is, all the previous items in the
+same order). In other words, \erlcode{deq1/1} evaluates in a pair
+whose first component is made of all the original items in the list
+except the last one. The second component is the last item in
+question. Consider the following:
+\begin{align*}
+\erlcode{enq1(a,[])}        &\twoheadrightarrow \erlcode{[a]};\\
+\erlcode{enq1(a,[b,c])}     &\twoheadrightarrow \erlcode{[a,b,c]};\\
+\erlcode{deq1([])}          &\nrightarrow;\\
+\erlcode{deq1([a])}         &\twoheadrightarrow \erlcode{\{[],a\}};\\
+\erlcode{deq1([a,b,c,d,e])} &\twoheadrightarrow \erlcode{\{[a,b,c,d],e\}}.
+\end{align*}
+We induce the following \Erlang definitions:
+\begin{alltt}
+enq1(I,Q)   -> [I|Q].\hfill% \emph{Queue} Q \emph{is a list}
+deq1(  [I]) -> \{[],I\};
+deq1([I|Q]) -> \{R,J\}=deq1(Q), \{[I|R],J\}.
+\end{alltt}
+If the queue contains \(n\)~items, then the delay \(\comp{deq1}{n}\)
+is defined by the following recurrent equations:
+\[
+\comp{deq1}{1} = 1;\quad
+\comp{deq1}{n} = 1 + \comp{deq1}{n-1}, \,\; \text{with} \,\; n > 0.
+\]
+This is a recurrence extremely easy to solve: \(\comp{deq1}{n} = n\),
+for~\(n \geqslant 0\). So this one\hyp{}list implementation of queues
+provides constant time for enqueuing and linear time for dequeuing.
+
+\medskip
+
+\paragraph{Two\hyp{}list implementation.}
+
+Let us now implement a more sophisticated approach with two lists,
+instead of one: one for enqueuing, called the \emph{rear list}, and
+one for dequeuing, called the \emph{front list}.
+\[
+\begin{array}{r@{\;}cc|c|c|c|c|c|c|cc@{\;}l}
+  \cline{3-6}\cline{8-10}
+  \text{Enqueue (rear)} & \rightsquigarrow & & a & b & c & & d & e & &
+  \rightsquigarrow & \text{Dequeue (front)}\\
+  \cline{3-6}\cline{8-10}
+\end{array}
+\]
+\noindent So enqueuing is pushing on the rear list and dequeuing is
+popping on the front list. In the latter case, if the front list is
+empty and the rear list is not, we swap the lists and reverse the
+(new) front. Pictorially, this is best summed up as
+\[
+\begin{array}{lcc|c|c|c|c|cl}
+  \cline{3-6}\cline{8-8}
+  \text{Given} & & & a & b & c & & &
+  \text{how to dequeue?}\\
+  \cline{3-6}\cline{8-8}\\
+  \cline{3-3}\cline{5-8}
+  \text{Make} & & & & a & b & c & &
+   \text{and dequeue now.}\\
+  \cline{3-3}\cline{5-8}
+\end{array}
+\]
+\noindent Let the pair \erlcode{\{In,Out\}} denote the queue where
+\erlcode{In}~is the rear list and~\erlcode{Out} the front
+list. Enqueuing is as easy as with one list: just push the item
+on~\erlcode{In}:
+\begin{verbatim}
+enq2(E,{In,Out}) -> {[E|In],Out}.
+\end{verbatim}
+Dequeuing requires some care when the front list is empty. This
+suggests an approach like this:
+\begin{alltt}
+deq2(\{In,     []\}) -> \fbcode{deq2(\{[],rev(In)\})};
+deq2(\{In,[E|Out]\}) -> \fbcode{deq2(\{[],rev(In)\})}.
+\end{alltt}
+In the first clause, we must start over after moving the rear list to
+the front and reversing it (or reverse first and swap next, since both
+operations commute and are performed in one rewrite):
+\begin{alltt}
+deq2(\{In,     []\}) -> \textbf{deq2(\{[],rev(In)\})};
+deq2(\{In,[E|Out]\}) -> \fbcode{deq2(\{[],rev(In)\})}.
+\end{alltt}
+\verbatiminput{rev.def}
+In the second clause, we found the item expected to be
+dequeued:~\erlcode{E}. Therefore we draw
+\begin{alltt}
+deq2(\{In,     []\}) -> deq2(\{[],rev(In)\});
+deq2(\{In,[E|Out]\}) -> \textbf{\{\{In,Out\},E\}}.
+\end{alltt}
+When testing a definition, it is wise to always envisage the ``empty
+case,'' whatever that means for the data structures at hand. In this
+particular case, the empty queue is uniquely implemented by the
+\Erlang value \erlcode{\{[],[]\}}. If we try to rewrite
+\erlcode{deq2(\{[],[]\})}, we realise that the program never
+terminates because the first clause always matches the empty
+queue. What should have been expected for the empty queue? Simply put,
+the function \erlcode{deq2/1} should not be defined on the empty
+queue. Thus, let us change the pattern of the first clause in order to
+exclude any match for the empty queue:
+\begin{alltt}
+deq2(\{\textbf{In=[\_|\_]},     []\}) -> deq2(\{[],rev(In)\});
+deq2(\{      In,[E|Out]\}) -> \{\{In,Out\},E\}.
+\end{alltt}
+Let \(\comp{deq2}{p,q}\) be the delay for computing the call
+\erlcode{deq2(\{\(P\),\(Q\)\})}, where \(p\)~and~\(q\) are,
+respectively, the lengths of the rear list~\(P\) and the front
+list~\(Q\). From the definition, two recurrent equations follow:
+\begin{align*}
+\comp{deq2}{p,0} &= 1 + \comp{rev}{p} + \comp{deq2}{0,p}
+                  = p + 3 + \comp{deq2}{0,p},\,\;
+                    \text{with} \,\; p > 0;\\
+\comp{deq2}{p,q} &= 1 ,\,\; \text{with} \,\; q > 0.
+\end{align*}
+The best case for dequeuing happens when the front list is not empty,
+that is, \({q > 0}\): the delay is then \(\best{deq2}{n} = 1\), where
+\({n>0}\) is the total number of items in the queue. The worst case
+consists in having the front list empty, that is,~\(q=0\). Then the
+delay is \(\worst{deq2}{n} = n + 4\).
+
+\medskip
+
+\paragraph{Comparison.}
+
+We have \(\best{deq2}{n} \leqslant \comp{deq1}{n} < \worst{deq2}{n}\),
+therefore it is not possible to conclude for which values of \(n\)
+\erlcode{deq1/1} is faster than \erlcode{deq2/1}. A finer analysis is
+needed. Because the worst delay of \erlcode{deq/2} depends on the
+number of items in the rear list, that is, on the number of previous
+enqueuings, it makes sense to study the delay of \emph{a sequence of
+  operations} (here, enqueuings and dequeuings) on a two\hyp{}list
+queue, \emph{in the worst case}. Up to now, we studied worst case
+scenarios of \emph{one} function, taken in isolation, and we just
+found that this is sometimes insufficient. In general, it is indeed
+possible that the worst case for one specific operation leads to a
+good case for other subsequent operations; therefore, \emph{adding the
+  worst case delays of all operations taken in isolation may be much
+  more than the worst delay of the series considered as a whole.} This
+kind of analysis is called \emph{amortised} because it takes into
+account the fact that, in a series of operations on a data structure,
+some configurations lead to slow operations but the treatment of these
+create good configurations for others, so the high delay is amortised
+on a long run. Note that amortised analysis is not a statistic or
+probabilistic argument, as the randomness of a configuration has
+nothing to do with the phenomenon targeted by amortised analysis: we
+still consider the worst case, but of a sequence of operations, not a
+single one.
+
+To contrast these two analyses, let us study the delay
+\(\mathcal{D}_n\) of a series of \(n\)~operations on a queue,
+consisting of enqueuings and dequeuings implemented, respectively, by
+\erlcode{enq2/2} and \erlcode{deq2/1}. First, let us consider the
+worst case of a single operation. We already know that the worst case
+is when the operation is a dequeuing and the front list is empty:
+\(\worst{deq2}{i} = i + 4\), where \(i\)~is the number of items in the
+rear list. This means that
+\[
+\mathcal{D}_n \leqslant \sum_{i=1}^{n-1}{\worst{deq2}{i}} =
+\frac{1}{2}{(n-1)(n+8)} \mathrel{\sim} \frac{1}{2}{n^2}.
+\]
+There exists a real number~\(\alpha\) and an integer~\(n_0\) such
+that, for all \({n > n_0}\), \(\abs{(n-1)(n+8)/2} \leqslant \alpha
+n^2\). This is usually written concisely in the notation introduced by
+the mathematician Paul Bachmann\label{Bachmann} as \(\mathcal{D}_n \in
+\bachmann{n^2}\). That is, the delay of \(n\)~operations in the worst
+case is bounded from above by a quadratic polynomial as \(n\)~gets
+large. Contrast this notation with Landau's notation in
+equation~\vref{eq:Landau}, which is the set of functions
+\(\landau{g(n)}\) such that \(f \in \landau{g(n)} \Leftrightarrow
+\lim_{n \rightarrow \infty}{f(n)/g(n)} = 0\).
+
+Actually, the worst case above is too pessimistic and cannot even
+exist. Indeed, two important constraints were left aside. First, one
+cannot dequeue on an empty queue. As a consequence, at any time, the
+number of enqueuings since the beginning is always greater or equal
+than the number of dequeuings. In particular, the series of operations
+must start with at least one enqueuing. Second, when dequeuing on a
+queue whose front list is empty, all the items of the rear list are
+reversed into the front list, so they cannot be reversed again during
+the next dequeuing, whose delay will be~\(1\). Moreover,
+\(\comp{enq2}{} \leqslant \comp{deq2}{n}\), so the first consequence
+is that the worst case for a series of \(n\)~operations is when the
+number of dequeuings is maximum, that is, when it is
+\(\lfloor{n/2}\rfloor\). Thus, let us distinguish an even number of
+operations and an odd number. If we denote \(e\)~and~\(d\) the number
+of enqueuings and, respectively, the number of dequeuings, we have \(n
+= e + d\) and the two requisites for a worst case become \(e=d\) or
+\(e=d+1\).
+
+\medskip
+
+\paragraph{Dyck path (\(\boldsymbol{e=d}\)).}
+
+This refinement still does not take into account all the information
+we have, for instance, we do not use the fact that \emph{at any time}
+the past number of enqueuings is greater or equal than the past number
+of dequeuings (we only assumed this to hold after
+\(n\)~operations). This constraint can be visualised by representing
+an enqueuing by an opening parenthesis and a dequeuing by a closing
+parenthesis, so, for example, a valid series of operations when
+\(e=d=7\) could be \erlcode{((()()(()))())}. All the prefixes of this
+string of parentheses are
+\begin{center}
+\tt
+(\quad
+((\quad
+(((\quad
+((()\quad
+((()(\quad
+((()()\quad
+((()()(\quad
+((()()((\quad
+((()()(()\\
+((()()(())\quad
+((()()(()))\quad
+((()()(()))(\quad
+((()()(()))()\quad
+((()()(()))())
+\end{center}
+We can check that for each of them the number of closing parentheses
+never exceeds the number of opening parentheses. Another way to
+visualise this example is graphically, using a similar convention to
+the one found in section \ref{chap:persistence_and_backtracking}
+\vpageref{chap:persistence_and_backtracking}. See 
+\fig~\vref{fig:enq_deq}.
+\begin{figure}
+\centering
+\subfloat[Enqueue\label{fig:enqueue}]{%
+  \includegraphics[scale=0.75]{enqueue}
+}
+\qquad
+\subfloat[Dequeue\label{fig:dequeue}]{%
+  \includegraphics[scale=0.75]{dequeue}
+}
+\caption{Graphical representations of operations on queues\label{fig:enq_deq}}
+\end{figure}
+Then, \erlcode{((()()(()))())} can be represented in
+\fig~\vref{fig:dyck_path} as a \emph{Dyck path}, named in the honour
+of the logician Walther (von)~Dyck.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=75 572 505 725,scale=0.71]{dyck_path}
+\caption{Dyck path modelling queue operations (delay \(30\))
+\label{fig:dyck_path}}
+\end{figure}
+For a broken line to qualify as a Dyck path of \emph{length}~\(n\), it
+has to start at the origin~\((0,0)\) and end at coordinates~\((n,0)\),
+that is, on the abscissa axis. In terms of a \emph{Dyck language}, an
+enqueuing is called a \emph{rise} (see \fig~\vref{fig:enqueue}) and a
+dequeuing is called a \emph{fall}. A rise followed by a fall is called
+a \emph{peak}. The ordinate of a point on a path is called its
+\emph{height}. (The continued analogy is that of a mountain range.)
+For instance, in \fig~\vref{fig:dyck_path}, there are four peaks. The
+number near each rise or fall is the delay incurred by the
+corresponding operation on the queue, that is, either an enqueuing or
+a dequeuing. The height is interpreted as the number of items in the
+queue at a given time. Time is the meaning of the abscissas.
+
+When the number of enqueuings equals the number of dequeuings, that
+is, \({e=d}\), the graphical representation of the operations is a
+Dyck path of length \(n=2e=2d\). In order to deduce the total delay in
+this case, we must find a decomposition of the path that is
+workable. By decomposition we either mean to identify patterns whose
+delays are easy to compute and which make up any Dyck path, or to
+associate any path to another path whose delay is the same but easy to
+find. Actually, we are going to do both. \Fig~\vref{fig:dyck_eq1}
+\begin{figure}[b]
+\centering
+\includegraphics[bb=75 572 505 725,scale=0.71]{dyck_eq1}
+\caption{Dyck path equivalent to \fig~\vref{fig:dyck_path}
+\label{fig:dyck_eq1}}
+\end{figure}
+shows how the previous path can be mapped to an equivalent path only
+made of a series of isosceles triangles whose bases belong to the
+abscissa axis. Let us call them \emph{mountains} and their series a
+\emph{range}. The algorithm for the mapping is simple: after the first
+fall, if we are back to the abscissa axis, we have a mountain and we
+start again with the rest of the path. Otherwise, the next operation
+is a rise and we exchange it with the first fall after it. This brings
+us down by~\(1\) and we can repeat the procedure until the bottom line
+is reached. We call this process \emph{rescheduling} because it
+amounts, in operational terms, to reordering subsequences of
+operations a posteriori. For instance, see in
+\fig~\vref{fig:rescheduling} the rescheduling of
+\fig~\vref{fig:dyck_path}.
+\begin{figure}
+\centering
+\subfloat[Initial\label{fig:initial}]{%
+  \includegraphics[bb=56 590 218 724,scale=0.75]{mountain0}
+}
+\qquad
+\subfloat[Swapping \(4\nearrow 5\) and \(5\searrow 6\)]{%
+  \includegraphics[bb=56 590 218 724,scale=0.75]{mountain1}
+}
+\qquad
+\subfloat[Swapping \(5\nearrow 6\) and \(8 \searrow
+  9\)\label{fig:valley}]{%
+  \includegraphics[bb=56 590 218 725,scale=0.75]{mountain4}
+}
+\qquad
+\subfloat[Last one]{%
+  \includegraphics[bb=18 646 180 782,scale=0.75]{mountain5}
+}
+\caption{Rescheduling of \fig~\vref{fig:dyck_path}\label{fig:rescheduling}}
+\end{figure}
+Rescheduling is not an \emph{injection}, that is, two different Dyck
+paths can be rescheduled to the same path. What makes
+\fig~\vref{fig:valley}, called a \emph{low valley}, equivalent to
+\fig~\vref{fig:initial} is that the delay is invariant because all
+operations have individual delays of~\(1\). This is always the case
+because, on the one hand, enqueuings always have delay~\(1\) and, on
+the other hand, the dequeuings involved in a rescheduling have
+delay~\(1\) because they found the front list non\hyp{}empty after a
+peak. We proved that all series of queue operations corresponding to a
+Dyck path are equivalent to a range, whose associated queue operations
+have the same delay as the original one. Therefore, the worst case can
+be found on ranges alone and it happens that their delays are easy to
+compute. Let us note \(e_1, e_2, \dots, e_k\) the series of rises; for
+example, in \fig~\vref{fig:dyck_eq1}, we have \({e_1=3}\), \({e_2=3}\)
+and \({e_3=1}\), meaning: ``Three rises from the bottom line, then
+again and finally one rise.'' Of course, \(e=e_1 + e_2 + \dots +
+e_k\). Then the fall making up the \(i\)th~peak incurs the delay
+\(e_i+4\) due to the front list being empty because we started the
+rise from the abscissa axis. The next \(e_i-1\) falls have all delay
+\(1\), because the front list is not empty. For the \(i\)th~mountain,
+the delay is thus \(e_i+(e_i+4)+(e_i-1) = 3e_i+3\). In total, the
+delay \(\comp{}{e,k}\) is thus
+\[
+\comp{}{e,k} = \sum_{i=1}^{k}{(3e_i+3)} = 3(e+k).
+\]
+We can check the example in \fig~\vref{fig:dyck_eq1}, where \({e=7}\)
+and \({k=3}\) and find \(\comp{}{e,k}=3\cdot(7+3)=30\), which is
+correct. The worst case is obtained by maximising \(\comp{}{e,k}\) for
+a given~\(e\), because~\(k\), not being a parameter of the problem, is
+free to vary. We have
+\[
+\max_{1 \leqslant k \leqslant e}{\comp{}{e,k}}
+  = \comp{}{e,e}
+  = 3(e+e) = 3n = \worst{}{e,e},\,\; \text{with} \,\; n=2e,
+\]
+where \(\worst{}{e,e}\) is the worst delay when there are \(e\)
+enqueuings and \({d=e}\) dequeuings. In other words, the worst case
+when \(e=d=7\) is the saw\hyp{}toothed Dyck path shown in
+\fig~\vref{fig:worst_dyck}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=86 657 503 724,scale=0.7]{worst_dyck}
+\caption{Worst case when \(e=d=7\) (delay \(42\))
+\label{fig:worst_dyck}}
+\end{figure}
+Importantly, there are no other Dyck paths whose rescheduling lead to
+this worst case and the reason is that the reverse transformation from
+ranges to general Dyck paths works on dequeuings of delay~\(1\) and
+the solution we found is the only one with no dequeuing equal
+to~\(1\).
+
+\medskip
+
+\paragraph{Dyck meander (\(\boldsymbol{e=d+1}\)).}
+
+The other possibility for a worst case is that \(e=d+1\) and the
+graphical representation is then a \emph{Dyck meander} whose extremity
+ends at ordinate \(e-d=1\). An example is given in
+\fig~\vref{fig:dyck_meander1}, where the last operation is a
+dequeuing.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=76 572 475 725,scale=0.76]{dyck_meander1}
+\caption{Dyck meander modelling queue operations (total delay
+  \(25\))\label{fig:dyck_meander1}}
+\end{figure}
+The dotted line delineates the result of applying the rescheduling we
+used on Dyck paths. Here, the last operation becomes an
+enqueuing. Another possibility is shown in
+\fig~\vref{fig:dyck_meander2},
+\begin{figure}[b]
+\centering
+\includegraphics[bb=76 572 475 725,scale=0.76]{dyck_meander2}
+\caption{Dyck meander modelling queue operations (total delay
+  \(29\))\label{fig:dyck_meander2}}
+\end{figure}
+where the last operation is left unchanged. The difference between the
+two examples lies in the fact that the original last dequeuing has, in
+the former case, a delay of~\(1\) (thus is changed) and, in the latter
+case, a delay greater than~\(1\) (thus is invariant). The range
+resulting from the rescheduling leads to peaks whose falls have a
+delay greater than~\(1\). The third kind of Dyck meander to consider
+is one ending with an enqueuing, but because this enqueuing must start
+from the abscissa axis, this is the same situation as the result of
+rescheduling a meander ending with a dequeuing with delay~\(1\) (see
+dotted line in \fig~\ref{fig:dyck_meander1} again). Therefore, we are
+left to compare the results of rescheduling meanders ending with a
+dequeuing, that is, we have two cases: either a range of \({n-1}\)
+operations (\({e-1}\) enqueuings and \(d=e-1\) dequeuings) followed by
+an enqueuing or a range of \({n-3}\) operations (\({e-2}\) enqueuings
+and \(d-1=e-2\) dequeuings) followed by two rises and one fall
+(totalling a delay of~\(8\)). In the former case, the worst case of
+the range is a saw\hyp{}toothed Dyck path of delay
+\(\comp{}{e-1,e-1}=3((e-1)\cdot 2)=3(n-1)\), because
+\(n=e+d=2e-1\). The worst delay of the whole meander is then simply
+\(3(n-1)+1 = 3n-2\) and there are \(k=e-1\) peaks. In the latter case,
+the worst case of the range is a saw\hyp{}toothed Dyck path of delay
+\(\comp{}{e-2,e-2}=3(n-3)\), so the worst delay of the whole meander
+is \(3(n-3)+8=3n-1\). This delay is slightly worse than the previous
+one, so we can conclude
+\[
+\worst{}{e,e-1} = 3n-1,\,\; \text{with} \,\; n = 2e-1.
+\]
+
+\smallskip
+
+\paragraph{Conclusion.}
+
+As a conclusion, the delay \(\mathcal{D}_n\) of a series of
+\(n\)~queue operations, that is, enqueuings and dequeuings starting on
+an empty queue, is bounded as follows:
+\[
+ n \leqslant \mathcal{D}_n \leqslant 3n.
+\]
+The lower bound corresponds to the case where all the operations are
+enqueuings, the upper bound occurs when there are \(e\)~enqueuings and
+\(e\)~dequeuings, with \({n=2e}\), in a saw\hyp{}toothed
+pattern. Because these bounds are tight, that is, they correspond to
+actual configurations of the input, it would be less precise to state
+that \(\mathcal{D}_n \in \bachmann{n}\), where the multiplicative
+constant is hidden and unknown. We proved that, despite some
+dequeuings having a delay linear in the size of the queue in the worst
+case, \emph{a series of enqueuings and dequeuings has a linear delay
+  in terms of the number of operations in the worst case,} because
+individual worst cases lead to favourable dequeuings later. If we
+average the delay over the number of operations, we obtain the
+\emph{amortised delay} of one operation, \(\mathcal{D}_n/n\), which
+lies between \(1\)~and~\(3\).
+
+\medskip
+
+\paragraph{Exercises.}
+\label{ex:queues}
+
+\noindent [See answers page~\pageref{ans:queues}.]
+\begin{enumerate}
+
+  \item Write a definition for a function \erlcode{head/1} such that
+    the call \erlcode{head(Q)}, where \erlcode{Q}~is a queue
+    implemented with two lists, is rewritten into the first item to be
+    dequeued. For example,
+    \[
+     \erlcode{head(\{[4,3],[1,2]\})} \twoheadrightarrow \erlcode{1}.
+    \]
+    Make sure that the delay of \erlcode{head/1} is
+    constant. (\emph{Hint.} Revise \erlcode{enq2/2} and
+    \erlcode{deq2/1} so that they enforce the invariant property that
+    the front list is empty only if the rear list is empty. In other
+    words, suppose that this is true when the heads match and make
+    sure it is still true after the body is computed.)
+
+  \item A \emph{double\hyp{}ended queue} is a queue where enqueuing
+    and dequeuing are allowed on both ends. Use two lists for the
+    implementation and write enqueuing and dequeuing on both ends
+    efficiently. (\emph{Hint.} Extend the invariant of the previous
+    exercise so that none of the two lists is empty if the
+    double\hyp{}ended queue contains at least two items and when a
+    list becomes empty, split the other list in half and reverse one
+    of the halves.)
+
+\end{enumerate}
+

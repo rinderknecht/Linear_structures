@@ -1,0 +1,1496 @@
+%%-*-latex-*-
+
+\chapter{Delay and Tail Form Revisited}
+
+When determining the delay of a function, we often end up with
+recurrence equations to solve. There are many methods to deal with
+special and common systems exactly, but it is sometimes possible to
+rely on some heuristics as well. For instance, let us recall equations
+\eqref{eq:srev_p} \vpageref{eq:srev_p}:
+\begin{equation}
+\comp{srev}{0} = 1;\quad
+\comp{srev}{n} = 1 + n + \comp{srev}{n-1},\,\;
+\text{where}\;\, n > 0.\label{eq:srev_n}
+\end{equation}
+If we have the intuition that the delay is quadratic, then it can be
+determined within a few tries. Let
+\[
+\comp{srev}{n} := a n^2 + b n + c,\,\; \text{with} \,\; a, b,
+c \in \mathbb{Q},
+\]
+and let us find the values of the coefficients. Since there are three
+of them, we need at least three values of~\(\comp{srev}{n}\) to solve
+the linear equations
+\begin{align*}
+\comp{srev}{0} &= 1 = c,\\
+\comp{srev}{1} &= 1 + 1 + 1 = 3 = a + b + c,\\
+\comp{srev}{2} &= 1 + 2 + 3 = 6 = a \cdot 2^2 + b \cdot 2 + c.
+\end{align*}
+Therefore, replacing~\(c\) by its value, we draw \(c = 1\), \(a + b =
+2\) and \(4a + 2b = 5\); finally \(a = 1/2\), \(b = 3/2\) and~\(c =
+1\), that is \(\comp{srev}{n} = (n^2 + 3n + 2)/2 = (n+1)(n+2)/2\), as
+we found \vpageref{delay:srev}. Since the assumption about the
+quadratic behaviour could have been wrong, it is then important to try
+other values with the newly found formula, for instance
+\(\comp{srev}{4} = (4+1)(4+2)/2 = 15\), then compare with the count of
+all the rewrites to compute the call \erlcode{srev([a,1,7,a])}, for
+example. Here, the contents of the list is irrelevant, only its length
+is. After finding a formula for the delay using the empirical method
+above, it is necessary to prove it for all values of~\(n\). Since the
+initial equations are recurrent, the proof method of choice is the
+\emph{proof by induction}. In general, let us suppose we want to prove
+a property~\(\mathcal{P}\) of~\(n\), written~\(\mathcal{P}(n)\). The
+first step consists in verifying that the property holds for the
+smallest value of~\(n\), let us say~\(\mathcal{P}(0)\). The second
+step postulates~\(\mathcal{P}(n)\) for some given~\(n\) (this is
+called the \emph{induction hypothesis}). Finally, we
+prove~\(\mathcal{P}(n+1)\). The \emph{induction principle} then allows
+us to conclude that \(\mathcal{P}(n)\)~is true for
+\emph{any}~\(n\). In our example, we want to prove the
+property~\(\mathcal{P}(n)\) stating that \(\comp{srev}{n} = (n^2 + 3n
++ 2)/2\). By definition of the empirical approach that lead to the
+formula, we already checked its validity for some small values, here,
+\(n=0,1,2\). Let us suppose it valid for some value of~\(n\) and let
+us prove \(\comp{srev}{n+1} = ((n+1)^2 + 3(n+1) + 2)/2\). Equation
+\eqref{eq:srev_n} implies
+\begin{align*}
+\comp{srev}{n+1} &= 1 + (n+1) + \comp{srev}{n}.
+\intertext{The induction hypothesis, in turn, implies}
+\comp{srev}{n+1} &= 2 + n + (n^2 + 3n + 2)/2
+                  = (n^2 + 5n + 6)/2\\
+                 &= ((n+1)^2 + 3(n+1) + 2)/2,
+\end{align*}
+which is~\(\mathcal{P}(n+1)\). Therefore, the induction principle says
+that the delay we found experimentally is always correct.
+
+The same technique can be applied to compute
+\(\comp{rm\_fst\_alt}{n}\), \vpageref{delay:rm_fst_alt}, for example,
+or any other function for which we have some recurrence equations
+defining its delay and about which we suppose the solved form is of a
+specific function in terms of~\(n\).
+
+It is inconvenient and error\hyp{}prone to rewrite by hand the calls
+we need to set the linear equations. Why use paper and pencil when we
+can use \Erlang instead? The idea is to transform a given function
+definition into another which computes the same values \emph{and} the
+number of rewrites to reach it. It seems then a good idea to change
+the final values to be a list containing these two pieces of data, but
+a list supposes that it is always possible to add (push) or subtract
+(pop) some information from it, whereas what we want here is a fixed,
+closes, number of values packaged together. In order to do this, we
+need a new concept: the \emph{tuple}. \Erlang tuples are conceptually
+like mathematical tuples, except that they are written
+differently. For instance, in mathematics, we would write \((4,7)\),
+whilst in \Erlang this same tuple is written \erlcode{\{4,7\}}. In
+other words, \Erlang uses curly braces in stead of
+parentheses. Special cases of tuples are \emph{pairs}, which compound
+exactly two values, like \erlcode{\{4,7\}}, and \emph{triples}, which
+gather exactly three values. Another way to conceive tuples is to
+think them as a kind of list on which no item can be pushed: it must
+be defined by giving all its items at once.
+
+Now how do we proceed? Let us take again the definition of
+\erlcode{rm\_lst\_tf/2}:
+\verbatiminput{rm_lst_tf.def} The methods consists in adding a
+parameter which is a counter, adding an initial call which sets it to
+\erlcode{0}~or~\erlcode{1} and incrementing its value in each clause
+(changes in bold):
+\begin{alltt}
+rm_lst_tf(I,L)        -> rev_join(I,L,[],\textbf{1}).\hfill% \emph{One}
+rev_join(   [],Q,I,\textbf{C}) -> rm_fst(I,Q,[],\textbf{C+1});
+rev_join([J|P],Q,I,\textbf{C}) -> rev_join(P,[J|Q],I,\textbf{C+1}).
+rm_fst(_,   [],A,\textbf{C})   -> \textbf{\{}A,\textbf{C+1\}};\hfill% \emph{Result is a pair}
+rm_fst(I,[I|Q],A,\textbf{C})   -> rev_join(Q,A,\textbf{C+1});
+rm_fst(I,[J|Q],A,\textbf{C})   -> rm_fst(I,Q,[J|A],\textbf{C+1}).
+\end{alltt}
+This simple and effective approach can be implemented with all
+definitions in tail form. 
+
+Let us consider what happens with a definition which is not in tail
+form, for instance, \erlcode{flat\_opt/1} \vpageref{code:flat_opt}:
+\begin{alltt}
+flat_opt(       []) -> [];
+flat_opt(   [[]|L]) -> flat_opt(L);
+flat_opt(  [[I]|L]) -> flat_opt([I|L]);
+flat_opt([[I|M]|L]) -> flat_opt([I,M|L]);
+flat_opt(    [I|L]) -> [I|flat_opt(L)].
+\end{alltt}
+If we try the previous direct manner, we need to (1)~add a counter as
+an extra parameter everywhere in the clauses of \erlcode{flat\_opt/1},
+which becomes \erlcode{flat\_opt/2}; (2)~add a definition for
+\erlcode{flat\_opt/1} setting the counter's initial value; (3)~make
+sure to increment the counter in all the calls and (4)~for each body
+which is not a call, pair up the expression with the counter plus one
+(changes in bold):
+\begin{alltt}
+\textbf{flat_opt(L)           -> flat_opt(L,0).}\hfill% \emph{Not} 1
+flat_opt(       [],\textbf{C}) -> \textbf{\{}[],\textbf{C+1\}};
+flat_opt(   [[]|L],\textbf{C}) -> flat_opt(L,\textbf{C+1});
+flat_opt(  [[I]|L],\textbf{C}) -> flat_opt([I|L],\textbf{C+1});
+flat_opt([[I|M]|L],\textbf{C}) -> flat_opt([I,M|L],\textbf{C+1});
+flat_opt(    [I|L],\textbf{C}) -> [I|flat_opt(L,\textbf{C+1})].\hfill% \emph{Problem}
+\end{alltt}
+The problem lies with the last clause, which is not in tail form: the
+value of the call \erlcode{flat\_opt(L,C+1)} is a pair, but it is
+treated as a list because the control context is
+\erlcode{[I|\textvisiblespace]}. We need a way to hold the value of
+the call, then extract the list from it, push item~\erlcode{I} on it
+and put back the augmented list together with the counter in a new
+pair. All this can be done by simply adding an auxiliary function, say
+\erlcode{aux/2}:
+\begin{alltt}
+flat_opt(L)           -> flat_opt(L,0).
+flat_opt(       [],C) -> \{[],C+1\};
+flat_opt(   [[]|L],C) -> flat_opt(L,C+1);
+flat_opt(  [[I]|L],C) -> flat_opt([I|L],C+1);
+flat_opt([[I|M]|L],C) -> flat_opt([I,M|L],C+1);
+flat_opt(    [I|L],C) -> \textbf{aux(I,flat_opt(L,C+1))}.
+\textbf{aux(I,\{L,C\})          -> \{[I|L],C\}.}\hfill% C \emph{unchanged}
+\end{alltt}
+Notice how the counter~\erlcode{C} is left invariant in the definition
+of \erlcode{aux/2} because we only want to measure the delay of
+\erlcode{flat\_opt/2} (that is precisely why we initialised the
+counter to~\erlcode{0} instead of~\erlcode{1} in the clause defining
+\erlcode{flat\_opt/1}).
+
+What about the following definition?
+\verbatiminput{srev.def}
+The definition is not in tail form, hence we expect to add an
+auxiliary function, \erlcode{aux/2}, to handle the call to
+\erlcode{join/2}, and an auxiliary function \erlcode{srev/2} to
+introduce the accumulator:
+\begin{alltt}
+srev(L)       -> srev(L,0).
+srev(   [],C) -> \{[],C\};
+srev([I|L],C) -> aux(srev(L,C+1),I).
+aux(\{L,C\},I)  -> \{join(L,[I]),C\}.
+\end{alltt}
+If we want to also count the rewrites by \erlcode{join/2}, a counter
+must also be added to the definition of \erlcode{join/2}. Let us take
+the definition
+\verbatiminput{join_2.def}
+and follow the same method of transformation:
+\begin{alltt}
+join(   [],Q,C) -> \{Q,C+1\};
+join([I|P],Q,C) -> aux1(I,join(P,Q,C+1)).
+aux1(I,\{L,C\})   -> \{[I|L],C\}.
+\end{alltt}
+Now the call to \erlcode{join/3} in the body of \erlcode{aux/2} is in
+tail form:
+\begin{alltt}
+aux(\{L,C\},I)    -> \textbf{join(L,[I],C)}.
+\end{alltt}
+Note how \erlcode{join/3} takes care of constructing a pair, so there
+is no point in making another one in the body of \erlcode{aux/2}.
+
+Let us consider now a definition more involved, like the following
+\vpageref{code:sflat_par_alpha}: \verbatiminput{sflat.def} The
+difficulty here lies in the third clause, because it contains two
+recursive calls. Since the order of argument evaluation is not
+specified in \Erlang, we do not know which call is computed
+first. Therefore there are two approaches to add a rewrite counter:
+either keeping the indeterminacy or forcing an order. Let us first
+proceed with the former plan. We add a counter to the definition and
+add another definition whose purpose is to initialise the counter:
+\begin{alltt}
+\textbf{sflat1(L)          -> sflat(L,0).}
+sflat(       [],\textbf{C}) -> \textbf{\{}[],\textbf{C+1\}};
+sflat(   [[]|L],\textbf{C}) -> sflat(L,\textbf{C+1});
+sflat([[I|M]|L],\textbf{C}) ->
+\hfill join(sflat([I|M],\fbcode{C+1}),sflat(L,\fbcode{C+1}),\fbcode{C+1});
+sflat(    [I|L],\textbf{C}) -> [I|sflat(L,\textbf{C+1})].
+\end{alltt}
+The last clause can be handled as we did before with
+\erlcode{flat\_opt/2}:
+\begin{alltt}
+sflat1(L)          -> sflat(L,0).
+sflat(       [],C) -> \{[],C+1\};
+sflat(   [[]|L],C) -> sflat(L,C+1);
+sflat([[I|M]|L],C) ->
+\hfill join(sflat([I|M],\fbcode{C+1}),sflat(L,\fbcode{C+1}),\fbcode{C+1});
+sflat(    [I|L],C) -> \textbf{aux(I,}sflat(L,C+1)\textbf{)}.
+\textbf{aux(I,\{L,C\})       -> \{[I|L],C\}.}
+\end{alltt}
+In the third clause, we call recursively with a new counter set
+to~\(0\), so we need an auxiliary to sum these two resulting counters
+to~\erlcode{C} and call \erlcode{join/3}:
+\begin{alltt}
+sflat1(L)          -> sflat(L,0).
+sflat(       [],C) -> \{[],C+1\};
+sflat(   [[]|L],C) -> sflat(L,C+1);
+sflat([[I|M]|L],C) -> \textbf{aux1}(sflat([I|M],\textbf{0}),sflat(L,\textbf{0}),\textbf{C+1});
+sflat(    [I|L],C) -> \textbf{aux(I,}sflat(L,C+1)\textbf{)}.
+aux(I,\{L,C\})            -> \{[I|L],C\}.
+\textbf{aux1(\{L1,C1\},\{L2,C2\},C) -> join(L1,L2,C1+C2+C).}
+\end{alltt}
+The second approach consists in imposing an order of evaluation on the
+two recursive calls. Let us say, arbitrarily, that we compute
+\erlcode{sflat([I|M])} before \erlcode{sflat(L)}. Let us resume the
+transformation at the following stage (we rename \erlcode{flat/1} into
+\erlcode{flat2/1} to avoid confusion with the first approach):
+\begin{alltt}
+sflat2(L)          -> sflat(L,0).
+sflat(       [],C) -> \{[],C+1\};
+sflat(   [[]|L],C) -> sflat(L,C+1);
+sflat([[I|M]|L],C) ->
+\hfill aux1(sflat([I|M],\fbcode{C+1}),sflat(L,\fbcode{C+1}),\fbcode{C+1});
+sflat(    [I|L],C) -> aux(I,sflat(L,C+1)).
+aux(I,\{L,C\})            -> \{[I|L],C\}.
+aux1(\{L1,C1\},\{L2,C2\},C) -> join(L1,L2,C1+C2+C).
+\end{alltt}
+The idea then consists, in the third clause of \erlcode{sflat/2}, in
+passing the counter \erlcode{C+1} to the call
+\erlcode{sflat([I|M],\fbcode{C+1})}, then extract from the result the
+new counter and pass it to the second call,
+\erlcode{sflat(L,\fbcode{C+1})}. Function \erlcode{aux1/1} must be
+modified and an auxiliary function \erlcode{aux2/1} is needed:
+\begin{alltt}
+sflat2(L)          -> sflat(L,0).
+sflat(       [],C) -> \{[],C+1\};
+sflat(   [[]|L],C) -> sflat(L,C+1);
+sflat([[I|M]|L],C) -> \textbf{aux1(L,}sflat([I|M],\textbf{C+1})\textbf{)};
+sflat(    [I|L],C) -> aux(I,sflat(L,C+1)).
+aux(I,\{L,C\})       -> \{[I|L],C\}.
+\textbf{aux1(L,\{P,C\})      -> aux2(P,}sflat(L,\textbf{C})\textbf{).}
+\textbf{aux2(P,\{Q,C\})      ->} join(\textbf{P},\textbf{Q},\textbf{C})\textbf{.}
+\end{alltt}
+Notice how the auxiliary functions keep the counter invariant because
+they are not part of the original design of \erlcode{sflat/1}. On the
+one hand, the definition of \erlcode{sflat2/2} is longer than that of
+\erlcode{sflat1/2} and it does not keep the order of evaluation
+undetermined. On the other hand, \erlcode{sflat2/2} is more efficient
+because it does not set two counters to zero when matching an embedded
+non\hyp{}empty list, these zeros being later uselessly added. If we
+note~\(\mathcal{N}\) the number of non\hyp{}empty embedded lists in
+the original input, the third clause of \erlcode{sflat1/2} is
+used~\(\mathcal{N}\) times, which means that~\(2 \mathcal{N}\) useless
+additions to zero are performed. For inputs with a small number of
+non\hyp{}empty embedded lists, this probably will make no notable
+difference because the delay of \erlcode{sflat/1} is linear
+in~\(\mathcal{N}\), but this is enough ground to deem
+\erlcode{sflat2/2} faster than \erlcode{sflat1/1}. The different
+strategies can be summed up in \fig~\ref{fig:sflat_delay}, where the
+abstract syntax tree of \erlcode{join(sflat([I|M]),sflat(L))} is
+presented. Each node is annotated on its left by the value of the
+counter just before the corresponding call is computed (counter
+in). The annotations on the right\hyp{}side of the nodes corresponds
+to the value of the counter after the corresponding call is just
+finished being computed (counter out). Of course, it is
+\erlcode{sflat1/2} and \erlcode{sflat2/2} which are called with a
+counter, instead of \erlcode{sflat/1}, that is why the counters are
+annotations to the abstract syntax tree and are not depicted as
+arguments. \Fig~\vref{fig:sflat_par} shows that each recursive call
+to \erlcode{sflat/1} is done with a counter set to~\(0\) and each
+resulting counters, \erlcode{C1}~and~\erlcode{C2}, are then added
+to~\erlcode{C+1} to give the counter finally passed to
+\erlcode{join/3}. \Fig~\vref{fig:sflat_seq} demonstrates that the
+current counter, \erlcode{C+1}, is passed to \erlcode{sflat([I|M])}
+first, thus imposing an order of evaluation on the recursive calls;
+the resulting counter~\erlcode{C1} is, in turn, passed
+to \erlcode{sflat(L)} and the subsequent counter, \erlcode{C2},
+becomes the counter finally passed to \erlcode{join/3}.
+\begin{figure}[t]
+\centering
+\subfloat[Parallel (\erlcode{sflat1/1})\label{fig:sflat_par}]{
+  \includegraphics[bb=71 652 196 721]{counters_par}%
+}
+\quad
+\subfloat[Sequential (\erlcode{sflat2/1})\label{fig:sflat_seq}]{
+  \includegraphics[bb=71 652 205 721]{counters_seq}%
+}
+\caption{Two ways of computing the delay of \erlcode{sflat([[I|M]|L])}
+\label{fig:sflat_delay}}
+\end{figure}
+Let us consider one more case, function \erlcode{rm\_fst\_alt/2},
+\vpageref{rm_fst_alt} (we rename the arrows here):
+\begin{alltt}
+rm_fst_alt(I,L)     \(\smashedrightarrow{\beta}\) rm_fst__(I,L,[]).
+rm_fst__(_,   [],A) \(\smashedrightarrow{\gamma}\) A;
+rm_fst__(I,[I|L],A) \(\smashedrightarrow{\delta}\) join(A,L);
+rm_fst__(I,[J|L],A) \(\smashedrightarrow{\epsilon}\) rm_fst__(I,L,join(A,[J])).
+\end{alltt}
+We know from the previous example that we can reuse \erlcode{join/3}
+to manage the counter while joining two lists at the same time. In
+clause~\clause{\epsilon}, we need to recover the counter computed
+by~\erlcode{join/3} so an extended \erlcode{rm\_fst\_\_/4} take it in
+turn, which means that some auxiliary function~\erlcode{aux/3} is
+needed. Before adding a counter, let us add the usage of
+\erlcode{aux/3}:
+\begin{alltt}
+rm_fst_alt(I,L)     \(\smashedrightarrow{\beta}\) rm_fst__(I,L,[]).
+rm_fst__(_,   [],A) \(\smashedrightarrow{\gamma}\) A;
+rm_fst__(I,[I|L],A) \(\smashedrightarrow{\delta}\) join(A,L);
+rm_fst__(I,[J|L],A) \(\smashedrightarrow{\epsilon}\) \textbf{aux}(I,L,join(A,[J])).
+\textbf{aux(I,L,P)          \(\smashedrightarrow{\zeta}\) rm_fst__(I,L,P).}
+\end{alltt}
+This program is clearly equivalent to the original one,
+as~\erlcode{aux/3} is the identity function for now. Let us then
+replace calls to \erlcode{join/2} by calls to \erlcode{join/3}, as
+announced, add the counters and then the value computed by all
+functions have to be a pair made of the value as calculated by the
+original function and the counter.
+\begin{alltt}
+\textbf{rm_fst_alt(I,L)       \(\smashedrightarrow{\alpha}\) rm_fst_alt(I,L,\fbcode{0}).}
+rm_fst_alt(I,L,\textbf{C})     \(\smashedrightarrow{\beta}\) rm_fst__(I,L,[],\textbf{C}).
+rm_fst__(_,   [],A,\textbf{C}) \(\smashedrightarrow{\gamma}\) A\hfill% C \emph{unused yet}
+rm_fst__(I,[I|L],A,\textbf{C}) \(\smashedrightarrow{\delta}\) join(A,L,\textbf{C});
+rm_fst__(I,[J|L],A,\textbf{C}) \(\smashedrightarrow{\epsilon}\) aux(I,L,join(A,[J],\textbf{C})).
+aux(I,L,P)            \(\smashedrightarrow{\zeta}\) rm_fst__(I,L,P).\hfill% \emph{Type error}
+\end{alltt}
+Using~\erlcode{join/3} instead of \erlcode{join/2} lead to a change in
+the nature of the third argument of \erlcode{aux/3}, as calls to
+\erlcode{join/3} rewrite to a pair made of a list and an integer. So
+\erlcode{P}~in clause~\clause{\zeta} is a pair now and the call to
+\erlcode{rm\_fst\_\_/3} is no longer correct. The
+parameter~\erlcode{P} needs to be de\-structured in the pattern so its
+two components, list and counter, are distinguished and the proper
+call to \erlcode{rm\_fst\_\_/4} is set:
+\begin{alltt}
+rm_fst_alt(I,L)       \(\smashedrightarrow{\alpha}\) rm_fst_alt(I,L,\fbcode{0}).
+rm_fst_alt(I,L,C)     \(\smashedrightarrow{\beta}\) rm_fst__(I,L,[],C).
+rm_fst__(_,   [],A,C) \(\smashedrightarrow{\gamma}\) A\hfill% C \emph{unused yet}
+rm_fst__(I,[I|L],A,C) \(\smashedrightarrow{\delta}\) join(A,L,C);
+rm_fst__(I,[J|L],A,C) \(\smashedrightarrow{\epsilon}\) aux(I,L,join(A,[J],\textbf{C})).
+aux(I,L,\textbf{\{P,C\}})        \(\smashedrightarrow{\zeta}\) rm_fst__(I,L,P,\textbf{C}).
+\end{alltt}
+Now, let us increment~\erlcode{C} where necessary, so as to account
+for one more function call \emph{in the original program}:
+\begin{alltt}
+rm_fst_alt(I,L)       \(\smashedrightarrow{\alpha}\) rm_fst_alt(I,L,\textbf{0}).
+rm_fst_alt(I,L,C)     \(\smashedrightarrow{\beta}\) rm_fst__(I,L,[],\textbf{C+1}).
+rm_fst__(_,   [],A,C) \(\smashedrightarrow{\gamma}\) A\hfill% C \emph{unused yet}
+rm_fst__(I,[I|L],A,C) \(\smashedrightarrow{\delta}\) join(A,L,\textbf{C+1});
+rm_fst__(I,[J|L],A,C) \(\smashedrightarrow{\epsilon}\) aux(I,L,join(A,[J],\textbf{C+1})).
+aux(I,L,\{P,C\})        \(\smashedrightarrow{\zeta}\) rm_fst__(I,L,P,C).
+\end{alltt}
+Notice how the counter~\erlcode{C} is left unchanged in
+clause~\clause{\zeta} because there is no equivalent clause in the
+original definition, so this function call must not be accounted
+for. Similarly, in clause~\clause{\alpha}, the initial value of the
+counter is~\erlcode{0}, because this is a newly added
+clause. Clause~\clause{\gamma} is still in need of attention. It is
+the last step of \erlcode{rm\_fst\_\_/4}, so we need to pair the
+original result, that is, \erlcode{A}, with the newly added
+counter~\erlcode{C}, properly incremented, of course. Doing so will
+change the type of the calls to \erlcode{rm\_fst\_alt/4}:
+\begin{alltt}
+rm_fst_alt(I,L)       \(\smashedrightarrow{\alpha}\) rm_fst_alt(I,L,0).
+rm_fst_alt(I,L,C)     \(\smashedrightarrow{\beta}\) rm_fst__(I,L,[],C+1).
+rm_fst__(_,   [],A,C) \(\smashedrightarrow{\gamma}\) \textbf{\{A,C+1\}};
+rm_fst__(I,[I|L],A,C) \(\smashedrightarrow{\delta}\) join(A,L,C+1);
+rm_fst__(I,[J|L],A,C) \(\smashedrightarrow{\epsilon}\) aux(I,L,join(A,[J],C+1)).
+aux(I,L,\{P,C\})        \(\smashedrightarrow{\zeta}\) rm_fst__(I,L,P,C).
+\end{alltt}
+This concludes the transformation.
+
+What would have happened if we had started with a definition in tail
+form? Let us try with \erlcode{rm\_lst\_tf/2}, as found
+\vpageref{code:rm_lst_tf}: \verbatiminput{rm_lst_tf.def} We add a
+counter and a new clause to set its initial value. We increment it
+where the current clause corresponds to another one in the original
+definition. We must not forget to pair value and counter in the bodies
+without function calls (because the definition is in tail form, these
+bodies are the last expressions to be evaluated before the programs
+terminates). We get\label{code:count_tf}
+\begin{alltt}
+\textbf{rm_lst_tf(I,L)        -> rm_lst_tf(I,L,0).}
+rm_lst_tf(I,L,\textbf{C})      -> rev_join(L,[],I,\textbf{C+1}).
+rev_join(   [],Q,I,\textbf{C}) -> rm_fst(I,Q,[],\textbf{C+1}).
+rev_join([J|P],Q,I,\textbf{C}) -> rev_join(P,[J|Q],I,\textbf{C+1}).
+rm_fst(_,   [],A,\textbf{C})   -> \textbf{\{A,C+1\}}
+rm_fst(I,[I|Q],A,\textbf{C})   -> rev_join(Q,A,\textbf{C+1});
+rm_fst(I,[J|Q],A,\textbf{C})   -> rm_fst(I,Q,[J|A],\textbf{C+1}).
+\end{alltt}
+It becomes apparent now that adding an integer to count the number of
+function calls to a definition in tail form is very simple: just
+increment the counter everywhere. This would be the way to go if we
+planned to write a program adding these counters automatically: first
+make an automatic transformation into tail form and then add the
+counter in this simple manner.
+
+\medskip
+
+\paragraph{Into tail form.}
+
+Our definition of \erlcode{flat/1} with lifting,
+\vpageref{code:flat_lifting}, \verbatiminput{flat.def} is almost in
+tail form: only the last clause has a call with a non\hyp{}empty
+control context. Following the strategy proposed up to now, this means
+that, by adding an accumulator, this definition can be transformed
+into an equivalent one in tail form. The purpose of this accumulator
+is to store the variables which occur in the control contexts, so
+these can be rebuilt and computed after the current function is over.
+
+Let us add a list accumulator \erlcode{A}, unchanged in every clause,
+and add a new \erlcode{flat\_tf/1} definition calling the new
+\erlcode{flat/2} with the initial value of the accumulator set to the
+empty list:
+\begin{alltt}
+\textbf{flat_tf(L)        \(\smashedrightarrow{\alpha}\) flat(L,[]).}
+flat(       [],\textbf{A}) \(\smashedrightarrow{\beta}\) [];\hfill% A \emph{unused yet}
+flat(   [[]|L],\textbf{A}) \(\smashedrightarrow{\gamma}\) flat(L,\textbf{A});
+flat([[I|M]|L],\textbf{A}) \(\smashedrightarrow{\delta}\) flat([I,M|L],\textbf{A});
+flat(    [I|L],\textbf{A}) \(\smashedrightarrow{\epsilon}\) [I|flat(L,\textbf{A})].
+\end{alltt}
+Now we must accumulate a value at each call which is not in tail form
+(here, clause~\clause{\epsilon}), and use the contents of the
+accumulator in all clauses where there is no call (here,
+clause~\clause{\alpha}). The technique consists in accumulating in
+clause~\clause{\epsilon} the values occurring in the control context,
+which is \erlcode{[I|\textvisiblespace]}; in other words: we
+push~\erlcode{I} onto~\erlcode{A}:
+\begin{alltt}
+flat_tf(L)        \(\smashedrightarrow{\alpha}\) flat(L,[]).
+flat(       [],A) \(\smashedrightarrow{\beta}\) [];\hfill% A \emph{unused yet}
+flat(   [[]|L],A) \(\smashedrightarrow{\gamma}\) flat(L,A);
+flat([[I|M]|L],A) \(\smashedrightarrow{\delta}\) flat([I,M|L],A);
+flat(    [I|L],A) \(\smashedrightarrow{\epsilon}\) flat(L,\textbf{[I|}A\textbf{]}).
+\end{alltt}
+When the input is fully consummated, in clause~\clause{\beta}, the
+accumulator contains all the non\hyp{}list items (all the \erlcode{I}s
+from clause~\clause{\epsilon}) in the reverse order of the original
+list; therefore, they need to be reversed. That is to say:
+\begin{alltt}
+flat_tf(L)        \(\smashedrightarrow{\alpha}\) flat(L,[]).
+flat(       [],A) \(\smashedrightarrow{\beta}\) \textbf{rev(A)};
+flat(   [[]|L],A) \(\smashedrightarrow{\gamma}\) flat(L,A);
+flat([[I|M]|L],A) \(\smashedrightarrow{\delta}\) flat([I,M|L],A);
+flat(    [I|L],A) \(\smashedrightarrow{\epsilon}\) flat(L,[I|A]).
+\end{alltt}
+What about \erlcode{sflat/1} \vpageref{code:sflat_par_alpha}?
+\verbatiminput{sflat.def} That definition has the peculiarity that
+some of its clauses contain two or more calls---let us not forget that
+a call being recursive or not has nothing to do, in general, with
+being in tail form or not. Let us start by adding the extra
+accumulative parameter to \erlcode{sflat/1} and initialise it with the
+empty list:
+\begin{alltt}
+\textbf{sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).}\hfill% \emph{Added}
+sflat(       [],\textbf{A}) \(\smashedrightarrow{\gamma}\) [];\hfill% A \emph{unused yet}
+sflat(   [[]|L],\textbf{A}) \(\smashedrightarrow{\delta}\) sflat(L,\textbf{A});
+sflat([[I|M]|L],\textbf{A}) \(\smashedrightarrow{\epsilon}\) join(sflat([I|M],\textbf{A}),sflat(L,\textbf{A}));
+sflat(    [I|L],\textbf{A}) \(\smashedrightarrow{\zeta}\) [I|sflat(L,\textbf{A})].
+join(   [],Q)      \(\smashedrightarrow{\eta}\) Q;
+join([I|P],Q)      \(\smashedrightarrow{\theta}\) [I|join(P,Q)].
+\end{alltt}
+Let us decide that, in clause~\clause{\epsilon}, the first call to be
+rewritten is the leftmost recursive call \erlcode{sflat([I|M],A)},
+whose control context is thus
+\erlcode{join(\textvisiblespace,sflat(L,A))}. Therefore, in
+clause~\clause{\epsilon}, let us save~\erlcode{L} in~\erlcode{A} so we
+can reconstruct the control context in the body of~\clause{\gamma},
+where the current list to process is empty and thus lists saved in the
+accumulator allow us to resume the flattening:
+\begin{alltt}
+sflat_tf(L)            \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],\textbf{[L|}A\textbf{]}) \(\smashedrightarrow{\gamma}\) \textbf{join(}[]\textbf{,sflat(L,A))};\hfill% \emph{Used}
+sflat(   [[]|L],    A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],    A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],\textbf{[L}|A\textbf{]});\hfill% \emph{Saved}
+sflat(    [I|L],    A) \(\smashedrightarrow{\zeta}\) [I|sflat(L,A)].
+join(   [],Q)          \(\smashedrightarrow{\eta}\) Q;
+join([I|P],Q)          \(\smashedrightarrow{\theta}\) [I|join(P,Q)].
+\end{alltt}
+But a clause is now missing: what if the accumulator is empty?
+Therefore, a clause~\clause{\beta} must be added before
+clause~\clause{\gamma} to cater this situation:
+\begin{alltt}
+sflat_tf(L)            \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+\textbf{sflat(       [],   []) \(\smashedrightarrow{\beta}\) [];}
+sflat(       [],[L|A]) \(\smashedrightarrow{\gamma}\) join([],sflat(L,A));
+sflat(   [[]|L],    A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],    A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[L|A]);
+sflat(    [I|L],    A) \(\smashedrightarrow{\zeta}\) [I|sflat(L,A)].
+join(   [],Q)          \(\smashedrightarrow{\eta}\) Q;
+join([I|P],Q)          \(\smashedrightarrow{\theta}\) [I|join(P,Q)].
+\end{alltt}
+We can simplify the body of clause~\clause{\gamma} because of the
+algebraic identity
+\[
+  \erlcode{join([],\(L\))} \mathrel{\equiv} L,
+\]
+for all lists~\(L\) and the definition of \erlcode{join/2} becomes
+useless altogether.
+\begin{alltt}
+sflat_tf(L)            \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],   []) \(\smashedrightarrow{\beta}\) [];
+sflat(       [],[L|A]) \(\smashedrightarrow{\gamma}\) \textbf{sflat(L,A)};\hfill% \emph{Simplified}
+sflat(   [[]|L],    A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],    A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[L|A]);
+sflat(    [I|L],    A) \(\smashedrightarrow{\zeta}\) [I|sflat(L,A)].
+\end{alltt}
+Clause~\clause{\zeta} is not in tail form. We cannot just
+push~\erlcode{I} onto the accumulator
+\begin{alltt}
+sflat(    [I|L],    A) \(\smashedrightarrow{\zeta}\) sflat(L,\textbf{[I|}A\textbf{]}).\hfill% \emph{Wrong}
+\end{alltt}
+because the latter contains lists to be flattened later (see
+clause~\clause{\epsilon}) and \erlcode{I} is not a list---this
+modification would lead to a match failure just after
+clause~\clause{\gamma} matches, because all heads only match
+lists. What can we do? Perhaps the first idea which comes to the mind
+is to add another accumulator to hold the non\hyp{}list items,
+like~\erlcode{I}. Basically, this is exactly the same method as
+before, except it applies to another accumulator, say~\erlcode{B}. Let
+us first add~\erlcode{B} everywhere and initialise it with
+\erlcode{[]}:
+\begin{alltt}
+sflat_tf(L)              \(\smashedrightarrow{\alpha}\) sflat(L,[],\textbf{[]}).
+sflat(       [],   [],\textbf{B}) \(\smashedrightarrow{\beta}\) [];\hfill% B \emph{unused yet}
+sflat(       [],[L|A],\textbf{B}) \(\smashedrightarrow{\gamma}\) sflat(L,A,\textbf{B});
+sflat(   [[]|L],    A,\textbf{B}) \(\smashedrightarrow{\delta}\) sflat(L,A,\textbf{B});
+sflat([[I|M]|L],    A,\textbf{B}) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[L|A],\textbf{B});
+sflat(    [I|L],    A,\textbf{B}) \(\smashedrightarrow{\zeta}\) [I|sflat(L,A,\textbf{B})].
+\end{alltt}
+Now we can save the variables of the control context in
+clause~\clause{\zeta} in~\erlcode{B} and erase the control context in
+question. In clause~\clause{\beta}, we know that \erlcode{B}~contains
+all the non\hyp{}list items in reversed order, so we must
+reverse~\erlcode{B}. Since clause~\clause{\beta} contained no further
+calls, this is the end.
+\begin{alltt}
+sflat_tf(L)              \(\smashedrightarrow{\alpha}\) sflat(L,[],[]).
+sflat(       [],   [],B) \(\smashedrightarrow{\beta}\) \textbf{rev(B)};
+sflat(       [],[L|A],B) \(\smashedrightarrow{\gamma}\) sflat(L,A,B);
+sflat(   [[]|L],    A,B) \(\smashedrightarrow{\delta}\) sflat(L,A,B);
+sflat([[I|M]|L],    A,B) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[L|A],B);
+sflat(    [I|L],    A,B) \(\smashedrightarrow{\zeta}\) sflat(L,A,\textbf{[I|B]}).
+\end{alltt}
+Further examination can lead to a simpler program, where the heads do
+not only match embedded lists:
+\begin{alltt}
+sflat_tf(L)       -> sflat(L,[],[]).
+sflat(   [],[],B) -> rev(B);
+sflat(   [], A,B) -> sflat(A,   [],    B);
+sflat(  [I], A,B) -> sflat(I,    A,    B);\hfill% \emph{Optimisation}
+sflat([I|L], A,B) -> sflat(I,[L|A],    B);
+sflat(    I, A,B) -> sflat(A,   [],[I|B]).
+\end{alltt}
+The shortcoming of this approach is that it requires many accumulators
+in general and, in this particular example, it is too \emph{ad hoc},
+as it makes use of algebraic identities to simplify the definitions
+and the control context consisting of a push is reconstructed as a
+call to \erlcode{rev/1}---which may not seem obvious.
+
+Instead of adding a supplementary accumulator to solve our problem, we
+can stick to only one but make sure that values in it are
+distinguished according to their origin, so a value from a given
+control context is not confused with a value from another control
+context. This was previously implemented by using different
+accumulators for different context values. The way of achieving this
+with only one accumulator consists in putting in a tuple the values of
+a given control context together with an atom, which plays the role of
+a tag identifying the original expression containing the call. Let us
+backtrack to
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) [];\hfill% A \emph{unused yet}
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) join(sflat([I|M],A),sflat(L,A));
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) [I|sflat(L,A)].
+join(   [],Q)      \(\smashedrightarrow{\eta}\) Q;
+join([I|P],Q)      \(\smashedrightarrow{\theta}\) [I|join(P,Q)].
+\end{alltt}
+Let us modify clause~\clause{\epsilon} by choosing, as before,
+\erlcode{sflat([I|M])} as the first call to be rewritten. We choose
+the atom~\erlcode{k1} to represent that call and we pair it with the
+sole value of its control context, that is,~\erlcode{L}. We remove the
+control context \erlcode{join(\textvisiblespace,sflat(L,A))} and, in
+the remaining call, we push~\erlcode{\{k1,L\}} onto the accumulator
+\erlcode{A}:
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) [];\hfill% A \emph{unused yet}
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) \textbf{sflat([I|M],[\{k1,L\}|A])};
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) [I|sflat(L,A)].
+join(   [],Q)      \(\smashedrightarrow{\eta}\) Q;
+join([I|P],Q)      \(\smashedrightarrow{\theta}\) [I|join(P,Q)].
+\end{alltt}
+The key point is that \erlcode{k1}~must not be pushed in this
+accumulator anywhere else in the program, because it must denote
+unambiguously the call in clause~\clause{\epsilon}. Of course, this
+program is not correct anymore, as the erased control context must be
+reconstructed somewhere else and applied to the value of the call
+\erlcode{sflat([I|M],[\{k1,L\}|A])}. The accumulator~\erlcode{A}
+represents, as before, the values of the control contexts. Where
+should we extract its contents? Clause~\clause{\gamma} does not make
+any use of~\erlcode{A} and this is our cue. It means that, at that
+point, there are no more lists to be flattened, beyond the trivial
+empty list, so this is the right moment to wonder if there is some
+work left to be done, that is, examine the contents of~\erlcode{A}. In
+order to implement this task, a dedicated function should be created,
+say~\erlcode{appk/2}, so that~\erlcode{appk(\(V\),\(A\))} will compute
+whatever remains to be done with what is found in the
+accumulator~\(A\), the value~\(V\) being a partial result, that is,
+the result up to this point. Hence, if there is nothing left to do,
+that is, if \(A\)~is empty, then \erlcode{appk(\(V\),\(A\))} rewrites
+into~\(V\) and this is it. In other words:
+\begin{alltt}
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) \fbcode{join(V,sflat(L,A))};
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.\hfill% \emph{The end}
+\end{alltt}
+The empty box must be filled with the reconstruction of the control
+context which was erased at the point where~\erlcode{k1} was saved in
+the accumulator. The control context in question was
+\erlcode{join(\textvisiblespace,sflat(L,A))}, in
+clause~\clause{\epsilon}, so we have now
+\begin{alltt}
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) join(\fbcode{V},sflat(L,A));
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+The remaining empty box is meant to be filled with the result of the
+function call \erlcode{sflat([I|M],[\{k1,L\}|A])}. To make this
+happen, two conditions must be fulfilled. Firstly, the accumulator in
+the head of \erlcode{appk/2} must be the same as at the moment of the
+call, that is, it must be matched by \erlcode{[\{k1,L\}|A]}. In
+theory, we should prove that the two occurrences of~\erlcode{A} indeed
+denote the same value, but this would lead us astray. Finally, we need
+to make sure that when a call to \erlcode{sflat/2} is over, a call
+to \erlcode{appk/2} is made with the result. When the whole
+transformation into tail form will be completed, no control context
+will be found anymore (by definition), so all calls
+to \erlcode{sflat/2} will end in clauses whose bodies do not contain
+any further call to be processed. A quick examination of the clauses
+reveals that clause~\clause{\gamma} is the only clause of concern and
+that \erlcode{A}~was unused yet. So let us replace the body of this
+clause with a call to \erlcode{appk/2}, whose first argument is the
+result of the current call to \erlcode{sflat/2}, that is, the current
+body, and whose second argument is the accumulator which may contain
+more information about control contexts to be rebuilt and applied. We
+have
+\begin{alltt}
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) \textbf{appk(}[],\textbf{A)};
+\end{alltt}
+Now we understand that~\erlcode{V} in clause~\clause{\kappa} is the
+value of the function call \erlcode{sflat([I|M],[\{k1,L\}|A])}, so we
+can proceed by plugging~\erlcode{V} into the place\hyp{}holder in
+clause~\clause{\kappa}:
+\begin{alltt}
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) join(\textbf{V},sflat(L,A));
+\end{alltt}
+A glance is enough to realise that clause~\clause{\kappa} is not in
+tail form. Therefore, let us repeat the same method. The first call
+that must be rewritten is~\erlcode{sflat(L,A)}, whose control context
+is \erlcode{join(V,\textvisiblespace)}. Let us associate the
+variable~\erlcode{V} in the latter with a new atom~\erlcode{k2} and
+push the two of them onto the accumulator:
+\begin{alltt}
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) sflat(L,\textbf{[\{k2,V\}|}A\textbf{]});
+\end{alltt}
+We need a new clause for \erlcode{appk/2} which handles the
+corresponding case, that is, when the value of the call has been found
+and the control context has to be reconstructed and resumed:
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) [I|sflat(L,A)].
+join(   [],Q)      \(\smashedrightarrow{\eta}\) Q;
+join([I|P],Q)      \(\smashedrightarrow{\theta}\) [I|join(P,Q)].
+\textbf{appk(V,[\{k2,W\}|A]) \(\smashedrightarrow{\lambda}\) join(W,V);}\hfill% A \emph{unused yet}
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+Notice how, in clause~\clause{\lambda}, we renamed~\erlcode{V} (in the
+accumulator) into~\erlcode{W}, so as to avoid a clash with the first
+argument of \erlcode{appk/2}. Also, why is it~\erlcode{join(W,V)} and
+not~\erlcode{join(V,W)}? The reason is found by recollecting that
+\erlcode{W} denotes the value of the call \erlcode{sflat([I|M])} (in
+the original definition), whereas \erlcode{V}~represents the value of
+\erlcode{sflat(L)} (in the original definition). Nothing is done yet
+with the rest of the accumulator~\erlcode{A}, which entails that we
+must pass it to \erlcode{join/2}, just like the other functions:
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) [I|sflat(L,A)].
+join(   [],Q,\textbf{A})    \(\smashedrightarrow{\eta}\) Q;\hfill% A \emph{unused yet}
+join([I|P],Q,\textbf{A})    \(\smashedrightarrow{\theta}\) [I|join(P,Q,\textbf{A})].
+appk(V,[\{k2,W\}|A]) \(\smashedrightarrow{\lambda}\) join(W,V,\textbf{A});\hfill% \emph{Passed} A
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+After clause~\clause{\epsilon}, the first clause not being in tail
+form is clause~\clause{\zeta}. Let us pair the variable~\erlcode{I} of
+the control context \erlcode{[I|\textvisiblespace]} with a new
+atom~\erlcode{k3}, and let us save the pair into the accumulator,
+while reconstructing the erased control context in a new
+clause~\clause{\mu} of \erlcode{appk/2}:
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) sflat(L,\textbf{[\{k3,I\}|}A\textbf{]}).\hfill% I \emph{saved}
+join(   [],Q,\textbf{A})    \(\smashedrightarrow{\eta}\) Q;\hfill% A \emph{unused yet}
+join([I|P],Q,\textbf{A})    \(\smashedrightarrow{\theta}\) [I|join(P,Q,\textbf{A})].
+\textbf{appk(V,[\{k3,I\}|A]) \(\smashedrightarrow{\mu}\) [I|V];}\hfill% A \emph{unused yet}
+appk(V,[\{k2,W\}|A]) \(\smashedrightarrow{\lambda}\) join(W,V,A);
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+Something interesting happens here: the brand\hyp{}new body of
+clause~\clause{\mu} makes no use of the remaining
+accumulator~\erlcode{A}. We encountered the exact same situation
+with~\clause{\gamma}: a body containing no further calls. In this
+case, we need to check whether there is more work to be done with the
+data saved earlier in~\erlcode{A}. This is the very aim
+of \erlcode{appk/2}, therefore a call to it must be set within the
+body of clause~\clause{\mu}:
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) sflat(L,[\{k3,I\}|A]).
+join(   [],Q,A)    \(\smashedrightarrow{\eta}\) Q;\hfill% A \emph{unused yet}
+join([I|P],Q,A)    \(\smashedrightarrow{\theta}\) [I|join(P,Q,A)].
+appk(V,[\{k3,I\}|A]) \(\smashedrightarrow{\mu}\) \textbf{appk(}[I|V],\textbf{A)};
+appk(V,[\{k2,W\}|A]) \(\smashedrightarrow{\lambda}\) join(W,V,A);
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+The next clause to be considered is clause~\clause{\eta}, because its
+body contains no calls, so it requires now a call to \erlcode{appk/2}
+with the body, which is the result of the current call
+to \erlcode{sflat/2}, and the accumulator, that is,~\erlcode{A}:
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) sflat(L,[\{k3,I\}|A]).
+join(   [],Q,A)    \(\smashedrightarrow{\eta}\) \textbf{appk(}Q,\textbf{A)};
+join([I|P],Q,A)    \(\smashedrightarrow{\theta}\) [I|join(P,Q,A)].
+appk(V,[\{k3,I\}|A]) \(\smashedrightarrow{\mu}\) appk([I|V],A);
+appk(V,[\{k2,W\}|A]) \(\smashedrightarrow{\lambda}\) join(W,V,A);
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+Last but not least, clause~\clause{\theta} must be fixed as we did for
+the other clauses not in tail form. Let us pick a new atom,
+say,~\erlcode{k4}, and tuple it with the sole variable~\erlcode{I} of
+the control context \erlcode{[I|\textvisiblespace]} and push the
+resulting pair onto the accumulator~\erlcode{A}. Dually, we need to
+add a clause~\clause{\nu} to \erlcode{appk/2} to catch this case,
+rebuild the erased control context and apply it to the result of the
+current call to \erlcode{sflat/2}, that is, its first argument:
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) sflat(L,[\{k3,I\}|A]).
+join(   [],Q,A)    \(\smashedrightarrow{\eta}\) appk(Q,A);
+join([I|P],Q,A)    \(\smashedrightarrow{\theta}\) join(P,Q,\textbf{[I|}A\textbf{]}).
+\textbf{appk(V,[\{k4,I\}|A]) \(\smashedrightarrow{\nu}\) [I|V];}\hfill% A \emph{unused yet}
+appk(V,[\{k3,I\}|A]) \(\smashedrightarrow{\mu}\) appk([I|V],A);
+appk(V,[\{k2,W\}|A]) \(\smashedrightarrow{\lambda}\) join(W,V,A);
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+The newly created clause contains a body which contains no calls, so
+we must send it to \erlcode{appk/2} together with the rest of the
+accumulator, in order to process any pending control
+contexts:
+\begin{alltt}
+sflat_tf(L)        \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A) \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A) \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A) \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A) \(\smashedrightarrow{\zeta}\) sflat(L,[\{k3,I\}|A]).
+join(   [],Q,A)    \(\smashedrightarrow{\eta}\) appk(Q,A);
+join([I|P],Q,A)    \(\smashedrightarrow{\theta}\) join(P,Q,[\{k4,I\}|A]).
+appk(V,[\{k4,I\}|A]) \(\smashedrightarrow{\nu}\) \textbf{appk(}[I|V],\textbf{A)};
+appk(V,[\{k3,I\}|A]) \(\smashedrightarrow{\mu}\) appk([I|V],A);
+appk(V,[\{k2,W\}|A]) \(\smashedrightarrow{\lambda}\) join(W,V,A);
+appk(V,[\{k1,L\}|A]) \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        []) \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+The transformation is now finished. It is correct in the sense that
+the resulting program is equivalent to the original one, that is,
+\erlcode{sflat/1} and \erlcode{sflat\_tf/1} compute the same values
+from the same inputs, and all the clauses are in tail form. It is also
+complete in the sense that any definition can be transformed. Notice
+how we did not make any use of algebraic identities to simplify and
+speed up \erlcode{sflat\_tf/1}, contrary to the previous \emph{ad hoc}
+transformation. As announced, the main interest of this method lies in
+its uniformity and must not be expected to generate programs which are
+faster than the originals.
+
+It is possible, upon close examination, to shorten a bit the
+definition of \erlcode{appk/2}. Indeed, clauses
+\clause{\nu}~and~\clause{\mu} are identical, if not the presence of a
+different tag, \erlcode{k4}~versus~\erlcode{k3}. Let us fuse them into
+a single clause and use a new atom~\erlcode{k34} instead of every
+occurrence of \erlcode{k3}~and~\erlcode{k4}.\label{code:sflat_tf}
+\begin{alltt}
+sflat_tf(L)         \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A)  \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A)  \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A)  \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A)  \(\smashedrightarrow{\zeta}\) sflat(L,[\{\textbf{k34},I\}|A]).
+join(   [],Q,A)     \(\smashedrightarrow{\eta}\) appk(Q,A);
+join([I|P],Q,A)     \(\smashedrightarrow{\theta}\) join(P,Q,[\{\textbf{k34},I\}|A]).
+appk(V,[\{\textbf{k34},I\}|A]) \(\smashedrightarrow{\mu}\) appk([I|V],A);
+appk(V,[\{k2,W\}|A])  \(\smashedrightarrow{\lambda}\) join(W,V,A);
+appk(V,[\{k1,L\}|A])  \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        [])  \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+Let us make a short digression and transform \erlcode{sflat\_tf/1}
+further so that \erlcode{sflat\_tf(\(L\))} is rewritten into a pair
+made of the value of \erlcode{sflat(\(L\))} and its delay. As we saw
+\vpageref{code:count_tf}, because the definition is initially in tail
+form, we just have to add a counter and increment it where the clause
+corresponds to a clause in the original definition, else the counter
+is left unchanged. We also have to add a clause to set the first value
+of the counter. Let us recall first the original definition
+of \erlcode{sflat/1} \vpageref{code:sflat_par_alpha} (we rename the
+arrows here to ease the forthcoming steps):
+\begin{alltt}
+sflat(       []) \(\smashedrightarrow{\gamma}\) [];
+sflat(   [[]|L]) \(\smashedrightarrow{\delta}\) sflat(L);
+sflat([[I|M]|L]) \(\smashedrightarrow{\epsilon}\) join(sflat([I|M]),sflat(L));
+sflat(    [I|L]) \(\smashedrightarrow{\zeta}\) [I|sflat(L)].
+join(   [],Q)    \(\smashedrightarrow{\eta}\) Q;
+join([I|P],Q)    \(\smashedrightarrow{\theta}\) [I|join(P,Q)].
+\end{alltt}
+Then, let us identify and name identically in the tail form version
+\erlcode{sflat\_tf/1} the clauses that have their counterpart in the
+definition of \erlcode{sflat/1}:
+\begin{alltt}
+sflat_tf(L)         \(\smashedrightarrow{\phantom{\gamma}}\) sflat(L,[]).
+sflat(       [],A)  \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A)  \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A)  \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A)  \(\smashedrightarrow{\zeta}\) sflat(L,[\{k34,I\}|A]).
+join(   [],Q,A)     \(\smashedrightarrow{\eta}\) appk(Q,A);
+join([I|P],Q,A)     \(\smashedrightarrow{\theta}\) join(P,Q,[\{k34,I\}|A]).
+appk(V,[\{k34,I\}|A]) \(\smashedrightarrow{\phantom{\theta}}\) appk([I|V],A);
+appk(V,[\{k2,W\}|A])  \(\smashedrightarrow{\phantom{\theta}}\) join(W,V,A);
+appk(V,[\{k1,L\}|A])  \(\smashedrightarrow{\phantom{\theta}}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        [])  \(\smashedrightarrow{\phantom{\theta}}\) V.
+\end{alltt}
+Now we can add the counters and increment them only on the
+distinguished clauses:
+\begin{alltt}
+\textbf{sflat_tf(L)           \(\smashedrightarrow{\phantom{\gamma}}\) sflat_tf(L,0).}\hfill% \emph{New}
+sflat_tf(L,\textbf{C})         \(\smashedrightarrow{\phantom{\gamma}}\) sflat(L,[],\textbf{C}).
+sflat(       [],A,\textbf{C})  \(\smashedrightarrow{\gamma}\) appk([],A,\textbf{C+1});
+sflat(   [[]|L],A,\textbf{C})  \(\smashedrightarrow{\delta}\) sflat(L,A,\textbf{C+1});
+sflat([[I|M]|L],A,\textbf{C})  \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A],\textbf{C+1});
+sflat(    [I|L],A,\textbf{C})  \(\smashedrightarrow{\zeta}\) sflat(L,[\{k34,I\}|A],\textbf{C+1}).
+join(   [],Q,A,\textbf{C})     \(\smashedrightarrow{\eta}\) appk(Q,A,\textbf{C+1});
+join([I|P],Q,A,\textbf{C})     \(\smashedrightarrow{\theta}\) join(P,Q,[\{k34,I\}|A],\textbf{C+1}).
+appk(V,[\{k34,I\}|A],\textbf{C}) \(\smashedrightarrow{\phantom{\theta}}\) appk([I|V],A,\textbf{C});
+appk(V,[\{k2,W\}|A],\textbf{C})  \(\smashedrightarrow{\phantom{\theta}}\) join(W,V,A,\textbf{C});
+appk(V,[\{k1,L\}|A],\textbf{C})  \(\smashedrightarrow{\phantom{\theta}}\) sflat(L,[\{k2,V\}|A],\textbf{C});
+appk(V,        [],\textbf{C})  \(\smashedrightarrow{\phantom{\theta}}\) \textbf{\{V,C\}}.
+\end{alltt}
+Note how the last clause of \erlcode{appk/3} always implements the
+last rewrite, so this is the only place where we must care to create
+the expected pair.
+
+Drawing from our practical understanding of the new, systematic
+transformation, we can try to summarise it as follows.
+\begin{enumerate}
+
+  \item Consider all the definitions involved, that is, the one of
+    immediate concern, but also all which it depends upon;
+
+  \item add a list accumulator to all these definitions and add a
+    definition setting the empty list as the initial value of the
+    accumulator;
+
+  \item for each body made of a call in tail form, just pass the
+    accumulator unchanged;
+
+  \item replace each body containing no call by a call to a new
+    function~\erlcode{appk/2}, with the body expression and the
+    accumulator unchanged;
+
+  \item for each body not in tail form, including those
+    of \erlcode{appk/2},
+    \begin{enumerate}
+
+      \item identify or choose the first possible call to be computed;
+
+      \item select all the values and variables in the control context
+        which are parameters, except the accumulator, and group them
+        in a tuple, together with a unique atom;
+
+      \item replace the body in question with the call to be done
+        first and pass to it the accumulator on top of which the tuple
+        of the previous step has been pushed;
+
+      \item \label{add_appk1} create a clause for \erlcode{appk/2}
+        matching this case, whose body is the previously mentioned
+        control context;
+
+      \item \label{add_appk2} replace the
+        place\hyp{}holder~\erlcode{\textvisiblespace} in the control
+        context by the first argument of \erlcode{appk/2} and make
+        sure that there is no clash of variables;
+
+    \end{enumerate}
+
+  \item add the clause \erlcode{appk(V,[]) -> V} to \erlcode{appk/2}.
+
+\end{enumerate}
+This algorithm is said to be \emph{global}, insofar as \emph{all} the
+steps must be achieved before a program equivalent to the original
+input is reached, because intermediary steps may not lead to correct
+definitions. It is possible to dynamically rearrange the order in
+which some steps are applied so the algorithm becomes
+\emph{incremental}, but it is probably not worth the complication.
+
+Let us apply the same methodological steps to another difficult
+definition like~\erlcode{fib/1}, as given \vpageref{fibonacci}:
+\begin{alltt}
+fib(0)            \(\smashedrightarrow{\beta}\) 1;
+fib(1)            \(\smashedrightarrow{\gamma}\) 1;
+fib(N) when N > 1 \(\smashedrightarrow{\delta}\) fib(N-1) + fib(N-2).
+\end{alltt}
+The steps are as follows.
+\begin{enumerate}
+
+  \item This definition is self\hyp{}contained.
+
+  \item Let us rename~\erlcode{fib/1} into \erlcode{fib/2}, then add a
+    list accumulator to it so it becomes~\erlcode{fib/2}, next create
+    a clause~\clause{\alpha} defining~\erlcode{fib\_tf/1} as a single
+    call to \erlcode{fib/2} where the initial value of the accumulator
+    is the empty list:
+\begin{alltt}
+\textbf{fib_tf(N)           \(\smashedrightarrow{\alpha}\) fib(N,[]).}\hfill% \emph{New}
+fib(0,\textbf{A})            \(\smashedrightarrow{\beta}\) 1;
+fib(1,\textbf{A})            \(\smashedrightarrow{\gamma}\) 1;
+fib(N,\textbf{A}) when N > 1 \(\smashedrightarrow{\delta}\) fib(N-1,\textbf{A}) + fib(N-2,\textbf{A}).
+\end{alltt}
+
+  \item There is no body in tail form which contains a call.
+
+  \item Clauses \clause{\beta}~and~\clause{\gamma} are in tail form
+    and contain no call, so we must replace the bodies with a call to
+    function~\erlcode{appk/2}, whose first argument is the original
+    body (here, both are the value~\erlcode{1}) and the second
+    argument is the accumulator unchanged:
+\begin{alltt}
+fib_tf(N)           \(\smashedrightarrow{\alpha}\) fib(N,[]).
+fib(0,A)            \(\smashedrightarrow{\beta}\) \textbf{appk(}1,\textbf{A)};
+fib(1,A)            \(\smashedrightarrow{\gamma}\) \textbf{appk(}1,\textbf{A)};
+fib(N,A) when N > 1 \(\smashedrightarrow{\delta}\) fib(N-1,A) + fib(N-2,A).
+\end{alltt}
+
+  \item Clause~\clause{\delta} is not in tail form and contains two
+    calls, so we must choose which one we want to compute first. Let
+    us arbitrarily choose the rightmost call, that is,
+    \erlcode{fib(N-2,A)}. Therefore, its control context is
+    \erlcode{fib(N-1,A) + \textvisiblespace}. The values in the
+    control context, excluding the accumulator, are reduced to the
+    sole value of~\erlcode{N}. Let us create a unique atom identifying
+    this call,~\erlcode{k1}, and form the
+    pair~\erlcode{\{k1,N\}}. Then, let us replace the entire body of
+    clause~\clause{\delta} with
+    \erlcode{fib(N-2,\textbf{[\{k1,N\}|A]})}. Next, let us create a
+    clause for \erlcode{appk/2} matching this tuple. Its body is the
+    control context we just removed from the body of
+    clause~\clause{\delta}. In it, let us fill the
+    hole~\erlcode{\textvisiblespace} with the first parameter.
+\begin{alltt}
+fib_tf(N)           \(\smashedrightarrow{\alpha}\) fib(N,[]).
+fib(0,A)            \(\smashedrightarrow{\beta}\) appk(1,A);
+fib(1,A)            \(\smashedrightarrow{\gamma}\) appk(1,A);
+fib(N,A) when N > 1 \(\smashedrightarrow{\delta}\) fib(N-2,\textbf{[\{k1,N\}|A]}).
+\textbf{appk(V,[\{k1,N\}|A])  \(\smashedrightarrow{\epsilon}\) fib(N-1,A) + V.}
+\end{alltt}
+
+    The body of the clause handling~\erlcode{k1} is not in tail form,
+    as it contains a function call not located at the root of the
+    abstract syntax tree. The control context of this call
+    is~\erlcode{\textvisiblespace{} + V} and all the values it
+    contains are limited to the one denoted by the
+    variable~\erlcode{V}. Let us generate a new unique
+    atom~\erlcode{k2} and pair it with~\erlcode{V}. We then replace
+    the body of clause~\clause{\epsilon} with the call to be computed
+    first and we pass to it the accumulator~\erlcode{A} on top of
+    which the pair has been pushed. We make a new clause
+    of \erlcode{appk/2} matching this case and in its body we put the
+    control context we just mentioned. We substitute the first
+    parameter to the place\hyp{}holder~\erlcode{\textvisiblespace}. We
+    have
+\begin{alltt}
+\textbf{appk(V,[\{k2,W\}|A]) \(\smashedrightarrow{\zeta}\) V + W;}
+appk(V,[\{k1,N\}|A]) \(\smashedrightarrow{\epsilon}\) fib(N-1,\textbf{[\{k2,V\}|A]}).
+\end{alltt}
+    Note that we carefully renamed the variable~\erlcode{V} in the
+    accumulator into~\erlcode{W} in order to avoid a clash with the
+    first parameter~\erlcode{V}. This new body~\erlcode{V+W} is in
+    tail form and contains no further function calls, so it must be
+    embedded into a recursive call because the accumulator~\erlcode{A}
+    may not be empty---so further calls may be waiting. We pass to the
+    call the remaining accumulator, that is,~\erlcode{A}. Finally, all
+    the clauses are in tail form:
+\begin{alltt}
+fib_tf(N)           \(\smashedrightarrow{\alpha}\) fib(N,[]).
+fib(0,A)            \(\smashedrightarrow{\beta}\) appk(1,A);
+fib(1,A)            \(\smashedrightarrow{\gamma}\) appk(1,A);
+fib(N,A) when N > 1 \(\smashedrightarrow{\delta}\) fib(N-2,[\{k1,N\}|A]).
+appk(V,[\{k2,W\}|A])  \(\smashedrightarrow{\zeta}\) \textbf{appk(}V+W,\textbf{A)};
+appk(V,[\{k1,N\}|A])  \(\smashedrightarrow{\epsilon}\) fib(N-1,[\{k2,V\}|A]).
+\end{alltt}
+
+  \item We must make sure to add a clause to match the case of the
+    empty accumulator and rewrite to the first parameter:
+\begin{alltt}
+fib_tf(N)           \(\smashedrightarrow{\alpha}\) fib(N,[]).
+fib(0,A)            \(\smashedrightarrow{\beta}\) appk(1,A);
+fib(1,A)            \(\smashedrightarrow{\gamma}\) appk(1,A);
+fib(N,A) when N > 1 \(\smashedrightarrow{\delta}\) fib(N-2,[\{k1,N\}|A]).
+\textbf{appk(V,        [])  \(\smashedrightarrow{\eta}\) V;}\hfill% \emph{Do not forget!}
+appk(V,[\{k2,W\}|A])  \(\smashedrightarrow{\zeta}\) appk(V+W,A);
+appk(V,[\{k1,N\}|A])  \(\smashedrightarrow{\epsilon}\) fib(N-1,[\{k2,V\}|A]).
+\end{alltt}
+
+\end{enumerate}
+Let us apply now our general method to \erlcode{flat/1}. Let us pick
+up here:
+\begin{alltt}
+flat_tf(L)        -> flat(L,[]).
+flat(       [],A) -> [];\hfill% A \emph{unused yet}
+flat(   [[]|L],A) -> flat(L,A);
+flat([[I|M]|L],A) -> flat([I,M|L],A);
+flat(    [I|L],A) -> [I|flat(L,A)].
+\end{alltt}
+The only body containing no calls is in the first clause
+of \erlcode{flat/2}, so it must be applied to a call
+to \erlcode{appk/2}, together with the accumulator. Only the last body
+is not in tail form. The only call to be performed has the control
+context~\erlcode{[I|\textvisiblespace]}, whose only values are reduced
+to the sole~\erlcode{I}. So we generate a unique atom~\erlcode{k1} and
+we pair it with~\erlcode{I}. We replace the body not in tail form with
+the call to which we pass the accumulator on top of which the pair has
+been pushed. We consequently create a clause for \erlcode{appk/2}
+matching this case. Its body is the just erased control context. The
+hole~\erlcode{\textvisiblespace} is filled with the first parameter:
+\begin{alltt}
+flat_tf(L)         -> flat(L,[]).
+flat(       [],A)  -> \textbf{appk(}[],\textbf{A)};
+flat(   [[]|L],A)  -> flat(L,A);
+flat([[I|M]|L],A)  -> flat([I,M|L],A);
+flat(    [I|L],A)  -> \textbf{flat(L,[\{k1,I\}|A])}.
+\textbf{appk(V,[\{k1,I\}|A]) -> [I|V].}
+\end{alltt}
+Since the body of the newly created clause of \erlcode{appk/2} is a
+value, it has to be wrapped into a recursive call because the
+accumulator~\erlcode{A} may not be empty, so perhaps some more calls
+have to be computed:
+\begin{alltt}
+flat_tf(L)         -> flat(L,[]).
+flat(       [],A)  -> appk([],A);
+flat(   [[]|L],A)  -> flat(L,A);
+flat([[I|M]|L],A)  -> flat([I,M|L],A);
+flat(    [I|L],A)  -> flat(L,[\{k1,I\}|A]).
+appk(V,[\{k1,I\}|A]) -> \textbf{appk(}[I|V],\textbf{A)}.
+\end{alltt}
+Finally, the definition of \erlcode{appk/2} must be completed by a
+clause corresponding to the case when the accumulator is empty and its
+body simply returns the first argument, which is, by design, the
+result:
+\begin{alltt}
+flat_tf(L)         -> flat(L,[]).
+flat(       [],A)  -> appk([],A);
+flat(   [[]|L],A)  -> flat(L,A);
+flat([[I|M]|L],A)  -> flat([I,M|L],A);
+flat(    [I|L],A)  -> flat(L,[\{k1,I\}|A]).
+\textbf{appk(V,        []) -> V;}
+appk(V,[\{k1,I\}|A]) -> appk([I|V],A).
+\end{alltt}
+If we compare this version with 
+\begin{verbatim}
+flat_tf(L)        -> flat(L,[]).
+flat(       [],A) -> rev(A);
+flat(   [[]|L],A) -> flat(L,A);
+flat([[I|M]|L],A) -> flat([I,M|L],A);
+flat(    [I|L],A) -> flat(L,[I|A]).
+\end{verbatim}
+we understand that the latter can be derived from the former if the
+pair~\erlcode{\{k1,I\}} is replaced by~\erlcode{I}. This is possible
+because it is the only atom which was generated. The definition
+of \erlcode{appk/2} then is equivalent to \erlcode{rev\_join/2},
+\vpageref{code:rev_join}:
+\verbatiminput{rev.def} The philosophy underlying our general method
+to transform a given group of definitions into an equivalent in tail
+form consists in adding a parameter which is a list accumulating the
+values of the different control contexts and creating a function
+(\erlcode{appk/2}) to reconstruct these when the call they contained
+is over. These rebuilt control contexts are in turn transformed into
+tail form until all the clauses are in tail form. As a result, the
+number of clauses is larger than in the original source and the
+algorithm is obscured because of all the administrative work about the
+accumulator. Even though the call stack is managed by the
+run\hyp{}time system much more efficiently than the heap, the often
+greater number of function calls makes it hard to guarantee a speedup
+every time a tail form is used. In order to save time and efforts, it
+is wise to consider tail forms useful \emph{a posteriori}, when we run
+afoul of the maximum stack size because, except if very large inputs
+are, from the design phase, likely.
+
+\medskip
+
+\paragraph{Lighter encoding of linear accumulators.}
+\label{tuples_vs_list}
+
+The accumulators used to transform definitions into tail form are, in
+their most general instance, lists of tuples. While using a list
+brings to the fore the very nature of the accumulator, it incurs a
+penalty in the size of the memory required because, in the abstract
+syntax trees, a push corresponds to a node, just as a tuple. \emph{By
+  nesting tuples in tuples, we can get rid of the list altogether.}
+For instance, instead of writing
+\erlcode{[\{k3,\(I_1\)\},\{k1,\(V\),\(E\)\},\{k3,\(I_2\)\}]}, we would
+write the nested tuples
+\erlcode{\{k3,\(I_1\),\{k1,\(V\),\(E\),\{k3,\(I_2\),\{\}\}\}\}}. Both
+abstract syntax trees are easily compared in
+\fig~\vref{fig:tuple_vs_list}. The encoding of a list accumulator by
+means of tuples only supposes to add a component to each tuple, which
+holds what was the ``next'' tuple in the list. The memory saving
+consists in one edge for each initial tuple, plus all the push nodes,
+that is, if there were \(n\)~tuples, we save \(n\)~edges (often called
+\emph{pointers} in imperative languages) and \(n\)~nodes. This is a
+very significant amelioration.
+\begin{figure}[t]
+\centering
+\subfloat[With a list of tuples\label{fig:acc_with_a_list}]{
+  \includegraphics[bb=71 631 212 721]{acc_with_a_list}
+}
+\subfloat[With nested tuples\label{fig:acc_with_tuples}]{
+  \includegraphics[bb=71 651 188 721]{acc_with_tuples}
+}
+\caption{Two implementations of the same linear accumulator
+\label{fig:tuple_vs_list}}
+\end{figure}
+As an illustration, let us improve on the following code we derived
+earlier:
+\begin{alltt}
+sflat_tf(L)         \(\smashedrightarrow{\alpha}\) sflat(L,[]).
+sflat(       [],A)  \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A)  \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A)  \(\smashedrightarrow{\epsilon}\) sflat([I|M],[\{k1,L\}|A]);
+sflat(    [I|L],A)  \(\smashedrightarrow{\zeta}\) sflat(L,[\{k34,I\}|A]).
+join(   [],Q,A)     \(\smashedrightarrow{\eta}\) appk(Q,A);
+join([I|P],Q,A)     \(\smashedrightarrow{\theta}\) join(P,Q,[\{k34,I\}|A]).
+appk(V,[\{k34,I\}|A]) \(\smashedrightarrow{\mu}\) appk([I|V],A);
+appk(V,[\{k2,W\}|A])  \(\smashedrightarrow{\lambda}\) join(W,V,A);
+appk(V,[\{k1,L\}|A])  \(\smashedrightarrow{\kappa}\) sflat(L,[\{k2,V\}|A]);
+appk(V,        [])  \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+It results in the more economical
+\begin{alltt}
+sflat_tf(L)         \(\smashedrightarrow{\alpha}\) sflat(L,\{\}).
+sflat(       [],A)  \(\smashedrightarrow{\gamma}\) appk([],A);
+sflat(   [[]|L],A)  \(\smashedrightarrow{\delta}\) sflat(L,A);
+sflat([[I|M]|L],A)  \(\smashedrightarrow{\epsilon}\) sflat([I|M],\{k1,L,A\});
+sflat(    [I|L],A)  \(\smashedrightarrow{\zeta}\) sflat(L,\{k34,I,A\}).
+join(   [],Q,A)     \(\smashedrightarrow{\eta}\) appk(Q,A);
+join([I|P],Q,A)     \(\smashedrightarrow{\theta}\) join(P,Q,\{k34,I,A\}).
+appk(V,\{k34,I,A\})   \(\smashedrightarrow{\mu}\) appk([I|V],A);
+appk(V,\{k2,W,A\})    \(\smashedrightarrow{\lambda}\) join(W,V,A);
+appk(V,\{k1,L,A\})    \(\smashedrightarrow{\kappa}\) sflat(L,\{k2,V,A\});
+appk(V,      \{\})    \(\smashedrightarrow{\iota}\) V.
+\end{alltt}
+
+%\medskip
+
+\paragraph{Improvements.}
+
+Just to illustrate the point that improvements on a definition which
+is not in tail form are much more beneficial than a mere
+transformation to tail form, let us consider again the Fibonacci
+function:
+\begin{verbatim}
+fib(0)            -> 1;
+fib(1)            -> 1;
+fib(N) when N > 1 -> fib(N-1) + fib(N-2).
+\end{verbatim}
+The equations defining the delay of this function are simply:
+\[
+\comp{fib}{0} := 1;\quad
+\comp{fib}{1} := 1;\quad
+\comp{fib}{n} := 1 + \comp{fib}{n-1} +
+\comp{fib}{n-2},\,\; \text{with} \,\; n > 1.
+\]
+Adding \(1\) on both sides of the last equation and reordering the
+terms:
+\[
+\comp{fib}{n} + 1 = (\comp{fib}{n-1} + 1) + (\comp{fib}{n-2} + 1).
+\]
+This gives us the idea to set \(D_n := \comp{fib}{n} + 1 \),
+yielding, for~\(n > 1\),
+\[
+D_0 = \comp{fib}{0} + 1 = 2,\quad
+D_1 = \comp{fib}{1} + 1 = 2,\quad
+D_n = D_{n-1} + D_{n-2}.
+\]
+The recurrence is the same as the Fibonacci sequence (third clause
+of \erlcode{fib/1}), except for \(D_0\)~and~\(D_1\) whose values
+are~\(2\) instead of~\(1\). In order to make it coincide with the
+values of \erlcode{fib/1}, we need to set \(F_n := D_n/2\):
+\[
+\comp{fib}{n} = 2 \cdot F_n - 1.
+\]
+Now we have \(F_0 = F_1 = 1\) and \(F_n = F_{n-1} + F_{n-2}\), for
+all~\(n > 1\); importantly, \(F_n\)~computes the same values
+as~\erlcode{fib/1}, that is, \(F_n \mathrel{\equiv}
+\erlcode{fib(\(n\))}\). Let us prove now by means of \emph{complete
+  induction} on~\(n > 0\) that
+\[
+F_0 = 1;\quad
+F_n = \frac{1}{\sqrt{5}}(\phi^n - \hat\phi^n),\,\; \text{where} \,\;
+\phi := \frac{1+\sqrt{5}}{2} \,\; \text{and} \,\; \hat\phi
+:= 1 - \phi.
+\]
+First, let us verify that the formula works for the smallest value of
+\(n\):
+\[
+F_1 = \frac{1}{\sqrt{5}}(\phi - \hat\phi)
+     := \frac{1}{\sqrt{5}}(\phi - (1 - \phi)) = 1.
+\]
+Let us suppose now that the equation to establish is valid for all
+values ranging from~\(1\) to~\(n\) (this is the \emph{complete
+  induction hypothesis}) and let us prove that it holds for
+\(n+1\). We have, \( F_{n+1} := F_n + F_{n-1}\). We can use
+the complete induction hypothesis for the cases \(n-1\)~and~\(n\):
+\begin{align*}
+F_{n+1} &= \frac{1}{\sqrt{5}}(\phi^n - \hat\phi^n) +
+          \frac{1}{\sqrt{5}}(\phi^{n-1} - \hat\phi^{n-1})\\
+       &= \frac{1}{\sqrt{5}}((\phi^n + \phi^{n-1}) - (\hat\phi^n +
+          \hat\phi^{n-1}))\\
+       &= \frac{1}{\sqrt{5}}(\phi^{n-1}(\phi + 1) -
+          \hat\phi^{n-1}(\hat\phi + 1)).
+\intertext{The key is that \(\phi\) and \(\hat\phi\) are the roots of
+  the polynomial equation \(x^2 = x + 1\), therefore}
+F_{n+1} &= \frac{1}{\sqrt{5}}(\phi^{n-1} \cdot \phi^2 -
+          \hat\phi^{n-1} \cdot \hat\phi^2)
+        = \frac{1}{\sqrt{5}}(\phi^{n+1} - \hat\phi^{n+1}),
+\end{align*}
+which was the statement to be proved. The complete induction principle
+then implies that the equation holds for all~\(n>0\). Now that we
+derived a closed form for~\(F_n\), let us study its asymptotic
+behaviour. This is straightforward if we start by noticing
+that~\(\hat\phi < 1\). Therefore \(\hat\phi^n \rightarrow 0\), as
+\(n\)~gets large and, because~\(\phi > 1\), only remains, as~\(n
+\rightarrow \infty\),
+\[
+F_n \mathrel{\sim} \frac{1}{\sqrt{5}}\phi^n,\,\; \text{implying}
+\,\; \comp{fib}{n} \mathrel{\sim} \frac{2}{\sqrt{5}}\phi^n.
+\]
+That is, this delay is \emph{exponential} and, because~\(\phi > 1\),
+it will always be greater than any polynomial delay, except perhaps
+for a finite number of some small values of~\(n\). In other words,
+this is hopelessly slow.
+
+How can we improve this definition?
+
+We must resist the temptation to transform it into tail form because
+being in tail form only benefits the call stack, not the delay in
+general. By looking back at the call tree of \erlcode{fib(5)},
+\vpageref{fig:fib5_tree}, we realise that some small subtrees are
+duplicated, like the ones rooted at~\erlcode{fib(2)} and, even larger
+ones, like~\erlcode{fib(3)}. Let us examine the leftmost branch, from
+the leaf to the root. It is made of the successive nodes
+\erlcode{fib(1)}, \erlcode{fib(2)}, \erlcode{fib(3)}, \erlcode{fib(4)}
+and \erlcode{fib(5)}, that is, all the values of \erlcode{fib(N)}
+for~\erlcode{N} ranging from~\erlcode{1} to~\erlcode{5}. Generalising
+this observation, we can say that the series
+\((\erlcode{fib(N)})_{\erlcode{N}}\) is entirely described,
+except~\erlcode{fib(0)}, by the leftmost branch in the call tree of
+\erlcode{fib(N)}. Therefore, starting from the small tree
+\begin{center}
+\includegraphics[bb=71 691 150 721]{fib2_tree}
+\end{center}
+we can obtain the complete call tree for \erlcode{fib(5)} by growing
+the tree from the root, whilst sharing some subtrees, that is, reusing
+them instead of recomputing them, so the call tree looks now like in
+\fig~\vref{fig:fib5_sharing} (technically, it is not a simple tree but
+a more general \emph{Directed Acyclic Graph}, where the curved arrowed
+edges implement the reuse of subtrees.
+\begin{figure}
+\centering
+\includegraphics[bb=71 671 326 718]{fib5_sharing}
+\caption{Call tree of \erlcode{fib(5)} with maximal sharing
+\label{fig:fib5_sharing}}
+\end{figure}
+This graph representation leads us to think that if two successive
+Fibonacci numbers are kept at all times, we can achieve this maximal
+sharing. Let us denote by~\(F_n\) the \(n\)th~Fibonacci number in the
+series. Then each computational step is \((F_{n-1},F_{n}) \rightarrow
+(F_{n}, F_{n+1}) := (F_{n},F_{n}+F_{n-1})\). In other words,
+let \(f\)~be the function such that \(f(x,y) := (y,x+y)\),
+then \((F_{n},F_{n+1}) = f(F_{n-1},F_{n})\) and
+\[
+(F_n,F_{n+1}) = f(F_{n-1},F_{n}) = f(f(F_{n-2},F_{n-1})) =
+f^2(F_{n-2},F_{n-1})
+\]
+etc. till we reach \((F_{n},F_{n+1}) = f^n(F_0,F_1) :=
+f^{n}(1,1)\), for all \(n \geqslant 0\). Let \(\pi_1\) be the function
+such that \(\pi_1(x,y) = x\), that is, it projects the first component
+of a pair, then \(F_n = \pi_1 \circ f^n(1,1)\), for all \(n \geqslant
+0\). The iteration of \(f\) is easy to define by the recurrent
+equations
+\begin{align*}
+f^0(x,y) &= (x,y),\\
+f^n(x,y) &= f^{n-1}(f(x,y)) := f^{n-1}(y,x+y), && \text{where} \,\; n > 0.
+\end{align*}
+The \Erlang code is now straightforward:
+\begin{verbatim}
+fib_opt(N) -> pi1(f(N,{1,1})).
+pi1({X,_}) -> X.
+f(0,{X,Y}) -> {X,Y};
+f(N,{X,Y}) -> f(N-1,{Y,X+Y}).
+\end{verbatim}
+A tail form definition is extremely easy to obtain, without applying
+the general method:
+\begin{alltt}
+fib_opt_tf(N) -> f(N,\{1,1\}).
+f(0,\{X,_\})    -> X;\hfill% \emph{Projection done here}
+f(N,\{X,Y\})    -> f(N-1,\{Y,X+Y\}).
+\end{alltt}
+We deduce the delay \(\comp{fib\_opt\_tf}{n} = n + 2 \mathrel{\sim}
+n\), as \(n \rightarrow \infty\), which is thus asymptotically
+\emph{linear}. This is a tremendous improvement over~\erlcode{fib/1}
+and, as an unexpected bonus, the definition is in tail form and is
+made of the same number of clauses as the original.
+
+The general algorithm we presented in this section transforms all the
+definitions of the functions used by a given definition. Assuming that
+the size of the control stack is a real issue, is it possible not to
+transform all the functions involved? Consider again
+\erlcode{rm\_lst/2}, defined \vpageref{rm_lst}:
+\begin{alltt}
+rm_lst(I,L) -> rev(rm_fst(I,rev(L))).
+\end{alltt}
+If we use the alternative definition \erlcode{rm\_fst\_tf/2}, which is
+in tail form, instead of \erlcode{rm\_fst/2}, and,
+since~\erlcode{rev/1} is already in tail form, we reach
+\begin{alltt}
+rm_lst(I,L) -> rev(rm_fst_tf(I,rev(L))).
+\end{alltt}
+where all the composed functions are in tail form. Of course, a
+function composition, like~\erlcode{rm\_fst/2}, is not, by definition,
+in tail form, but it is not a problem. The size of control stack
+needed to compute the calls to \erlcode{rm\_lst/2} will be bounded by
+a small constant, because it is not recursive. That is why many good
+programmers only worry of having recursive functions in tail form and
+that function definitions in \emph{tail form} are often called by
+reductionism \emph{tail\hyp{}recursive}.
+
+\medskip
+
+\paragraph{Exercises.}
+\label{ex:delay_and_tail_form_revisited}
+
+\noindent [See answers \vpageref{ans:delay_and_tail_form_revisited}.]
+\begin{enumerate}
+
+  \item Define a function~\erlcode{split/2} such that the call
+    \erlcode{split(\(L\),\(n\))}, where \(L\)~is a list and \(n\)~an
+    integer, is rewritten into a pair of lists, the first containing
+    the first \(n\)~items of~\(L\) in the original order, the second
+    containing the remaining items in the original order as
+    well. If~\(n \leqslant 0\) or \(n\)~is the length of~\(L\), then
+    \erlcode{split(\(L\),\(n\))} is undefined (if the latter case were
+    allowed, there would be an ambiguity between two possible
+    outcomes: \erlcode{\{\(L\),[]\}} and \erlcode{\{[],\(L\)\}}). For
+    example,
+    \begin{align*}
+      \erlcode{split([a,b,c,d,e,f,g],5)}
+      &\twoheadrightarrow
+      \erlcode{\{[a,b,c,d,e],[f,g]\}};\\
+      \erlcode{split([a,b,c,d,e,f,g],1)}
+      &\twoheadrightarrow
+      \erlcode{\{[a],[b,c,d,e,f,g]\}}.
+    \end{align*}
+    Provide a tail form as well. Discuss the delay and the possible
+    best and worst cases. 
+
+  \item Define a function~\erlcode{rot/2} such that the call
+    \erlcode{rot(\(L\),\(n\))}, where \(L\)~is a list and \(n\)~an
+    integer, is rewritten into the list containing the items of~\(L\)
+    such that the \erlcode{len(\(L\)) - \(n\)} last items of~\(L\)
+    come first (in the original order), followed by the \(n\)~first
+    items of~\(L\) (in the original order). This is usually called a
+    \emph{circular rotation}. For instance,
+    \begin{align*}
+      \erlcode{rot([a,b,c,d,e,f,g],5)}
+      &\twoheadrightarrow
+      \erlcode{[f,g,a,b,c,d,e]};\\
+      \erlcode{rot([a,b,c,d,e,f,g],0)}
+      &\twoheadrightarrow
+      \erlcode{[a,b,c,d,e,f,g]};\\
+      \erlcode{rot([a,b,c,d,e,f,g],7)}
+      &\twoheadrightarrow
+      \erlcode{[a,b,c,d,e,f,g]};\\
+      \erlcode{rot([a,b,c,d,e,f,g],9)}
+      &\twoheadrightarrow
+      \erlcode{[c,d,e,f,g,a,b]};\\
+      \erlcode{rot([a,b,c,d,e,f,g],-3)}
+      &\twoheadrightarrow
+      \erlcode{[e,f,g,a,b,c,d]};\\
+      \erlcode{rot([a,b,c,d,e,f,g],-12)}
+      &\twoheadrightarrow
+      \erlcode{[c,d,e,f,g,a,b]};\\
+      \erlcode{rot([a,b,c,d,e,f,g],-7)}
+      &\twoheadrightarrow
+      \erlcode{[a,b,c,d,e,f,g]};\\
+      \erlcode{rot([a,b,c,d,e,f,g],-0)}
+      &\twoheadrightarrow
+      \erlcode{[a,b,c,d,e,f,g]}.
+    \end{align*}
+    \emph{Hint.} It is helpful to put all the items around a circle,
+    like markings on a clockwall, the first at noon, and imagine the
+    only hand initially pointing to it. Then move the hand clockwise
+    as many times as required by the rotation, or
+    counter\hyp{}clockwise if the offset is negative, and the final
+    item pointed is the first item of the result. Then read the
+    following items clockwise. Discuss delay and worst and best cases
+    (if any). Provide a version in tail form. You will probably need
+    the arithmetic operator~\erlcode{rem/2}, which gives the remainder
+    of the Euclidian division, for instance,
+    \begin{align*}
+       \erlcode{17 rem 3}   &= \erlcode{2},
+     & \erlcode{-17 rem 3}  &= \erlcode{-2},\\
+      \erlcode{17 rem -3}  &= \erlcode{2},
+     & \erlcode{-17 rem -3} &= \erlcode{-2}.
+    \end{align*}
+    Note how the sign of the remainder is always the sign of the
+    dividend. This depends on the programming languages and must
+    always be checked before doing arithmetics.
+
+  \item Transform into tail form and find the delay of the following
+    definition. Transform it so the function returns a pair containing
+    the number of rewrites to find the result.
+\begin{alltt}
+flat_ter(L)           -> flat_ter(L,[]).
+flat_ter(       [],B) -> rev(B);
+flat_ter(   [[]|L],B) -> flat_ter(L,B);
+flat_ter([[I|M]|L],B) ->
+\hfill flat_ter(L,flat_ter([I|M],B));
+flat_ter(    [I|L],B) -> flat_ter(L,[N|B]).
+\end{alltt}
+Have you seen the resulting definition before?
+
+  \item What is the delay of the following definition?
+\begin{verbatim}
+sflat_tf(L)       -> sflat(L,[],[]).
+sflat(   [],[],B) -> rev(B);
+sflat(   [], A,B) -> sflat(A,   [],    B);
+sflat(  [I], A,B) -> sflat(I,    A,    B);
+sflat([I|L], A,B) -> sflat(I,[L|A],    B);
+sflat(    I, A,B) -> sflat(A,   [],[I|B]).
+\end{verbatim}
+
+\end{enumerate}

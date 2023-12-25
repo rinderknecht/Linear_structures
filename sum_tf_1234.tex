@@ -1,0 +1,78 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesepA=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \erlnode{1}
+    \pstree{\erlnode{|}}{
+      \erlnode{2}
+      \pstree{\erlnode{|}}{
+        \erlnode{3}
+        \pstree{\erlnode{|}}{
+          \erlnode{4}
+          \erlnode{[]}
+        }
+      }
+    }
+  }
+}
+\hspace{-28pt}\raisebox{-3pt}{\(\xrightarrow{\alpha}\)}\hspace{-4pt}
+\pstree[nodesepA=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \erlnode{2}
+    \pstree{\erlnode{|}}{
+      \erlnode{3}
+      \pstree{\erlnode{|}}{
+        \erlnode{4}
+        \erlnode{[]}
+      }
+    }
+  }
+  \erlnode{1}
+}
+\hspace{-6pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{-2pt}
+\pstree[nodesepA=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \erlnode{3}
+    \pstree{\erlnode{|}}{
+      \erlnode{4}
+      \erlnode{[]}
+    }
+  }
+  \erlnode{3}
+}
+\hspace{-1pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{-5pt}
+\pstree[nodesepA=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \erlnode{4}
+    \erlnode{[]}
+  }
+  \erlnode{6}
+}
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{0pt}
+\pstree[nodesepB=2pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  \erlnode{[]}
+  \erlnode{10}
+}
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\hspace{-1pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{10}}{}
+\endTeXtoEPS
+
+\end{document}

@@ -1,0 +1,42 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\SpecialCoor
+
+\begin{document}
+
+\TeXtoEPS
+%\psset{showbbox=true}
+\pstree[nodesep=0pt,levelsep=24pt,treesep=14pt]{\rnode{Root}{}\TC}{
+  \pstree{\TC}{
+    \pstree{\TC}{
+      \Tf
+      \Tf
+    }
+    \pstree{\TC}{
+      \Tf
+      \Tf
+    }
+  }
+  \pstree{\TC}{
+    \pstree{\TC}{
+      \Tf
+      \Tf
+    }
+    \pstree{\rnode{Leaf}{}\TC}{
+      \Tf
+      \Tf
+    }
+  }
+}
+\pcline[linestyle=dashed](Root)(1,0|1,0)
+\pcline[linestyle=dashed](Leaf)(1,0|1,-1.68)
+\psset{arrowscale=2,linewidth=0.2pt}
+\pcline[arrows=<->](1,0)(1,-1.68)
+\ncput*{\(h=3\)}
+\endTeXtoEPS
+
+\end{document}

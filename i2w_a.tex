@@ -1,0 +1,42 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+%\psset{showbbox=true}
+\pstree[nodesep=2pt,levelsep=35pt,treesep=8pt,arrows=->,xbbr=-2]{\erlnode{[\(a\)]\!,\![]}}{
+  \pstree{\erlnode{[]\!,\![\(a\)]}\nbput[npos=0.6]{\(\epsilon\)\!\!\!}}{
+    \pstree{\erlnode{[\(b\)]\!,\![\(a\)]}\nbput[npos=0.4]{\(\delta\)\!}}{
+      \pstree{\erlnode{[\(a,b\)]\!,\![]}\nbput[npos=0.6]{\(\gamma\)\!\!\!}}{
+        \erlnode{[\(a,b\)]\!,\![\(c\)]}~{\((1,2,3)\)}\nbput[npos=0.4]{\(\zeta\)\!}
+      }
+      \pstree{\erlnode{[]\!,\![\(b,a\)]}\nbput[npos=0.5]{\(\epsilon\)\!}}{
+        \erlnode{[\(c\)]\!,\![\!\(b,a\)]}~{\((3,2,1)\)}\nbput[npos=0.4]{\(\delta\)\!}
+      }
+      \erlnode{[\(b\)]\!,\![\(c,a\)]}~{\((2,3,1)\)}\naput[npos=0.6]{\!\!\!\(\zeta\)}
+    }
+  }
+  \pstree{\erlnode{[\(a\)]\!,\![\(b\)]}\naput[npos=0.6]{\!\!\!\(\zeta\)}}{
+    \pstree{\erlnode{[\(b,a\)]\!,\![]}\nbput[npos=0.7]{\(\gamma\)\!\!\!}}{
+      \erlnode{[\(b,a\)]\!,\![\(c\)]}~{\((2,1,3)\)}\nbput[npos=0.4]{\(\zeta\)\!}
+    }
+    \pstree{\erlnode{[]\!,\![\(a,b\)]}\nbput[npos=0.5]{\(\epsilon\)\!}}{
+      \erlnode{[\(c\)]\!,\![\(a,b\)]}~{\((3,1,2)\)}\nbput[npos=0.4]{\!\!\(\delta\)}
+    }
+    \erlnode{[\(a\)]\!,\![\(c,b\)]}~{\((1,3,2)\)}\naput[npos=0.6]{\!\!\(\zeta\)}
+  }
+}
+\endTeXtoEPS
+
+\end{document}

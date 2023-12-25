@@ -1,0 +1,41 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum}}{
+  \pstree{\erlnode{|}}{
+    \erlnode{N}
+    \erlnode{[]}
+  }
+}
+\hspace*{-4pt}\raisebox{-3pt}{\(\xrightarrow{\alpha}\)}\hspace*{2pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{N}}{}
+\qquad\qquad
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum}}{
+  \pstree{\erlnode{|}}{
+    \erlnode{N}
+    \erlnode{L}
+  }
+}
+\hspace*{4pt}\raisebox{-3pt}{\(\xrightarrow{\beta}\)}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{+}}{
+  \erlnode{N}
+  \pstree{\erlnode{sum}}{
+    \erlnode{L}
+  }
+}
+\endTeXtoEPS
+
+\end{document}

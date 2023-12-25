@@ -1,0 +1,2 @@
+srev(   []) -> [];
+srev([I|L]) -> join(srev(L),[I]).

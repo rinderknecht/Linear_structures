@@ -1,0 +1,611 @@
+%%-*-latex-*-
+
+\chapter{Delay}
+
+When a function call is computed, several outcomes are possible: the
+rewrites may
+\begin{itemize}
+
+  \item never end (\emph{loop}),
+
+  \item end with a memory (call stack or heap) overflow,
+
+  \item end with a type error (as \erlcode{1 + []}),
+
+  \item end with a match failure (a body contains a call which is
+  matched by no head),
+
+  \item end with a \emph{value} (that is, an expression which is a
+    constant, for example, a list or an integer, and therefore cannot
+    be further rewritten).
+
+\end{itemize}
+In the latter case, it is sometimes feasible to express the number of
+rewrites needed to reach the result in terms of the input
+size. Accordingly, a loop requires an infinite number of steps and a
+value none. Also, a measure of the input must be decided upon in order
+to be able to apprehend the number of rewrite steps, which, in turn,
+can be interpreted temporally as a \emph{delay} (between the moment
+when the computation starts and when it ends successfully with a
+value). The choice of a measure of the data depends entirely on the
+programmer, but it is generally considered meaningful, for instance,
+to take the number of items in a list as its size, and an \Erlang
+integer \erlcode{N} is measured by its mathematical correspondent \(n
+\in \mathbb{N}\). The length of a list, that is, the number of items
+it contains, can be defined in several ways in \Erlang, one being
+\begin{verbatim}
+len(   []) -> 0;
+len([_|L]) -> 1 + len(L).
+\end{verbatim}
+It does not matter here that this definition is not in tail form
+because its purpose is to prove how a peculiar measure on lists can
+easily be implemented.
+
+Given an expression \(e\), we denote the number of rewrites to reach
+its value, assuming it exists, by \(\delay{\(e\)}\) and the value
+itself by \(\val{e}\). The strategy of \Erlang, which consists in
+computing the arguments of a call before the call itself and then
+selecting clauses for matching according to the order of definition,
+implies that if a value exists, then it is unique. Hence, computing a
+value~\(\val{v}\) incurs a null delay: \(\delay{\(\val{v}\)} = 0\).
+Moreover, the delay of a function call is the sum of the delays of its
+arguments plus the delay of rewriting the call with the resulting
+values. For example, let \(P\) and \(Q\) be two expressions whose
+values are lists. Then the delay of \erlcode{join(\(P\),\(Q\))} is
+denoted by \(\delay{join(\(P\),\(Q\))}\) and equals the sum of the
+delays of \(P\)~and~\(Q\), plus the delay of
+\erlcode{join(\(\val{P}\),\(\val{Q}\))}:
+\[
+\delay{join(\(P\),\(Q\))} := \delay{\(P\)} +
+\delay{\(Q\)} + \delay{join(\(\val{P}\),\(\val{Q}\))}.
+\]
+We need now to connect these notions to function definitions: the
+delay of a call matching a head is~\(1\) plus the delay of the
+corresponding body in the clause.
+
+\medskip
+
+\paragraph{Joining two Lists.} 
+
+Let us consider the definition of \erlcode{join/2} which is not in
+tail form:
+
+\verbatiminput{join_2.def}
+
+\noindent Applying the previous definition of the delay to each clause
+leads straightforwardly to the following \emph{recurrence
+  equations}. Roughly speaking, ``recurrence'' is the mathematical
+alter ego of ``recursive'' in computer science.
+\begin{align*}
+\delay{join([],Q)}    &:= 1 + \delay{Q},\\
+\delay{join([I|P],Q)} &:= 1 + \delay{[I|join(P,Q)]}.
+\end{align*}
+The relation \(a := b\) means ``\(a\) equals \(b\) by
+definition;'' \(a = b\) means ``\(a\) equals \(b\) by means of some
+mathematical deduction'' and \(a \mathrel{\equiv} b\) means ``\Erlang
+expressions \(a\)~and~\(b\) are rewritten into the same value,'' more
+precisely, their abstract syntax trees are identical. Here, all
+\Erlang variables, \erlcode{I}, \erlcode{P}~and~\erlcode{Q}, denote
+values, since they are bound to the arguments during the matching of
+the call. But what about \(\delay{[I|join(P,Q)]}\)? The \Erlang
+operator~(\erlcode{|}) can be considered as a function which is not
+defined by any clause, therefore it incurs no delay and only the
+delays of its two arguments matter. A more detailed analysis would
+take into account the time needed to push an item on top of a list,
+but we assume here that
+\[
+\delay{[I|L]} = \delay{I} + \delay{L}.
+\]
+Therefore
+\[
+\delay{[I|join(P,Q)]} = \delay{I} + \delay{join(P,Q)}.
+\]
+We have \(\delay{I} = 0\) and the equations are equivalent to
+\[
+\delay{join([],Q)}    = 1,\quad
+\delay{join([I|P],Q)} = 1 + \delay{join(P,Q)}.
+\]
+Note that we must use here~\((=)\) instead of~\((:=)\). We
+need now to define the delay in terms of the size of the input, that
+is, the arguments. The function call \erlcode{join(\(P\),\(Q\))} has
+two lists as arguments. The usual way to measure the size of a list is
+to consider the number of elements it contains, that is, its
+length. Here, the size of the input is characterised by a
+pair~\((n,m)\), where \(n, m \in \mathbb{N}\) are the mathematical
+abstractions of the values of \erlcode{len(\(P\))} and
+\erlcode{len(\(Q\))}. For practical purposes, we mean to identify
+\Erlang integers and mathematical integers. Let us define the delay of
+\erlcode{join/2} in terms of the input size as
+\[
+\comp{join}{n,m} := \delay{join(\(P\),\(Q\))},
+\]
+where \(n\)~is the length of~\(P\) and \(m\)~is the length of~\(Q\).
+Using this definition, the previous equations are equivalent to
+\[
+\comp{join}{0,q}   = 1,\quad
+\comp{join}{p+1,q} = 1 + \comp{join}{p,q}.
+\]
+where \erlcode{P}~and~\erlcode{Q} are supposed to contain respectively
+\(p\)~and~\(q\) items. It is not too late to observe or recall that
+\erlcode{Q}~is constant all along the rewrites, which can be seen here
+too because all the occurrences of~\(q\) are \(q\)~itself. In other
+words: \(q=m\). Thus, for the sake of clarity, let us define
+\(\comp{join}{p} := \comp{join}{p,m}\); then we simply have
+\[
+\comp{join}{0}   = 1,\quad
+\comp{join}{p+1} = 1 + \comp{join}{p}.
+\]
+As we wish to express \(\comp{join}{n}\) in terms of~\(n\) alone, that
+is, we want a \emph{closed form}, let us write the first terms and
+guess the general form when~\(p+1=n\) in the second equation:
+\begin{align*}
+\comp{join}{0} &= 1,\\
+\comp{join}{1} &= 1 + \comp{join}{0} = 1 + 1 = 2,\\
+\comp{join}{2} &= 1 + \comp{join}{1} = 1 + 2 = 3,\\
+&\;\;\vdots\\
+\comp{join}{n} &= 1 + \comp{join}{n-1} = 1 + n.
+\end{align*}
+But we must check if our guess is correct by replacing
+\(\comp{join}{p} = 1 + p\) back into the original equations, which
+must be satisfied:
+\[
+\comp{join}{0}   = 1 + 0 = 1,\quad
+\comp{join}{p+1} = 1 + (p+1) = 1 + \comp{join}{p}.
+\]
+And they are. So we can trust that \(\comp{join}{n} = n + 1\).
+
+We would remiss if we do not mention that, whilst the previous
+reckoning is perfectly valid, there exists a direct approach that does
+not suppose to guess the result and later check it. The technique
+needed here, called \emph{telescoping}, consists in forming the
+differences between two successive terms in the series
+\((\comp{join}{p})_{p \in \mathbb{N}}\) and then summing these
+differences. The second equation implies the following ones:
+\begin{align}
+\comp{join}{p+1} - \comp{join}{p} &= 1, & \text{where} \;\, p
+\geqslant 0,\notag\\
+\sum_{p=0}^{n-1}{\left(\comp{join}{p+1} - \comp{join}{p}\right)}
+  &= \sum_{p=0}^{n-1}{1}, & \text{where} \;\, n > 0,\notag\\
+\comp{join}{n} - \comp{join}{0} &= n,\notag\\
+\comp{join}{n} &= n + 1.\label{delay:join}
+\end{align}
+The clue that the reasoning has been tidied up is that it contains no
+more ellipses \((\ldots)\), English or Latin locutions like ``and so
+on'' and ``etc.'' Furthermore, it is important to have a clear
+understanding of the behaviour of the delay when the input becomes
+significantly large with res<pect to the chosen measure. This insight
+is provided by considering an \emph{equivalent function} when the
+variable takes arbitrarily large values:
+\[
+\comp{join}{n} \mathrel{\sim} n, \,\; \text{as} \;\, n
+\rightarrow \infty.
+\]
+By definition, two functions \(f(n)\)~and~\(g(n)\) are
+\emph{asymptotically equivalent} if \(\lim_{n \rightarrow
+  \infty}{f(n)/g(n)} = 1\). Our assumption all along has been that the
+number of steps necessary to fully rewrite a function call, which we
+call delay and other authors often call \emph{time complexity} or
+\emph{cost}, is proportional to the real, wall\hyp{}clock, delay. This
+means, for example, that the time required to join two lists is almost
+proportional to the length of the first list and the more the list
+grows, the more accurate the proportionality becomes. In particular,
+doubling the size of the first list will approximately double the time
+to get the result, whereas doubling the length of the second list will
+have no impact at all. Despite being quite reasonable, this
+proportionality assumption is slightly weak because many untold
+details have been abstracted away so as to get a simple introduction
+to functional programming. A much stronger case is found in comparing
+two functions, especially if they compute the same results on the same
+inputs (this is another sort of equivalence). Indeed, both functions
+then assume the same abstract execution model (think of the
+implementation of some virtual machine, for example) and no direct
+reference to the physical world is needed for validating the
+comparison: knowing which function is faster \emph{in the same
+  environment} implies that this function is also faster with respect
+to the wall\hyp{}clock. This kind of question can sometimes be
+answered very reliably and the asymptotic expressions, that is,
+involving the equivalence sign~\((\sim)\), are especially useful
+because real life data is usually big, assuming that the measure
+chosen is pertinent. If small inputs are likely, it can be wise to
+have a version of the function dedicated to be efficient on such data
+and another version specialised for large cases.
+
+Is it mandatory to go through all these mathematics to reach the
+result? Most of the time, such thorough investigation is not necessary
+and sometimes not even tractable. We could have think as follows. Let
+
+\verbatiminput{join_2.def}
+
+\noindent In the calls \erlcode{join(\(P\),\(Q\))}, we know that the
+size of~\(Q\) does not matter. By focusing on the recursive call in
+the definition, we see that the first parameter changes from
+\erlcode{[I|P]} (in the head) to~\erlcode{P}. Thus, the sensible
+measure on lists is the length because it decreases by one at each
+recursive call. Let us suppose that \erlcode{P}~is bound to an
+argument which contains \(p\)~items. Let \(\comp{join}{p}\) be the
+number of steps to rewrite \erlcode{join(\(P\),\(Q\))} to a
+value. Then the second clause implies that \(\comp{join}{p+1} = 1 +
+\comp{join}{p}\) and the first one \(\comp{join}{0} = 1\). The
+number~\(1\) in each case comes from the fact that one clause is used
+(an arrow ``\erlcode{->}''). Then the recurrence relations are solved
+and the result is \(\comp{join}{n} = n + 1\).
+
+Let us consider again the definition of \erlcode{join\_tf/2}
+\vpageref{code:join_tf}: \input{join_tf_alpha.def} It was named
+\erlcode{join\_tf} because it is a version of \erlcode{join} which is
+in \textbf{t}ail \textbf{f}orm. Clause \clause{\gamma} pushes
+item~\erlcode{I} on top of~\erlcode{Q} but the actual contents
+of~\erlcode{Q} is never used. So let us find \(\comp{join\_tf}{n}\),
+that is, the delay of \erlcode{join\_tf(\(P\),\(Q\))}, where \(n\) is
+the length of list~\(P\). Instead of deducing a set of recurrence
+equations and solve them, let us endeavour with a direct approach
+consisting in counting, for each clause, how many times it is used:
+\begin{itemize}
+
+  \item clause~\clause{\alpha} is used once;
+
+  \item clause~\clause{\delta} is used \(n\)~times (the first argument
+    is reversed on the accumulator~\erlcode{A}),
+
+  \item clause~\clause{\gamma} is used \(n\)~times (the accumulator is
+    empty at the beginning and the first list was reversed on it, so
+    it contains \(n\)~items when clause~\clause{\eta} is used),
+
+  \item clause~\clause{\beta} is used once.
+
+\end{itemize}
+Note that the order of the clauses in the previous list follows the
+order of computation, for example, clause~\clause{\beta} is always
+used last. This allows us to express compactly this execution trace as
+the composition \(\alpha\delta^n\gamma^n\beta\), where order
+matters. The total number of steps is
+\(\abs{\alpha\delta^n\gamma^n\beta} = \abs{\alpha} + n \cdot
+\abs{\delta} + n \cdot \abs{\gamma} + \abs{\beta} = 2n + 2 =
+\comp{join\_tf}{n}\). We can now compare \(\comp{join}{n}\) and
+\(\comp{join\_tf}{n}\):
+\[
+\comp{join\_tf}{n} = 2 \cdot \comp{join}{n}.
+\]
+In other words, the version in tail form is twice as slow as the
+other, \emph{even if we do not know the wall\hyp{}clock delay of
+  none.}
+
+\medskip
+
+\paragraph{List Reversal.}
+
+Let us reconsider now the following definition of \erlcode{srev/1},
+and investigate its delay:
+
+\verbatiminput{srev.def}
+
+\noindent First, let us go for a mathematical approach. For any
+expression~\(L\) whose value is a list, the delay
+\(\delay{srev(\(L\))}\) is, by definition, the sum of the costs of
+rewriting~\(L\) and the cost of rewriting the call with the
+corresponding value~\(\val{L}\) as an argument:
+\[
+\delay{srev(\(L\))} := \delay{\(L\)} +
+\delay{srev(\(\val{L}\))}.
+\]
+Considering each clause separately, we can therefore write the
+equations defining the delays:
+\begin{align*}
+\delay{srev([])} &:= 1,\\
+\delay{srev([H|T])} 
+  &:= 1 + \delay{join(srev(T),[H])}\\
+  &= 1 + (\delay{srev(T)} +
+\delay{join(\(\val{\erlcode{srev(T)}}\),[H])}).
+\end{align*}
+Let us define the delay of \erlcode{srev/1} in terms of the input size
+as
+\[
+\comp{srev}{n} := \delay{srev(\(L\))},
+\]
+where \(n\)~is the length of \(L\). Using this definition and assuming
+that \erlcode{T}~is bound to a list containing \(p\)~items, then the
+length of \erlcode{srev(T)} is also~\(p\) and the previous equations,
+for~\(p~\geqslant~0\), are equivalent to
+\begin{align*}
+\comp{srev}{0}   &= 1,\\
+\comp{srev}{p+1}
+  &= 1 + \comp{srev}{p} + \comp{join}{p}
+   = 1 + \comp{srev}{p} + (p+1)
+   = 2 + p + \comp{srev}{p}.
+\end{align*}
+We would rather like to express \(\comp{srev}{p}\) in terms of~\(p\)
+only---in other words, we want to solve the equations. The technique
+consists in making up all the differences of two successive terms in
+the series and then summing up these differences, so that terms cancel
+pairwise:
+\begin{align*}
+\comp{srev}{p+1} - \comp{srev}{p} &= 2 + p, & \text{where}\;\, p > 0,\\
+   \sum_{p=0}^{n-1}{\left(\comp{srev}{p+1} - \comp{srev}{p}\right)}
+&= \sum_{p=0}^{n-1}{(2 + p)}, & \text{where} \;\, n > 0.
+\end{align*}
+Let us change variable \(p\) into \(p-2\) in the
+  right\hyp{}hand side:
+\[
+   \comp{srev}{n} - \comp{srev}{0} = \sum_{p=2}^{n+1}{p}
+\;\Leftrightarrow\;
+   \comp{srev}{n} - 1 = \sum_{p=2}^{n+1}{p}
+\;\Leftrightarrow\;
+   \comp{srev}{n} = \sum_{p=1}^{n+1}{p}.
+\]
+Let us double each side of the equality:
+\[
+  2 \cdot \comp{srev}{n}
+= 2 \cdot \sum_{p=1}^{n+1}{p} = \sum_{p=1}^{n+1}{p} + \sum_{p=1}^{n+1}{p}.
+\]
+Let us change the variable~\(p\) into \(n-p+2\) in the second sum:
+\begin{align}
+   2 \cdot \comp{srev}{n}
+&= \sum_{p=1}^{n+1}{p} + \sum_{p=1}^{n+1}{(n-p+2)}
+ = \sum_{p=1}^{n+1}{(p+(n-p+2))}\notag\\
+&= \sum_{p=1}^{n+1}{(n+2)} = (n+1)(n+2).\notag\\
+   \comp{srev}{n}
+&= (n+1)(n+2)/2,\,\; \text{where} \;\, n > 0.\notag
+\intertext{Since that replacing \(n\) by \(0\) in the latter formula
+  gives}
+\comp{srev}{0} &= (0+1)(0+2)/2 = 1,\notag
+\intertext{we can therefore gather the two cases into one as}
+\comp{srev}{n} &= (n+1)(n+2)/2,\,\; \text{where} \;\, n \geqslant 0.
+\label{delay:srev}
+\end{align}
+As an example, the number of rewrites for the call
+\erlcode{srev([3,2,1])} \vpageref{rev_321bis} was found to be~\(10\)
+and our formula indeed reckons this number: since
+\erlcode{len([3,2,1])}~\(\mathrel{\equiv}\)~\erlcode{3}, we need
+\(\comp{srev}{3} = (3+1)(3+2)/2 = 4 \cdot 5/2 = 10\).
+
+Would a lightweight approach have been possible? Yes. What we need to
+do is to use ellipses when we do not want to detail too much, but we
+must make sure that we do not get sloppy either. Let us resume from
+the recurrence equations and change \(p\)~into~\(p-1\):
+\begin{equation}
+\comp{srev}{0} = 1;\quad
+\comp{srev}{p} = 1 + p + \comp{srev}{p-1},\,\; \text{where}\;\, p >
+0,\label{eq:srev_p}
+\end{equation}
+and simply write a few terms of the series until \(p=n\):
+\begin{align*}
+\comp{srev}{0} &= 1,\\
+\comp{srev}{1} &= 1 + 1 + \comp{srev}{0},\\
+\comp{srev}{2} &= 1 + 2 + \comp{srev}{1},\\
+&\;\;\vdots\\
+\comp{srev}{n} &= 1 + n + \comp{srev}{n-1}, & \text{where}\;\, n >
+0.
+\end{align*}
+By looking at the left\hyp{}hand sides we find the terms
+\(\comp{srev}{0}\), \(\comp{srev}{1}\), \dots, \(\comp{srev}{n}\),
+whereas, in the right\hyp{}hand sides, we can see \(\comp{srev}{0}\),
+\(\comp{srev}{1}\), \dots, \(\comp{srev}{n-1}\), \emph{which are all
+  present in the left\hyp{}hand side.} This gives us the idea to sum
+all the equations into one whose left\hyp{}hand side will be
+\(\comp{srev}{0} + \comp{srev}{1} + \dots + \comp{srev}{n}\) and the
+right\hyp{}hand side \(\comp{srev}{0} + \comp{srev}{1} + \dots +
+\comp{srev}{n-1}\) can be subtracted on both sides. That is, the
+technique is based on
+\[
+\comp{srev}{0} + \comp{srev}{1} + \dots + \comp{srev}{n} = x +
+\comp{srev}{0} + \comp{srev}{1} + \dots + \comp{srev}{n-1}
+\]
+being simply equivalent to \(\comp{srev}{n} = x\). We need to
+explicit~\(x\) now. It is made of two parts, which can be seen as two
+columns in the list of equations: the first is \(1 + 1 + \dots + 1\)
+(\(n+1\)~times, since it starts at \(\comp{srev}{0}\) and ends at
+\(\comp{srev}{n}\)) and the second is~\(1 + 2 + \dots + n\). The
+former is simply the value~\(n+1\), while the latter should be
+familiar by now. If not, here is another way to calculate it. Let
+\(S_n = 1 + 2 + \dots + n\). By writing the sum from right to left,
+this is still \(S_n = n + (n-1) + \dots + 1\). By adding side by side
+these two equalities yield \(S_n + S_n = (1 + n) + (2 + (n-1)) + \dots
++ (n + 1) = (1 + n) \cdot n\), so \(S_n = n(n+1)/2\). Finally, we can
+gather all these findings into the expected result
+\[
+\comp{srev}{n} = (n+1) + n(n+1)/2 = (n+1)(n+2)/2, \,\;
+\text{where}\;\, n > 0.
+\]
+This formula can be extended to~\(n=0\) since it implies
+\(\comp{srev}{0} = (0+1)(0+2)/2 = 1\), as expected. We further have
+\[
+\comp{srev}{n} = \frac{1}{2}{n^2} + \frac{3}{2}{n} + 1
+\;\Rightarrow\;
+\frac{2}{n^2}{\comp{srev}{n}} = 1 + \frac{3}{n} + \frac{2}{n^2}
+\rightarrow 1,\,\; \text{as} \,\; n \rightarrow \infty.
+\]
+By definition of~\((\sim)\), this implies
+\[
+\comp{srev}{n} \mathrel{\sim} \frac{1}{2}{n^2}, \,\; \text{as} \;\,
+n \rightarrow \infty.
+\]
+When a function~\(f\) satisfies \(f(n) \mathrel{\sim} a n^2\) for some
+constant~\(a\) and with~\(n \rightarrow \infty\), it is said to be
+\emph{asymptotically quadratic}. In our example at hand, multiplying
+by~\(10\) the size of a large input list will multiply at least
+by~\(50\) the computation time.
+
+Let us reconsider now the definition of \erlcode{rev/1}
+\vpageref{code:rev_join}: \input{rev_alpha.def} and assess the number
+of steps to compute \erlcode{rev(\(L\))}, with \(L\)~being an
+expression whose value is a list containing \(n\) items. Considering
+each clause separately, we can then write the equations defining the
+delays
+\begin{align*}
+\delay{rev(L)}             &\eqn{\alpha} 1 + \delay{rev\_join(L,[])},\\
+\delay{rev\_join([],Q)}    &\eqn{\beta} 1,\\
+\delay{rev\_join([I|P],Q)} &\eqn{\gamma} 1 + \delay{rev\_join(P,[I|Q])}.
+\end{align*}
+Let us now define the delay in terms of the size of the input, that
+is, the argument. The function call~\erlcode{rev(\(L\))} has one list
+as argument. The usual way to measure the size of a list is to
+consider the number of elements it contains, that is, its
+length. Here, the size of the input~\(L\) is characterised by an
+integer~\(n\). The same measure fits \erlcode{rev\_join/2}. Let us
+define the delay of \erlcode{rev/1} and \erlcode{rev\_join/2} in terms
+of the input size:
+\[
+\comp{rev}{n} := \delay{rev(\(L\))};\quad
+\comp{rev\_join}{n,m} := \delay{rev\_join(\(P\),\(Q\))},
+\]
+where \(n\)~is the length of~\(P\) and \(m\)~is the length
+of~\(Q\). Using these definitions and assuming that
+\erlcode{T}~contains \(p\)~items and \erlcode{A}~contains \(q\)~items,
+then the previous equations are equivalent to the following system:
+\begin{equation}
+\comp{rev}{n} \eqn{\alpha} 1 + \comp{rev\_join}{n,0};\quad
+\comp{rev\_join}{0,q} \eqn{\beta} 1,\quad
+\comp{rev\_join}{p+1,q} \eqn{\gamma} 1 + \comp{rev\_join}{p,q+1}.
+\label{eq:rev_join_p_q}
+\end{equation}
+We would rather like to express~\(\comp{rev}{p}\) (respectively
+\(\comp{rev\_join}{p,q}\)), in terms of~\(p\) only (respectively
+\(p\)~and~\(q\)). The solution consists in using the telescoping
+technique we have seen before, that is, in making the differences of
+two successive terms in the series \((\comp{rev\_join}{p,q})_{p \in
+  \mathbb{N}}\) and summing them:
+\begin{align*}
+  && \boxed{\comp{rev\_join}{p,q}} - \comp{rev\_join}{p-1,q+1} &= 1\\
++ && \comp{rev\_join}{p-1,q+1} - \comp{rev\_join}{p-2,q+2} &= 1\\
++ &&&\;\;\vdots\\
++ &&\comp{rev\_join}{1,q+(p-1)} - \boxed{\comp{rev\_join}{0,q+p}} &= 1
+\intertext{\rule{230pt}{0.4pt}}
+\Rightarrow 
+  &&\boxed{\comp{rev\_join}{p,q}} - \boxed{\comp{rev\_join}{0,q+p}}
+  &= \underbrace{1 + 1 + \dots + 1}_{p \; \text{times}} = p\\
+\Leftrightarrow &&\comp{rev\_join}{p,q} - 1 &= p\\
+\Leftrightarrow &&\comp{rev\_join}{p,q} &= p + 1,\,\; \text{where}
+\;\, p > 0.
+\intertext{Since that replacing~\(p\) by~\(0\) in the last formula
+  leads to the expected}
+&&\comp{rev\_join}{0,q} &= 0 + 1 = 1,
+\end{align*}
+we can gather all the cases into just one formula:
+\[
+\comp{rev\_join}{n,m} = n + 1,\,\; \text{where} \;\, n, m
+\geqslant 0.
+\]
+Clearly, \(m\)~is useless because it is absent from the
+right\hyp{}hand side. Then
+\begin{align}
+  \comp{rev\_join}{n} &= n + 1 \mathrel{\sim} n;
+& \comp{rev}{n} &= n + 2 \mathrel{\sim} n,\,\; \text{as} \;\, n
+\rightarrow \infty.\label{delay:rev_join}
+\end{align}
+When a function~\(f\) satisfies \(f(n) \mathrel{\sim} an\) for some
+constant~\(a\) and with~\(n \rightarrow \infty\), it is said to be
+\emph{asymptotically linear}. In other words, the delay will be
+proportional to the size of the input, for large inputs; that is a
+much better than a quadratic relationship.
+
+Actually, a little bit more linguistic argument would have lead us
+quickly to the result, by counting the number of times each clause is
+used when rewriting a non\hyp{}empty list of \(n\)~items:
+\begin{itemize}
+
+  \item clause~\(\alpha\) is used once;
+
+  \item clause~\(\gamma\) is used once for each item in the input,
+    that is, \(n\)~times;
+
+  \item clause~\(\beta\) is used once,
+
+\end{itemize}
+that is, the execution trace is \(\alpha\gamma^n\beta\) and the total
+number of rewrites is indeed \(\abs{\alpha\gamma^n\beta} =
+\abs{\alpha} + n \cdot \abs{\gamma} + \abs{\beta} = n+2\).
+
+We can now compare \erlcode{srev/1} and \erlcode{rev/1} in terms of
+delays:
+\[
+\comp{srev}{n} = \frac{(n+1)(n+2)}{2} = (n+1)\frac{\comp{rev}{n}}{2} =
+\frac{n+1}{2} \cdot \comp{rev}{n}.
+\]
+It is clear how much more efficient is~\erlcode{rev/1} with respect
+to \erlcode{srev/1} and this comparison does not rely on any
+assumption about the speed of the \Erlang run\hyp{}time, for example,
+the virtual machine, with respect to the wall\hyp{}clock time. Again,
+let us hammer down that the efficiency of \erlcode{rev/1} is
+\emph{not} due to its definition being in tail form, but because the
+algorithm it implements is more efficient. That is why we did not
+rename it~\erlcode{rev\_tf/1} because we only do this to signal that a
+definition is the tail form version of another and, this is not the
+case of \erlcode{rev/1} in regard to \erlcode{srev/1} (whose name is
+now revealed as standing for \emph{\textbf{s}low \textbf{rev}ersal}).
+
+\medskip
+
+\paragraph{Counting the Pushes}
+\label{counting_the_pushes}
+
+We said above that we do not count the delay incurred by pushing items
+on top of a list, that is, we suppose
+\[
+\delay{[I|L]} = \delay{I} + \delay{L},
+\]
+because the construction of the value~\erlcode{[I|L]} is not the
+result of a user\hyp{}defined function. We cannot compare or mix
+delays of predefined and user\hyp{}defined functions because their
+implementation most probably rely on different execution
+mechanisms. But it is possible to make a complementary analysis of
+some user\hyp{}defined function in order to count the number of items
+that are pushed on a list, for instance. Usually, this is done using
+the same approach we used for counting the number of rewrites to reach
+the results. For example,
+\begin{alltt}
+srev(   [])   -> [];\hfill% \emph{No push}
+srev([I|L])   -> join(srev(L),[I]).\hfill% \emph{At least one}
+join(   [],Q) -> Q;\hfill% \emph{No push}
+join([I|P],Q) -> [I|join(P,Q)].\hfill% \emph{At least one}
+\end{alltt}
+Assuming that \erlcode{P}~contains \(p\)~items, we deduce the
+recurrence equations
+\begin{align*}
+\push{srev}{0}   &= 0, & \push{join}{0}   &= 0,\\
+\push{srev}{p+1} &= 1 + \push{srev}{p} + \push{join}{p},
+&\push{join}{p+1} &= 1 + \push{join}{p},
+\intertext{where \(\push{srev}{p}\) and \(\push{join}{p}\) are the
+  number of pushes needed to compute, respectively,
+  \erlcode{srev(\(L\))} and \erlcode{join(\(P\),\(Q\))}, with \(L\),
+  \(P\)~and~\(Q\) denoting lists and \(L\)~and~\(P\) contain
+  \(p\)~items each. The technique seen before lead to the solutions,
+  for all~\(n \geqslant 0\),}
+\push{srev}{n} &= n(n+1)/2, & \push{join}{n} &= n.
+\end{align*}
+It is meaningless to consider delays of the form \(\comp{srev}{n} +
+\push{srev}{n}\) since there is no reason a priori that the time for
+processing one rewrite is the same as the time to process one
+push. Only the pair \((\comp{srev}{n},\push{srev}{n})\) is meaningful
+and could be used to compare two functions.
+
+\medskip
+
+\paragraph{Exercises.}
+\label{ex:delay}
+
+\noindent [Answers \vpageref{ans:delay}.]
+\begin{enumerate}
+
+  \item Find the delay for \erlcode{rev\_ter/1} defined as
+\begin{verbatim}
+rev_ter(   []) -> [];
+rev_ter([I|L]) -> join_tf(rev_ter(L),[I]).
+
+join_tf(P,Q)        -> join(P,Q,[]).
+join(   [],Q,   []) -> Q;
+join(   [],Q,[I|A]) -> join([],[I|Q],A);
+join([I|P],Q,    A) -> join(P,Q,[I|A]).
+\end{verbatim}
+
+  \item Assess the maximum memory usage, including the call stack, of
+    the previous functions. Justify your answer as precisely as you
+    can.
+
+  \item Which of the two following equivalent definitions is the most
+    efficient in terms of delay?
+\begin{verbatim}
+join_3a(P,Q,R) -> join(P,join(Q,R)).
+join_3b(P,Q,R) -> join(join(P,Q),R).
+\end{verbatim}
+
+\end{enumerate}

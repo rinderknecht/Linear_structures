@@ -1,0 +1,46 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+  \erlnode{[]}
+  \TR{\rnode[r]{Qa}{\erlcode{Q}}}
+}
+\quad\raisebox{-3pt}{\(\xrightarrow{\alpha}\)}\quad
+\pstree[levelsep=20pt,treesep=14pt]{\TR{\rnode[cb]{Qup}{\(\circ\)}}}{}
+\qquad\qquad
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[br]{I}{\erlcode{I}}}
+    \TR{\rnode[br]{P}{\erlcode{P}}}
+  }
+  \TR{\rnode[br]{Qb}{\erlcode{Q}}}
+}
+\quad\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\quad
+\pstree[nodesep=2pt,levelsep=15pt,treesep=14pt]%
+  {\TR{\rnode[bl]{cons}{\erlcode{|}}}}{
+  \Tn
+  \Tn
+  \pstree{\TR{\rnode[bl]{joinP}{\rnode[br]{joinQ}{\erlnode{join}}}}}{
+    \Tn
+  }
+}
+\nccurve[angleA=-90,angleB=0,nodesepB=1pt,nodesepA=-1pt]{->}{Qup}{Qa}
+\nccurve[angleA=-130,angleB=-55,nodesepA=2pt,nodesepB=1pt,ncurvB=1]{->}{cons}{I}
+\nccurve[angleA=-120,angleB=-45,nodesepA=5pt]{->}{joinP}{P}
+\nccurve[angleA=-60,angleB=-50,nodesepA=5pt,nodesepB=1pt,ncurvA=1]{->}{joinQ}{Qb}
+\endTeXtoEPS
+
+\end{document}

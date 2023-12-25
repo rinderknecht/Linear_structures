@@ -1,0 +1,578 @@
+%%-*-latex-*-
+
+\chapter{Flattening}
+
+Let us undertake the task of designing a function~\erlcode{flat/1}
+such that the call~\erlcode{flat(\(L\))}, where \(L\)~is an arbitrary
+list, is rewritten into a list containing the same items as~\(L\), in
+the same order, except empty lists and all inner pushes~(\erlcode{|})
+have been removed. If \(L\)~contains no list, then
+\(\erlcode{flat(\(L\))} \mathrel{\equiv} L\). Let us review some more
+examples to grasp the concept.
+\begin{align*}
+\erlcode{flat([])}             & \twoheadrightarrow \erlcode{[]};\\
+\erlcode{flat([3,[]])}         & \twoheadrightarrow \erlcode{[3]};\\
+\erlcode{flat([[],[[]]])}      & \twoheadrightarrow \erlcode{[]};\\
+\erlcode{flat([5,foo,[3,[]]])} & \twoheadrightarrow \erlcode{[5,foo,3]};\\
+\erlcode{flat([[],[1,[2,[]],4],[],x])}
+                               & \twoheadrightarrow \erlcode{[1,2,4,x]}.
+\end{align*}
+
+\medskip
+
+\paragraph{Direct approach.}
+
+Let us try a direct approach. A list is either empty or not:
+\begin{alltt}
+flat(   []) -> \fbcode{HHHHHHHH};
+flat([I|L]) -> \fbcode{HHHHHHHH}.
+\end{alltt}
+Then we must discriminate on the kind of head~\erlcode{I} because if
+it is not a list, for example, an integer or an atom, we keep it as it
+is in the result, otherwise, we must flatten it as well. Function
+\erlcode{is\_a\_list/1} \vpageref{code:is_a_list} shows how to
+distinguish a list from other kind of values. We can adapt the same
+idea here:
+\begin{alltt}
+flat(       []) -> \fbcode{HHHHHHHH};
+flat(   [\textbf{[]}|L]) -> \fbcode{HHHHHHHH};
+flat([\textbf{[I|M]}|L]) -> \fbcode{HHHHHHHH};
+flat(    [I|L]) -> \fbcode{HHHHHHHH}.\hfill% I \emph{not a list}
+\end{alltt}
+It is easy to guess the first and second bodies:
+\begin{alltt}
+flat(       []) -> \textbf{[]};
+flat(   [[]|L]) -> \textbf{flat(L)};\hfill% \emph{Skipping} []
+flat([[I|M]|L]) -> \fbcode{HHHHHHHH};
+flat(    [I|L]) -> \fbcode{HHHHHHHH}.
+\end{alltt}
+The last clause is also easy to complete, because we know that
+\erlcode{I} is not a list, so it can remain at the same place in the
+result, whilst the tail~\erlcode{L} is flattened:
+\begin{alltt}
+flat(       []) -> [];
+flat(   [[]|L]) -> flat(L);
+flat([[I|M]|L]) -> \fbcode{HHHHHHHH};
+flat(    [I|L]) -> \textbf{[I|flat(L)]}.\hfill% \emph{Keeping} I
+\end{alltt}
+The third body requires more pondering. Perhaps the trap to avoid is
+to think that \erlcode{I}~is not a list. Actually, we can know nothing
+of the type of~\erlcode{I}, although we know that
+\erlcode{M}~and~\erlcode{L} are lists (perhaps not flat). Different
+courses of action can be pursued. First, let us try to flatten
+\erlcode{[I|M]}~and~\erlcode{L} separately and later join the two
+resulting lists. Let us rename the definition to avoid confusion and
+tag each clause:\label{code:sflat_par_alpha}
+\begin{alltt}
+sflat(       []) \(\smashedrightarrow{\alpha}\) [];
+sflat(   [[]|L]) \(\smashedrightarrow{\beta}\) sflat(L);
+sflat([[I|M]|L]) \(\smashedrightarrow{\gamma}\) \textbf{join(sflat([I|M]),sflat(L))};
+sflat(    [I|L]) \(\smashedrightarrow{\delta}\) [I|sflat(L)].
+\end{alltt}
+This choice is interesting because it leaves open, in theory, the
+possibility to compute in parallel the two recursive calls in clause
+\clause{\gamma}, but the outermost call to \erlcode{join/2} reminds us
+of the definition of \erlcode{srev/1}:
+\verbatiminput{srev.def} which was proved \vpageref{delay:srev} to be
+quadratic in the length of the input list: the delay
+of \erlcode{join/2} depends solely on the length of its first argument
+and the recursive call~\erlcode{srev(L)} is precisely the first
+argument to \erlcode{join/2}, hence incurring the quadratic cost
+because the same items are joined a number of times proportional to
+the length. So, perhaps, the similarity does not run deep because, in
+the case of \erlcode{sflat/1}, the first argument of \erlcode{join/2}
+is the recursive call~\erlcode{sflat([I|M])}, which is not the tail of
+the list~\erlcode{[[I|M]|L]} but its head.
+
+Is this enough a difference to not fear a quadratic delay? Let us try
+an example that exerts all the clauses of the definition. In the
+following, the call to be rewritten next is
+underlined.\label{trace:sflat_abc}
+\begin{tabbing}
+\underline{\erlcode{sflat([[],[[a],b],c])}}\\
+\erlcode{sflat([[]} \= \(\smashedrightarrow{\beta}\) \=\kill
+\> \(\xrightarrow{\beta}\) \> \underline{\erlcode{sflat([[[a],b],c])}}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{join(\underline{sflat([[a],b])},sflat([c]))}\\
+\> \(\smashedrightarrow{\gamma}\)
+\> \erlcode{join(join(\underline{sflat([a])},sflat([b])),sflat([c]))}\\
+\> \(\smashedrightarrow{\delta}\)
+\> \erlcode{join(join([a|\underline{sflat([])}],sflat([b])),sflat([c]))}\\
+\> \(\smashedrightarrow{\alpha}\)
+\> \erlcode{join(join([a|[]],sflat([b])),sflat([c]))}\\
+\> \(=\)
+\> \erlcode{join(join([a],\underline{sflat([b])}),sflat([c]))}\\
+\> \(\smashedrightarrow{\delta}\)
+\> \erlcode{join(join([a],[b|\underline{sflat([])}]),sflat([c]))}\\
+\> \(\smashedrightarrow{\alpha}\)
+\> \erlcode{join(join([a],[b|[]]),sflat([c]))}\\
+\> \(=\)
+\> \erlcode{join(join([a],[b]),\underline{sflat([c])})}\\
+\> \(\smashedrightarrow{\delta}\)
+\> \erlcode{join(join([a],[b]),[c|\underline{sflat([])}])}\\
+\> \(\smashedrightarrow{\alpha}\)
+\> \erlcode{join(join([a],[b]),[c|[]])}\\
+\> \(=\)
+\> \erlcode{join(join([a],[b]),[c])}\\
+\> \;\vdots\\
+\> \(\rightarrow\) \> \erlcode{[a,b,c]}\textrm{.}
+\end{tabbing}
+Notice that it was possible to choose to rewrite the call to
+\erlcode{join/2} when considering
+\erlcode{join(join([a],[b]),sflat([c]))}, but we preferred to rewrite
+the call to \erlcode{sflat/1} because this allows us to didactically
+distinguish the computations of\erlcode{join/2} from those
+of \erlcode{sflat/1}. The abstract syntax tree of
+\erlcode{join(join([a],[b]),[c])} in \fig~\vref{fig:sflat} brings to
+the fore the deep similarity with \erlcode{srev/1} as shown in
+\fig~\vref{fig:srev_iota}. The key point to notice is how a leftmost
+branch, that is, a series of connected edges, of \erlcode{join}~nodes
+can be produced, leading to a quadratic behaviour because the same
+items on the leftmost subtrees are processed several times until the
+root is reached.
+\begin{figure}[h]
+\centering
+\includegraphics[bb=71 651 174 721]{sflat}%
+\caption{Abstract syntax tree of \erlcode{join(join([a],[b]),[c])}
+\label{fig:sflat}}
+\end{figure}
+
+%\medskip
+
+\paragraph{Lifting.}
+
+There is another approach to the flattening of a list, which consists
+in lifting item~\erlcode{I} in clause~\clause{\gamma} one level up
+among the embedded lists, thus approaching little by little a flat
+list. Given a list of values written without the
+symbol~``\erlcode{|}'', the \emph{embedding level} of an item is the
+number of symbols~``\erlcode{[}'' to its left, including the outermost
+  one, minus the number of symbols~``\erlcode{]}'' encountered. The
+embedding levels of items \erlcode{a}, \erlcode{b}~and~\erlcode{c}
+in~\erlcode{[[],[[a,[b]]],c]} are, respectively, \(4-1=3\), \(5-1=4\)
+and \(5-4=1\). This is visualised better this way (opening square
+brackets in bold and item underlined):
+\begin{equation*}
+\underbrace{\erlcode{\textbf{[[}],\textbf{[[}}}_{\textbf{4}-1}\erlcode{\underline{a},[b]]],c]}\qquad
+\underbrace{\erlcode{\textbf{[[}],\textbf{[[}a,\textbf{[}}}_{\textbf{5}-1}\erlcode{\underline{b}]]],c]}\qquad
+\underbrace{\erlcode{\textbf{[[}],\textbf{[[}a,\textbf{[}b]]],}}_{\textbf{5}-4}\erlcode{\underline{c}]}
+\end{equation*}
+(Note that this example is different from the one we used to test
+\erlcode{sflat/1}.) But \erlcode{[a|[b|[]]]} should be written
+\erlcode{[a,b]} first before applying the previous definition,
+otherwise, \erlcode{b} would have a embedding level of~\(2\) instead
+of the correct level~\(1\). This is what was meant by ``Given a list
+written \emph{without the symbol \emph{`\erlcode{|}'}},[...]''
+
+The definition allows items to be lists as well and, for instance, the
+embedding levels of~\erlcode{[]}, \erlcode{[a,[b]]}~and~\erlcode{[b]}
+are, respectively, \(1-0=1\), \(3-1=2\) and \(4-1=3\):
+\begin{equation*}
+\underbrace{\erlcode{\textbf{[}}}_{\textbf{1}-0}\erlcode{\underline{[]},[[a,[b]]],c]}\quad\;\;
+\underbrace{\erlcode{\textbf{[[}],\textbf{[}}}_{\textbf{3}-1}\erlcode{\underline{[a,[b]]}],c]}\quad\;\;
+\underbrace{\erlcode{\textbf{[[}],\textbf{[[}a,}}_{\textbf{4}-1}\erlcode{\underline{[b]}]],c]}
+\end{equation*}
+By \emph{lifting} we meant that the embedding level of
+item~\erlcode{I} was reduced, more precisely it is decremented by
+one. The embedding level of an item can be alternatively seen on the
+abstract syntax tree as the number of left\hyp{}oriented edges in the
+path from the root to the node containing the item in question. See,
+for example, \fig~\vref{fig:embedding} where left\hyp{}oriented edges
+are in bold and each of them corresponds to one level of embedding on
+a path up to the root.
+\begin{figure}
+\centering
+\includegraphics[bb=73 591 174 721]{embedding}
+\caption{Embedding levels of~\(1\) in bold in
+  \erlcode{[[],[[a,[b]]],c]}\label{fig:embedding}}
+\end{figure}
+How to lift exactly one item up one level? The general scheme is shown
+in \fig~\vref{fig:flat_lifting}, where it is evident that the
+embedding level of~\erlcode{I} is~\(3\) and becomes~\(2\) after the
+rewrite, whilst the levels of \erlcode{M}~and~\erlcode{L} remain
+unchanged---respectively, \(1\)~and~\(0\). It is worth noting that the
+representation of \Erlang expressions as abstract syntax trees enables
+a natural extension of the concept of embedding level to
+sub\hyp{}lists, like~\erlcode{L}: a sub\hyp{}list has the same
+embedding level as the embedding list because the edge from a list to
+its immediate sub\hyp{}list is, by construction,
+right\hyp{}oriented. When a list is an item of another list, that is,
+it is graphically connected downwardly by a left\hyp{}oriented edge,
+it is said to be \emph{embedded}, and it is not a sub\hyp{}list. For
+instance, in the value~\erlcode{[[]]}, the list~\erlcode{[]} is
+embedded, while the implicit \erlcode{[]} terminating the whole list,
+visible if we write instead \erlcode{[[]|\textbf{[]}]}, is a
+sub\hyp{}list. The definition corresponding to the lifting technique,
+translated from \fig~\vref{fig:flat_lifting},
+is\label{code:flat_lifting}
+\begin{alltt}
+flat(       []) \(\smashedrightarrow{\alpha}\) [];
+flat(   [[]|L]) \(\smashedrightarrow{\beta}\) flat(L);
+flat([[I|M]|L]) \(\smashedrightarrow{\gamma}\) \textbf{flat([I,M|L])};\hfill% I \emph{lifted one level up}
+flat(    [I|L]) \(\smashedrightarrow{\delta}\) [I|flat(L)].
+\end{alltt}
+\begin{figure}
+\centering
+\subfloat[Before]{\includegraphics[bb=71 653 108 721]{flat_embedded}}
+\qquad
+\subfloat[After]{\includegraphics[bb=72 653 106 721]{flat_lifted}}
+\caption{Lifting~\erlcode{I} only one level up
+\label{fig:flat_lifting}}
+\end{figure}
+By repeating clause~\clause{\eta}, the first item of the first item
+etc. of~\erlcode{I} (following the leftmost path from the root to a
+leaf) will end up first of the outermost list and will be, in turn,
+matched against the empty list (clause~\clause{\zeta}) or a
+non\hyp{}list (clause~\clause{\theta}). Let us run the same example
+again:\label{trace:flat_abc}
+\begin{tabbing}
+\erlcode{flat([[],[[a,[b]]],c])} \= \(\smashedrightarrow{\beta}\) \= \erlcode{flat([[[a,[b]]],c])}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{flat([[a,[b]],[],c])}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{flat([a,[[b]],[],c])}\\
+\> \(\smashedrightarrow{\delta}\) \> \erlcode{[a|flat([[[b]],[],c])]}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{[a|flat([[b],[],[],c])]}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{[a|flat([b,[],[],[],c])]}\\
+\> \(\smashedrightarrow{\delta}\) \> \erlcode{[a|[b|flat([[],[],[],c])]]}\\
+\> \(=\)                    \> \erlcode{[a,b|flat([[],[],[],c])]}\\
+\> \(\smashedrightarrow{\beta}\)    \> \erlcode{[a,b|flat([[],[],c])]}\\
+\> \(\smashedrightarrow{\beta}\)  \> \erlcode{[a,b|flat([[],c])]}\\
+\> \(\smashedrightarrow{\beta}\)  \> \erlcode{[a,b|flat([c])]}\\
+\> \(\smashedrightarrow{\delta}\) \> \erlcode{[a,b|[c|flat([])]]}\\
+\> \(=\)                    \> \erlcode{[a,b,c|flat([])]}\\
+\> \(\smashedrightarrow{\alpha}\) \> \erlcode{[a,b,c|[]]}\\
+\> \(=\)                    \> \erlcode{[a,b,c]}\textrm{.}
+\end{tabbing}
+These rewrites should also be seen in two dimensions, that is, on the
+abstract syntax trees shown in
+\figs~\vrefrange{fig:flat_ast1}{fig:flat_ast2}, where the original
+empty list is inscribed in a dotted circled to distinguish it from the
+empty lists used to build non\hyp{}empty lists, and the root of the
+subtree being rewritten next is boxed as usual (here,
+only~\erlcode{flat}).
+\begin{figure}
+\centering
+\includegraphics[bb=71 566 263 720]{flat_ast_0}
+\includegraphics[bb=71 608 284 721]{flat_ast_1}
+\includegraphics[bb=71 587 302 720]{flat_ast_2}
+\caption{\erlcode{flat([[],[[a,[b]]],c])} \(\twoheadrightarrow\)
+  \erlcode{[a|flat([[b],[],[],c])]} \label{fig:flat_ast1}}
+\end{figure}
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 566 367 721]{flat_ast_3}
+\includegraphics[bb=71 606 375 721]{flat_ast_4}
+\caption{\erlcode{[a|flat([b,[],[],[],c])]} \(\twoheadrightarrow\)
+  \erlcode{[a,b,c]} \label{fig:flat_ast2}}
+\end{figure}
+
+\medskip
+
+\paragraph{Delays.}
+
+Let us now compare \erlcode{sflat/1} and \erlcode{flat/1} in terms of
+the number of rewrites to reach a value---in other words, their
+delays. We usually take as measure of a list its length, but this
+approach does not work here. For instance, \erlcode{[[1,w],6]} and
+\erlcode{[a,b]} have the same length, but the delay of their
+flattening differ. Examining how many times each clause is used gives
+us a clue about the right measures needed to assess the delay for the
+whole definition. Starting with \erlcode{sflat(\(L\))}, where \(L\)~is
+an arbitrary list, and recalling the definition
+\vpageref{code:sflat_par_alpha} \input{sflat_par_alpha.def} it comes
+that
+\begin{itemize}
+
+  \item clause~\clause{\beta} is used once for each empty list
+    originally in the input;
+
+  \item clause~\clause{\alpha} is used once when the end of the input
+    is reached \emph{and} once for each empty list generated by the
+    call~\erlcode{sflat(L)} in clause~\clause{\gamma};
+
+  \item clause~\clause{\delta} is used once for each item which is not
+    a list;
+
+  \item clause~\clause{\gamma} is used once for each non\hyp{}empty
+    embedded list.
+
+\end{itemize}
+We need to add the delay of calling~\erlcode{join/2} in
+clause~\clause{\gamma} but, first, let us realise that we now know the
+parameters which the delay depends upon:
+\begin{enumerate}
+
+  \item the number of items which are not lists, that is,
+    \erlcode{len(sflat(\(L\)))};
+
+  \item the number of non\hyp{}empty lists embedded in the input,
+    say~\(\mathcal{N}\);
+
+  \item the number of original empty lists, say~\(\mathcal{E}\).
+
+\end{enumerate}
+Then we can reformulate the above analysis in the following terms:
+\begin{itemize}
+
+  \item clause~\clause{\beta} is used \(\mathcal{E}\)~times;
+
+  \item clause~\clause{\alpha} is used \(1 + \mathcal{N}\)~times;
+
+  \item clause~\clause{\delta} is used
+    \erlcode{len(sflat(\(L\)))}~times;
+
+  \item clause~\clause{\gamma} is used \(\mathcal{N}\)~times.
+
+\end{itemize}
+So the delay due to the clauses of \erlcode{sflat/1} alone is \(1 +
+\erlcode{len(sflat(\(L\)))} + \mathcal{E} + 2 \cdot
+\mathcal{N}\). Hence, for instance, in the case of
+\erlcode{sflat([[],[[a],b],c])}, we should expect \(1 + 3 + 1 + 2
+\cdot 2 = 9\) rewrites---which is correct, according to our previous
+rewrites \vpageref{trace:sflat_abc}. Now we must add the delay of
+calling~\erlcode{join/2}. We already know \vpageref{delay:join} that
+it is the length of its first argument plus one, formally:
+\(\comp{join}{n} = n + 1\). Clause~\clause{\gamma} shows that
+\erlcode{join/2}~is called on all flattened non\hyp{}empty embedded
+lists, so the total delay of these calls is the number of
+non\hyp{}list items in all embedded lists, plus the number of embedded
+lists (this is due to the~``\(+ 1\)'' in~\(n+1\)). The latter number
+is none other than~\(\mathcal{N}\) but the former is perhaps more
+obscure.
+
+For a better understanding, let us visualise in
+\fig~\vref{fig:flat_example} the abstract syntax tree of some list
+like \erlcode{[[],[[a],b],c]}. The circled nodes corresponds to
+\emph{list constructors} (also known as \emph{pushes}, symbolised
+by~(\erlcode{|})) of embedded lists. Next to them is the number of
+non\hyp{}list items in the tree rooted at the node. Hence \(1\)
+because of the unique item~\erlcode{a} (clause~\clause{\epsilon})
+and~\(2\) because of \erlcode{b}~and~\erlcode{a} \emph{again}
+(\clause{\zeta}). It is convenient to visualise these numbers going up
+from the leaves and being added at circled nodes. Let us
+note~\(\mathcal{P}\) the number we try to understand: it is the sum of
+all the numbers at the circled nodes, in our example, it is thus \(1 +
+2 = 3\). So the total delay of \erlcode{sflat(\(L\))} is
+\[
+1 + n + \mathcal{E} + 3 \cdot \mathcal{N} + \mathcal{P},
+\]
+where the length of \erlcode{sflat(\(L\))} is~\(n\). In our example,
+\(\mathcal{P} = 3\), \(\mathcal{E} = 1\) (one empty list in the
+input), \(\mathcal{N} = 2\) (two non\hyp{}empty embedded lists, at the
+circled nodes) and the length of \erlcode{sflat([[],[[a],b],c])}
+is~\(3\). So, the total delay, including the rewrites by
+\erlcode{join/2} is \( 1 + 3 + 1 + 3 \cdot 2 + 3 = 14\). Indeed, we
+found that the delay for \erlcode{sflat/1} calls alone was~\(9\), and
+\(14\)~is consistent with the fact that \(5\)~additional steps are
+required to evaluate \erlcode{join(join([a],[b]),[c])}.
+\begin{figure}
+\centering
+\includegraphics[bb=71 631 192 721]{flat_example}%
+\caption{Abstract syntax tree of \erlcode{[[],[[a],b],c]}
+\label{fig:flat_example}}
+\end{figure}
+Unfortunately, it is almost as difficult to express
+algorithmically~\(\mathcal{P}\) as it is to define \erlcode{sflat/1},
+so it is certainly worth finding another, more intuitive, point of
+view.
+
+The idea may rise from the observation made in passing above, when
+computing~\(\mathcal{P}\) on the example of
+\fig~\vref{fig:flat_example}: a circled node was annotated with
+\clause{\zeta} because it counts~\erlcode{a} \emph{twice}. In other
+words, the atom item~\erlcode{a} is counted for one at each circled
+node because it is included in two non\hyp{}empty embedded lists, one
+of which is included in the other: \erlcode{a}~is embedded
+in~\erlcode{[a]}, which is, in turn, embedded
+in~\erlcode{[[a],b]}. Therefore, if we fix the size of the output,
+that is, the number of non\hyp{}list items, we can wonder how to
+arrange these items so as to maximise the delay. This is an example of
+worst case analysis which is based on the output size instead of the
+input size.  When the delay depends on the result of the call, it is
+said to be \emph{output\hyp{}dependent}. If we want to count as many
+times as possible the same items, we should put all of them in the
+deeper leftmost subtree. That is, we set the input
+\[
+L = \erlcode{[}\underbrace{\erlcode{[...[}}_{\mathcal{N} \;
+        \text{times}}I_0, I_1, \dots, I_{n-1}
+      \underbrace{\erlcode{]...]}}_{\mathcal{N} \;
+    \text{times}}\erlcode{]},
+\]
+where the~\(I_i\) are non\hyp{}list items. Here, the number of items
+which are non\hyp{}lists, called~\(\mathcal{N}\), is none other than
+the embedding level of the non\hyp{}list items~\(I\), minus one. Then
+\(\mathcal{P} = n \cdot \mathcal{N}\). Consider
+\fig~\vref{fig:sflat_iota}, where (1)~\Fig~\vref{fig:sflat_ast} is the
+input in the worst case, whose embedded lists are annotated with the
+number of non\hyp{}list items they contain, as in
+\fig~\vref{fig:flat_example}; (2)~\Fig~\vref{fig:sflat_join} displays
+the abstract syntax tree after all calls to \erlcode{sflat/1} on the
+input have been rewritten, hinting at the total number of steps
+required to finish the computation: \(\mathcal{N} \cdot (n+1)\). (Let
+us not forget that this is not the way \Erlang computes, so this
+presentation is set out as a didactic mean only.) and
+(3)~\Fig~\vref{fig:sflat_final} shows the final result. Of course, it
+is possible to increase the number of rewrites by inserting empty
+lists everywhere in the input, as this triggers clause~\clause{\beta}
+but this case is already accounted for. As a conclusion, the delay in
+the worst case of \erlcode{sflat(\(L\))} is
+\[
+\worst{sflat}{n,\mathcal{N}} = 1 + n + 2 \cdot \mathcal{N} +
+\mathcal{N} \cdot (1+n) = (\mathcal{N} + 1)(n + 3) - 2,
+\]
+where \(n\)~is the length of \erlcode{sflat(\(L\))} and
+\(\mathcal{N}\)~is the number of embedded non\hyp{}lists. All the
+terms involved in expressing the delay are now intuitive. For example
+\erlcode{sflat([[[[[a,b]]]]])} has a delay of \((4+1)(2+3)-2 = 23\)
+rewrites.
+\begin{figure}
+\centering
+\subfloat[Input \(L\) to \erlcode{sflat/1}\label{fig:sflat_ast}]{%
+  \includegraphics[bb=71 586 154 721]{sflat_input}%
+}
+\quad
+\subfloat[Partial result\label{fig:sflat_join}]{%
+  \includegraphics[bb=71 591 147 721]{sflat_partial}%
+}
+\qquad
+\subfloat[Result\label{fig:sflat_final}]{%
+  \includegraphics[bb=71 651 127 721]{sflat_final}%
+}
+\caption{\erlcode{sflat([\(\ldots\)[\(I_0, I_1, \dots,
+        I_{n-1}\)]\(\ldots\)])} \(\twoheadrightarrow\) \erlcode{[\(I_0,
+      I_1, \dots, I_{n-1}\)]}
+\label{fig:sflat_iota}}
+\end{figure}
+
+Let us consider now the delay of \erlcode{flat(\(L\))}, where \(L\)~is
+an arbitrary list. We settled for the following definition:
+\input{flat_alpha.def}
+We draw that
+\begin{itemize}
+
+  \item clause~\clause{\alpha} is used once when the end of the
+    input is reached;
+
+  \item clause~\clause{\gamma} is used once for each item of all the
+    embedded lists;
+
+  \item clause~\clause{\beta} is used once for each empty list
+    originally in the input \emph{and} once for each empty
+    list~\erlcode{M} by clause~\clause{\gamma} (if \erlcode{I}~is
+    empty, it has already been accounted for as an empty list
+    originally present);
+
+  \item clause~\clause{\delta} is used once for each item which is not
+    a list.
+
+\end{itemize}
+Therefore, the delay is
+\[
+1 + \mathcal{L} + (\mathcal{E} + \mathcal{N}) + n.
+\]
+where \(\mathcal{L}\)~is the sum of the lengths of all the
+sub\hyp{}lists (clause~\clause{\gamma}), \(\mathcal{E}\)~is the number
+of empty lists originally in the input (clause~\clause{\beta}),
+\(\mathcal{N}\)~is the number of non\hyp{}empty embedded lists
+(clause~\clause{\beta}) and \(n\)~is the number of non\hyp{}list items
+(clause~\clause{\delta}). For example,
+\begin{align*}
+\delay{flat([[[[[a,b]]]]])}    &= 1 + 5 + (0+4) + 2 = 12,\\
+\delay{flat([[],[[a],b],c])}   &= 1 + 3 + (1+2) + 3 = 10,\\
+\delay{flat([[],[[a,[b]]],c])} &= 1 + 4 + (1+3) + 3 = 12.
+\end{align*}
+These are the expected values and the last case was laid out in
+details \vpageref{trace:flat_abc}.
+
+How does~\erlcode{flat/1} compare with~\erlcode{sflat/1} in general?
+The delay of calling \erlcode{sflat/1} is \(1 + n + \mathcal{E} + 3
+\cdot \mathcal{N} + \mathcal{P}\), so the question boils down to
+comparing \(2 \cdot \mathcal{N} + \mathcal{P}\)
+with~\(\mathcal{L}\). Let us consider a few examples:
+\begin{itemize}
+
+  \item Let the input be~\erlcode{[a,b]}. Then~\(\mathcal{N} = 0\),
+    \(\mathcal{P} = 0\) and~\(\mathcal{L} = 0\), so \(2 \cdot 0 + 0 =
+    0\); that is, the delays are equal.
+
+  \item Let the input be~\erlcode{[[a,b]]}. Then \(\mathcal{N} = 1\),
+    \(\mathcal{P} = 2\) and~\(\mathcal{L} = 2\), so \(2 \cdot 1 + 2 >
+    2\); that is, \erlcode{flat/1}~is faster than~\erlcode{sflat/1}.
+
+  \item Let the input be~\erlcode{[[[],[],[]]]}. Then \(\mathcal{N} =
+    1\), \(\mathcal{P} = 0\) and~\(\mathcal{L} = 3\), so \(2 \cdot 1 +
+    0 < 3\); that is, \erlcode{sflat/1}~is faster
+    than~\erlcode{flat/1}.
+
+\end{itemize}
+Therefore, both functions are not comparable in general. Nevertheless,
+if we have no empty list in the input, that is, if~\(\mathcal{E} =
+0\), then~\(\mathcal{P} \geqslant \mathcal{L}\), because the length of
+each embedded list is lower than or equal to the number of
+non\hyp{}list items at greater or equal embedding levels (it is equal
+if there is no further embedded list). Therefore, summing up all these
+inequalities, we draw that if~\(\mathcal{E} = 0\), then
+\erlcode{flat/1}~is faster than~\erlcode{sflat/1}.
+
+\medskip
+
+\paragraph{Slight improvement.}
+
+Is it possible to improve the definition of \erlcode{flat/1}?  Upon
+close examination of the example given in
+\figs~\vrefrange{fig:flat_ast1}{fig:flat_ast2}, it becomes apparent
+that, for each non\hyp{}empty embedded list an empty list is produced
+when lifting the last item in them (\erlcode{M}~is an empty list
+then). These additional empty lists have to be removed by means of
+clause~\clause{\beta}. It is easy to avoid introducing empty lists
+which need to be eliminated next: let us just add a clause matching
+the case of an embedded list with one item, that is, a singleton
+list:\label{code:flat_opt}
+\begin{alltt}
+flat_opt(       []) -> [];
+flat_opt(   [[]|L]) -> flat_opt(L);
+\textbf{flat\_opt(  [[I]|L]) -> flat_opt([I|L]);}\hfill% \emph{Improvement}
+flat_opt([[I|M]|L]) -> flat_opt([I,M|L]);\hfill% M \(\neq\) []
+flat_opt(    [I|L]) -> [I|flat_opt(L)].
+\end{alltt}
+What is the delay of this improved definition? Simply, the
+term~\(\mathcal{N}\) vanishes:
+\[
+1 + \mathcal{L} + \mathcal{E} + n.
+\]
+As a consequence, we now have the delays
+\begin{align*}
+\delay{flat\_opt([[[[[a,b]]]]])}    &= 1 + 5 + 0 + 2 = 8,\\
+\delay{flat\_opt([[],[[a],b],c])}   &= 1 + 3 + 1 + 3 = 8,\\
+\delay{flat\_opt([[],[[a,[b]]],c])} &= 1 + 4 + 1 + 3 = 9.
+\end{align*}
+The improvement goes beyond a shorter delay: the delay itself can be
+expressed with one notion less---namely here, the number of embedded
+lists, noted~\(\mathcal{N}\). This is important too.
+
+\medskip
+
+\paragraph{Exercises.}
+
+\begin{enumerate}
+
+  \item Reconsider the delay of \erlcode{sflat/1} if we augment the
+    definition of \erlcode{join/2} with a special case (in bold):
+\begin{alltt}
+\textbf{join(    P,[]) -> P;}
+join(   [], Q) -> Q;
+join([E|P], Q) -> [E|join(P,Q)].
+\end{alltt}
+
+  \item Check that the following definition is equivalent
+    to \erlcode{flat/1} and find its delay.
+\begin{verbatim}
+flat_bis(L)          -> flat_bis(L,[],[]).
+flat_bis(   [],[],B) -> rev(B);
+flat_bis(   [], A,B) -> flat_bis(A,   [],    B);
+flat_bis(  [I], A,B) -> flat_bis(I,    A,    B);
+flat_bis([I|L], A,B) -> flat_bis(I,[L|A],    B);
+flat_bis(    I, A,B) -> flat_bis(A,   [],[I|B]).
+\end{verbatim}
+
+\end{enumerate}

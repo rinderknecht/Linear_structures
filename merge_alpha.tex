@@ -1,0 +1,6 @@
+\begin{alltt}
+merge(   [],      Q)            \(\smashedrightarrow{\alpha}\) Q;
+merge(    P,     [])            \(\smashedrightarrow{\beta}\) P;
+merge([I|P],Q=[J|_]) when I < J \(\smashedrightarrow{\gamma}\) [I|merge(P,Q)];
+merge(    P,  [J|Q])            \(\smashedrightarrow{\delta}\) [J|merge(P,Q)].
+\end{alltt}

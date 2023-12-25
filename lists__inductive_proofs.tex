@@ -1,0 +1,573 @@
+\chapter{Inductive Proofs of Programs}
+
+In this chapter, we shall use a mathematical notation for our programs
+because we will be dealing with mathematical proofs about them and
+with this typesetting will both mathematics and programs will blend
+in. For instance, instead of writing as usual \erlcode{rev}, we will
+write \fun{rev}; instead of \erlcode{X}, we will write \(x\). We have
+been using the \emph{transitive closure} of a rewrite
+relationship~\((\rightarrow)\), defined as \((\twoheadrightarrow) :=
+\bigcup_{i >
+  0}{(\smashedrightarrow{i})}\). Let~\((\smashedrightarrow{*})\) be
+the reflexive\hyp{}transitive closure of~\((\rightarrow)\), that is,
+\((\smashedrightarrow{*}) := (=) \cup (\twoheadrightarrow)\).
+
+Let us recall the definition
+\begin{equation*}
+\fun{join}(        \el,t) \smashedrightarrow{\alpha} t;\qquad
+\fun{join}(\cons{x}{s},t) \smashedrightarrow{\beta} \cons{x}{\fun{join}(s,t)}.
+\end{equation*}
+Let us notice that we have
+\[
+\fun{join}([1], [2,3,4]) \twoheadrightarrow [1,2,3,4] 
+\twoheadleftarrow \fun{join}([1,2], [3,4]).
+\]
+It is enlightening to create \emph{equivalence classes} of terms that
+are joinable: by definition, we have \(a \equiv b\) if there exists a
+value~\(v\) such that \(a \smashedrightarrow{*} v\) and \(b
+\smashedrightarrow{*} v\). For instance, \(\fun{join}([1,2], [3,4])
+\equiv \fun{join}([1], [2,3,4])\). If we want to prove equivalences on
+terms with variables ranging over infinite sets, like
+\(\fun{join}(s,\fun{join}(t,u)) \equiv
+\fun{join}(\fun{join}(s,t),u)\), we need to rely on some induction
+principle. In this section, we explain some inductive techniques
+commonly used to prove desired properties of programs, like
+equivalence, correctness and termination.
+
+\medskip
+
+\paragraph{Induction.}
+
+We define a \emph{well\hyp{}founded relation} on a set~\(A\) as being
+a binary relation~\((\prec)\) which does not have any \emph{infinite
+  descending chains}, that is, no \(\dots \prec x_1 \prec x_0\). The
+\emph{well\hyp{}founded induction} then states that, for any
+property~\(\aleph\), proving \(\forall x \in A.\aleph(x)\) is
+equivalent to proving \(\forall x.(\forall y.y \prec x \Rightarrow
+\aleph(y)) \Rightarrow \aleph(x)\). Because there are no infinite
+descending chains, any subset \({B \subseteq A}\) contains minimal
+elements \({M \subseteq B}\), that is, there is no \({y \in B}\) such
+that \({y \prec x}\) if \({x \in M}\). In this case, well\hyp{}founded
+induction degenerates into proving~\(\aleph(x)\) for all \({x \in
+  M}\). When \({A=\mathbb{N}}\), this principle is called
+\emph{mathematical (complete) induction}. \emph{Structural induction}
+is another particular case where \({x \prec y}\) holds if, and only
+if, \(x\)~is a proper subterm of~\(y\). For instance, we can define
+\(x \prec \cons{h}{x}\), for any term~\(h\) and any stack~\(x\). There
+is no infinite descending chain because \(\el\)~is the unique minimal
+element of~\(A\): \({\el \prec x}\), for all stacks~\(x\); hence the
+basis arises only when \({x=\el}\) and the proposition to establish
+degenerates into~\(\aleph(\el)\).
+
+\medskip
+
+\paragraph{Associativity of stack catenation.}
+
+Let us illustrate this principle by proving the associativity of
+\fun{join}. Let us call \(\mathcal{P}(s,t,u)\) the property
+``\(\fun{join}(s,\fun{join}(t,u)) \equiv
+\fun{join}(\fun{join}(s,t),u)\).'' Let \(T\)~be the set of all
+possible terms and \({S \subseteq T}\) be the set of all stacks. If
+not otherwise mentioned, we assume that a variable belongs
+to~\(S\). We must prove \(\forall t,u.\mathcal{P}(\el,t,u)\) and
+\(\forall s,t,u.(\mathcal{P}(s,t,u) \Rightarrow \forall x \in
+T.\mathcal{P}(\cons{x}{s},t,u))\). The first is straightforward:
+\(\fun{join}(\el,\fun{join}(s,t)) \smashedrightarrow{\alpha}
+\fun{join}(s,t) \smashedleftarrow{\alpha}
+\fun{join}(\fun{join}(\el,t),u)\). Let us assume now
+\(\mathcal{P}(s,t,u)\), called the \emph{induction hypothesis}, and
+prove \(\mathcal{P}(\cons{x}{s},t,u)\), for any term~\(x\). We have
+\(\fun{join}(\cons{x}{s},\fun{join}(t,u)) \smashedrightarrow{\beta}
+\cons{x}{\fun{join}(s,\fun{join}(t,u))} \equiv
+\cons{x}{\fun{join}(\fun{join}(s,t),u)} \smashedleftarrow{\beta}
+\fun{join}(\cons{x}{\fun{join}(s,t)},u) \smashedleftarrow{\beta}
+\fun{join}(\fun{join}(\cons{x}{s},t),u)\), therefore
+\(\mathcal{P}(\cons{x}{s},t,u)\) holds and, by the well\hyp{}founded
+induction principle, \(\forall s,t,u.\mathcal{P}(s,t,u)\).
+
+\medskip
+
+\paragraph{Involution of stack reversal.}
+
+Sometimes, a proof requires some lemma to be devised. Let us consider
+the definition of a function \(\fun{rev}_0\) reversing a stack:
+\begin{equation*}
+\fun{rev}_0(\el) \smashedrightarrow{\gamma} \el;\qquad
+\fun{rev}_0(\cons{x}{s})
+                 \smashedrightarrow{\delta} \fun{join}(\fun{rev}_0(s),[x]).
+\end{equation*}
+Let \(\mathcal{Q}(s)\) be the property ``\(\fun{rev}_0(\fun{rev}_0(s))
+\equiv s\).'' Proving the basis is immediate:
+\(\fun{rev}_0(\fun{rev}_0(\el)) \smashedrightarrow{\gamma}
+\fun{rev}_0(\el) \smashedrightarrow{\gamma} \el\). The induction
+hypothesis is~\(\mathcal{Q}(s)\) and we want to establish
+\(\mathcal{Q}(\cons{x}{s})\), for any~\(x\). If we start head\hyp{}on
+with \(\fun{rev}_0(\fun{rev}_0(\cons{x}{s}))
+\smashedrightarrow{\delta}
+\fun{rev}_0(\fun{join}(\fun{rev}_0(s),[x]))\), we are stuck. But the
+term to rewrite involves both \(\fun{rev}_0\)~and~\(\fun{join}\),
+hence spurring us to conceive a lemma where the stumbling pattern
+\(\fun{join}(\fun{rev}_0(\dots),\dots)\) occurs and is equivalent to a
+simpler term. Let \(\mathcal{R}(s,t)\)~be the property
+``\(\fun{join}(\fun{rev}_0(t),\fun{rev}_0(s)) \equiv
+\fun{rev}_0(\fun{join}(s,t))\).'' In order to prove it by induction on
+the structure of~\(s\), we need, for all~\(t\), to draw
+\(\mathcal{R}(\el,t)\), on the one hand, and
+\(\mathcal{R}(\cons{x}{s},t)\) if~\(\mathcal{R}(s,t)\), on the other
+hand. The former is almost within reach:
+\(\fun{rev}_0(\fun{join}(\el,t)) \smashedrightarrow{\alpha}
+\fun{rev}_0(t) \leftrightsquigarrow \fun{join}(\fun{rev}_0(t),\el)
+\smashedleftarrow{\gamma}
+\fun{join}(\fun{rev}_0(t),\fun{rev}_0(\el))\). The missing part is
+filled by showing that \((\leftrightsquigarrow)\)~is
+\((\twoheadleftarrow)\). Let \(\mathcal{S}(s)\)~be the property
+``\(\fun{join}(s,\el) \twoheadrightarrow s\).'' In order to prove it
+by induction on the structure of~\(s\), we have to prove the basis
+\(\fun{join}(\el,\el) \twoheadrightarrow \el\) and \(\mathcal{S}(s)
+\Rightarrow \forall x \in T.\mathcal{S}(\cons{x}{s})\). The former is
+easy: \(\fun{join}(\el,\el) \smashedrightarrow{\alpha} \el\). The
+latter is not complicated either: \(\fun{join}(\cons{x}{s},\el)
+\smashedrightarrow{\beta} \cons{x}{\fun{join}(s,\el)}
+\twoheadrightarrow \cons{x}{s}\), where the last step makes use of the
+induction hypothesis~\(\mathcal{S}(s)\). We have now completed our
+proof of~\(\mathcal{R}(\el,t)\). Assuming \(\mathcal{R}(s,t)\), we now
+must prove \(\forall x \in T.\mathcal{R}(\cons{x}{s},t)\):\\
+\noindent\(\fun{join}(\fun{rev}_0(t),\fun{rev}_0(\cons{x}{s}))\)
+\begin{align*}
+\hphantom{HHHHH}
+&\smashedrightarrow{\delta}
+\fun{join}(\fun{rev}_0(t),\fun{join}(\fun{rev}_0(s),[x]))\\
+&\equiv \fun{join}(\fun{join}(\fun{rev}_0(t),\fun{rev}_0(s)),[x])
+&& (\text{instance of} \,\; \mathcal{P})\\
+&\equiv \fun{join}(\fun{rev}_0(\fun{join}(s,t)),[x])
+&& (\text{hypothesis} \,\; \mathcal{R}(s,t))\\
+&\smashedleftarrow{\delta}
+\fun{rev}_0(\cons{x}{\fun{join}(s,t)})\\
+&\smashedleftarrow{\beta}
+\fun{rev}_0(\fun{join}(\cons{x}{s},t)).
+\end{align*}
+This proves \(\mathcal{R}(\cons{x}{s},t)\). We now resume the proof of
+\(\mathcal{Q}(\cons{x}{s})\), assuming \(\mathcal{Q}(s)\):\\
+\noindent\(\fun{rev}_0(\fun{rev}_0(\cons{x}{s}))\)
+\begin{align*}
+\hphantom{HH}
+&\smashedleftarrow{\alpha}
+\fun{rev}_0(\fun{rev}_0(\cons{x}{\fun{join}(\el,s)}))\\
+&\smashedleftarrow{\beta}
+\fun{rev}_0(\fun{rev}_0(\fun{join}([x],s)))\\
+&\equiv
+\fun{rev}_0(\fun{join}(\fun{rev}_0(s),\fun{rev}_0([x]))))
+&& (\mathcal{R}([x],s))\\
+&\equiv
+\fun{join}(\fun{rev}_0(\fun{rev}_0([x])),\fun{rev}_0(\fun{rev}_0(s)))
+&& (\mathcal{R}(\fun{rev}_0(s),\fun{rev}_0([x])))\\
+&\equiv
+\fun{join}(\fun{rev}_0(\fun{rev}_0([x])),s)
+&& (\text{hypothesis} \,\; \mathcal{Q}(s))\\
+&\smashedrightarrow{\delta}
+\fun{join}(\fun{rev}_0(\fun{join}(\fun{rev}_0(\el),[x])),s)\\
+&\smashedrightarrow{\gamma}
+\fun{join}(\fun{rev}_0(\fun{join}(\el,[x])),s)\\
+&\smashedrightarrow{\alpha}
+\fun{join}(\fun{rev}_0([x]),s)\\
+&\smashedrightarrow{\delta}
+\fun{join}(\fun{join}(\fun{rev}_0(\el),[x]),s)\\
+&\smashedrightarrow{\gamma}
+\fun{join}(\fun{join}(\el,[x]),s)\\
+&\smashedrightarrow{\alpha}
+\fun{join}([x],s)
+\smashedrightarrow{\beta}
+\cons{x}{\fun{join}(\el,s)}
+\smashedrightarrow{\alpha}
+\cons{x}{s}.
+\end{align*}
+
+\medskip
+
+\paragraph{Equivalence of programs.}
+
+We may have two definitions for the same function, which differ in
+complexity and/or efficiency. For instance, \(\fun{rev}_0\) was given
+an intuitive definition, as we can clearly see, in
+clause~\clause{\delta}, that the item~\(x\), which is the top of the
+input, is intended to occur at the bottom of the
+output. Unfortunately, this definition is computationally inefficient,
+that is, it leads to a great deal of rewrites relatively to the size
+of the input. (We will give a formal meaning to this statement in a
+coming section.) Let us assume that we also have an efficient
+definition for the stack reversal, named~\(\fun{rev}\), whose
+definition is
+\begin{equation*}
+\fun{rev}(s)            \smashedrightarrow{\epsilon} \fun{rc}(s,\el).\qquad
+\fun{rc}(\el,t)         \smashedrightarrow{\zeta} t;\qquad
+\fun{rc}(\cons{x}{s},t) \smashedrightarrow{\eta} \fun{rc}(s,\cons{x}{t}).
+\end{equation*}
+Let us prove the equivalence property \(\mathcal{T}(s)\) stated as
+``\(\fun{rev}_0(s) \equiv \fun{rev}(s)\).'' Using structural
+induction, we first have to prove~\(\mathcal{T}(\el)\) and then
+\(\forall x \in T.\mathcal{T}(\cons{x}{s})\), assuming
+\(\mathcal{T}(s)\). The former is easy: \(\fun{rev}_0(\el)
+\smashedrightarrow{\gamma} \el \smashedleftarrow{\zeta}
+\fun{rc}(\el,\el) \smashedleftarrow{\epsilon} \fun{rev}(\el)\). As for
+the latter: \(\fun{rev}_0(\cons{x}{s}) \smashedrightarrow{\delta}
+\fun{join}(\fun{rev}_0(s),[x]) \equiv \fun{join}(\fun{rev}(s),[x])
+\leftrightsquigarrow \fun{rc}(s,[x]) \smashedleftarrow{\eta}
+\fun{rc}(\cons{x}{s},\el) \smashedleftarrow{\epsilon}
+\fun{rev}(\cons{x}{s})\). The missing part is filled by showing
+\((\leftrightsquigarrow)\) to be~\((\equiv)\). Let
+\(\mathcal{U}(s,t)\) be the property ``\(\fun{rc}(s,t) \equiv
+\fun{join}(\fun{rev}(s),t)\).'' Induction on the structure of~\(s\)
+yields the basis \(\mathcal{U}(\el,t)\) and the general case
+\(\mathcal{U}(s,t) \Rightarrow \forall x \in
+T.\mathcal{U}(\cons{x}{s},t)\). The former is proved by
+\(\fun{rc}(\el,t) \smashedrightarrow{\zeta} t
+\smashedleftarrow{\alpha} \fun{join}(\el,t) \smashedleftarrow{\zeta}
+\fun{join}(\fun{rc}(\el,\el),t) \smashedleftarrow{\epsilon}
+\fun{join}(\fun{rev}(\el),t)\). The latter unfolds as
+follows:\\ \(\fun{rc}(\cons{x}{s},t)\)
+\begin{align*}
+\hphantom{XXXX}
+  &\smashedrightarrow{\eta} \fun{rc}(s,\cons{x}{t})\\
+  &\equiv \fun{join}(\fun{rev}(s),\cons{x}{t})
+  && (\text{hypothesis}\;\, \mathcal{U}(s,\cons{x}{t}))\\
+  &\smashedleftarrow{\alpha}
+   \fun{join}(\fun{rev}(s),\cons{x}{\fun{join}(\el,t)})\\
+  &\smashedleftarrow{\beta} \fun{join}(\fun{rev}(s),\fun{join}([x],t))\\
+  &\equiv \fun{join}(\fun{join}(\fun{rev}(s),[x]),t)
+  && (\text{associativity} \;\, \mathcal{P}(\fun{rev}(s),[x],t))\\
+  &\equiv \fun{join}(\fun{rc}(s,[x]),t)
+  && (\text{hypothesis}\;\, \mathcal{U}(s,[x]))\\
+  &\smashedleftarrow{\eta} \fun{join}(\fun{rc}(\cons{x}{s},\el),t)\\
+  &\smashedleftarrow{\epsilon} \fun{join}(\fun{rev}(\cons{x}{s}),t).
+\end{align*}
+
+\medskip
+
+\paragraph{Termination of Ackermann's function.}
+
+Let \(m,n \geqslant 0\) and consider
+\begin{align*}
+\fun{ack}(0,n)     &\smashedrightarrow{\theta} n+1;\\
+\fun{ack}(m+1,0)   &\smashedrightarrow{\iota} \fun{ack}(m,1);\\
+\fun{ack}(m+1,n+1) &\smashedrightarrow{\kappa} \fun{ack}(m,\fun{ack}(m+1,n)).
+\end{align*}
+This is a simplified form of Ackermann's function, an early example of
+a total computable function which is not primitive recursive. It makes
+use of double recursion and two parameters to grow as a tower of
+exponents, for example, \(\fun{ack}(4,3) \twoheadrightarrow
+2^{2^{65536}} - 3\). Our interest is that it is not obviously
+terminating, because if the first argument decreases, the second is
+allowed to increase largely. In order to deal with this definition, we
+need to define a well\hyp{}founded relation on pairs, called
+\emph{lexicographic order}. Let \((\prec_A)\)~and~\((\prec_B)\) be
+well\hyp{}founded relations on the sets \(A\)~and~\(B\). Then
+\((\prec_{A \times B})\)~defined as follows on \({A \times B}\) is
+well\hyp{}founded:
+\begin{equation*}
+(a_0,b_0) \prec_{A \times B} (a_1,b_1) \Leftrightarrow
+  \,\; a_0 \prec_A a_1 \,\; \text{or} \,\; a_0 = a_1 \;\,\text{and}\,\;
+  b_0 \prec_B b_1.
+\end{equation*}
+If \(A=B=\mathbb{N}\) then \((\prec_A) = (\prec_B) = (<)\). In order
+to prove that \(\fun{ack}(m,n)\) terminates for all \(m,n \geqslant
+0\), well\hyp{}founded induction requires proof that
+\(\fun{ack}(0,0)\) terminates and that \(\fun{ack}(p,q)\) terminates
+if \(\fun{ack}(m,n)\)~terminates for all~\((m,n) \prec (p,q)\). The
+former is direct: \(\fun{ack}(0,0) \smashedrightarrow{\theta} 1\). The
+latter is twofold. First, if \({p>0}\)~and~\({q=0}\), then
+\(\fun{ack}(p,q) \smashedrightarrow{\iota}
+\fun{ack}(p-1,1)\). Lexicographically, \((p-1,1) \prec (p,q)\), thus,
+by the induction hypothesis, \(\fun{ack}(p-1,1)\) terminates and so
+\(\fun{ack}(p,q)\) by \(\iota\). Second, if \({p>0}\)~and~\({q>0}\),
+we have \(\fun{ack}(p,q) \smashedrightarrow{\kappa}
+\fun{ack}(p-1,\fun{ack}(p,q-1))\). Because \((p,q-1) \prec (p,q)\),
+the induction hypothesis implies that \(\fun{ack}(p,q-1)\)
+terminates. Moreover, \((p-1,r) \prec (p,q)\), for any~\(r\), thus the
+same hypothesis proves that \(\fun{ack}(p-1,r)\) terminates, in
+particular whence \(r=\fun{ack}(p,q-1)\), which we just showed to be
+defined. Thus, by clause~\clause{\kappa}, we draw the termination
+of~\(\fun{ack}(p,q)\).
+
+\medskip
+
+\paragraph{Correctness of insertion sort.}
+
+In chapter~\vref{par:insertion_correctness}, we presented a sorting
+algorithm called \emph{insertion sort}, which consists in inserting
+objects orderly and one by one in a stack originally empty. The
+traditional analogy is that of sorting a hand in a card game: from
+left to right, each card is moved leftward until it reaches its place
+(the leftmost stays put). We also introduced a proof of its
+correctness, but it was semi\hyp{}formal, as it relied a lot on
+English. In this section, we want to propose a more formal correctness
+proof.
+
+A total order~\((\totaleq\,)\) is a binary relation that is
+antisymmetric (\(x \totaleq y \mathrel{\wedge} y \totaleq x
+\Rightarrow x = y\)), transitive (\(x \totaleq y \mathrel{\wedge} y
+\totaleq z \Rightarrow x \totaleq z\)) and total (\(x \totaleq y
+\mathrel{\vee} y \totaleq x\)). In particular, it is reflexive. As an
+example, let us restrict ourselves to sorting positive integers in
+nondecreasing order using~\((\leqslant)\). Let \(\fun{ins}(x,s)\)~be
+the stack resulting from the insertion of~\(x\) into the stack~\(s\),
+without an explicit comparison:
+\begin{equation*}
+ \fun{ins}(x,\el)         \rightarrow [x];\qquad
+ \fun{ins}(x,\cons{y}{s}) \rightarrow
+    \cons{\fun{min}(x,y)}{\fun{ins}(\fun{max}(x,y),s)}.
+\end{equation*}
+We need to provide definitions to compute the minimum and maximum:
+\begin{align*}
+\fun{max}(0,y) &\rightarrow y; & \fun{min}(0,y) &\rightarrow 0;\\
+\fun{max}(x,0) &\rightarrow x; & \fun{min}(x,0) &\rightarrow 0;\\
+\fun{max}(x,y) &\rightarrow 1 + \fun{max}(x-1,y-1).
+ & \fun{min}(x,y) &\rightarrow 1 + \fun{min}(x-1,y-1).
+\end{align*}
+While this approach fits our framework, it is both inefficient and
+bulky, hence it is worth extending our language so rewrite rules are
+selected by pattern matching only if some optional associated
+comparison holds. We can redefine \(\fun{ins}\) as
+\begin{align*}
+\fun{ins}(x,\cons{y}{s})   &\smashedrightarrow{\lambda}
+                             \cons{y}{\fun{ins}(x,s)},
+                             \;\,\text{if} \,\; y \total x;
+& \fun{sort}(\el)          &\smashedrightarrow{\nu} \el;\\
+\fun{ins}(x,s)             &\smashedrightarrow{\mu} \cons{x}{s}.
+& \fun{sort}(\cons{x}{s})  &\smashedrightarrow{\xi} 
+                             \fun{ins}(x,\fun{sort}(s)).
+\end{align*}
+Note that we used \({y \total x}\), meaning \(\neg(x \totaleq
+y)\). Using~\((<)\) on integers instead of~\((\total)\), this abstract
+program is translated straightforwardly in \Erlang as follows:
+\begin{verbatim}
+ins(X,[Y|S]) when Y < X -> [Y|ins(X,S)];
+ins(X,    S)            -> [X|S].
+
+sort(   []) -> [];
+sort([X|S]) -> ins(X,sort(S)).
+\end{verbatim}
+It is of the utmost importance to prove the \emph{correctness} of an
+important program. In fact, the concept of correctness is a
+relationship, so we always ought to speak of the correctness of a
+program \emph{with respect to its specification}. A specification is a
+logical description of the expected properties of the output of a
+program, given some assumptions on its input. In the case of insertion
+sort, we need to express those properties, first informally, then
+formally. We would say that ``The stack \(\fun{sort}(s)\) is totally
+ordered nondecreasingly and it contains all the items in~\(s\), but no
+more.'' This captures all what is expected from insertion sort. Let us
+name \(\mathcal{V}(s)\) the proposition ``The stack \(s\) is sorted
+nondecreasingly'' and \({p \approx q}\) the proposition ``The stacks
+\(p\) is a permutation of the stack \(q\),'' with the provision that a
+permutation consists in exchanging pairs of items. To define formally
+these concepts, we use \emph{inductive logic definitions}, that is, we
+propose a set of implications that construct objects from strictly
+smaller objects, according to a well\hyp{}founded relation. In the
+present case, the relation obeys \(x \prec \cons{x}{s}\) and
+\(\mathcal{V}\)~is
+\[
+(S_0) \;\; \mathcal{V}(\el);\quad\;
+(S_1) \;\; \mathcal{V}([x]);\quad\;
+(S_2) \;\; x \totaleq y \Rightarrow \mathcal{V}(\cons{y}{s})
+     \Rightarrow \mathcal{V}(\cons{x,y}{s}).
+\]
+Note that, if not otherwise mentioned, freely occurring variables are
+implicitly universally quantified at the level of the formula they
+occur in, for example, we should interpret~\(S_1\) as \(\forall x \in
+T.\mathcal{V}([x])\). The propositions \(S_0\)~and~\(S_1\) are
+\emph{axioms} because they are implied by any statement, so the symbol
+\((\Rightarrow)\) can be omitted. The case~\(S_2\) can be equivalently
+read as \((x \totaleq y \mathrel{\wedge} \mathcal{V}(\cons{y}{s}))
+\Rightarrow \mathcal{V}(\cons{x,y}{s})\). Moreover, since the
+implication is definitional, it is also an equivalence, so \(S_2\)~can
+also be understood as \((x \totaleq y \mathrel{\wedge}
+\mathcal{V}(\cons{y}{s})) \Leftarrow
+\mathcal{V}(\cons{x,y}{s})\). This view of an inductive definition is
+called an \emph{inversion lemma}.
+
+The relation between permutations of a stack can be defined as
+follows:
+\begin{align*}
+(P_0)\; & \; \el \approx \el;
+& 
+(P_2)\; &\; s \approx t \Rightarrow \cons{x}{s} \approx \cons{x}{t};\\
+(P_1)\; &\; \cons{x,y}{s} \approx \cons{y,x}{s};
+&
+(P_3)\; &\; s \approx u \Rightarrow u \approx t \Rightarrow s \approx t.
+\end{align*}
+We recognise \(P_0\)~and~\(P_1\) as axioms and \(P_3\)~as
+transitivity. The underlying idea consists in defining a permutation
+as a series of \emph{transpositions} by means of~\(P_1\), that is,
+exchanges of adjacent items. This approach is likely to work here
+because insertion can be thought of as adding an item on top of a
+stack and then performing a series of transpositions until the total
+order is restored. As a warm\hyp{}up exercise, let us prove the
+\emph{reflexivity} of~\((\approx)\), named \(\mathcal{W}(s)\): \(s
+\approx s\). The proof technique we use is a variation on structural
+induction which, instead of being applied to the object at hand, like
+a stack, is applied to the proof itself, considered as an
+object---better called \emph{meta\hyp{}object}. In the present case,
+the way instances of the relationship~\((\approx)\) are made is by a
+series of logical implications amounting to a linear structure, or
+stack, of growing instances; therefore, it is possible to apply
+structural induction to it. Let us demonstrate it by
+proving~\(\mathcal{W}(s)\). If \(P_0\)~produced \(s \approx s\), then
+\({s=\el}\) and \(\mathcal{W}(s)\) hold. Axiom~\(P_1\) is not
+reflexive unless \({x=y}\). Let us assume now that \(\mathcal{W}\)
+holds for the antecedents in \(P_2\)~and~\(P_3\) (inductive
+hypothesis) and let us prove that it also holds for the
+consequents. This is quick: assuming~\({s=t}\) in~\(P_2\) leads to
+\(\cons{x}{s} \approx \cons{x}{s}\) and, assuming \(s=u=t\) in~\(P_3\)
+leads to~\({s \approx s}\).
+
+Let us prove now the \emph{symmetry} of \((\approx)\) by the same
+technique, called \emph{induction on the structure of the proof}. Let
+\(\mathcal{X}(s,t)\) denote ``\(s \approx t \Rightarrow t \approx
+s\).'' The axioms are clearly symmetric. The induction hypothesis is
+that \(\mathcal{X}\) holds for the antecedents of \(P_2\) and
+\(P_3\). In the former case, we thus deduce \(t \approx s\), which can
+be the antecedent of another instance of \(P_2\) and imply
+\(\cons{x}{t} \approx \cons{x}{s}\). This proves the symmetry of the
+consequent of \(P_2\). In the last case, we deduce \(u \approx s\) and
+\(t \approx u\), which can be antecedents for \(P_3\) itself and lead
+to \(t \approx s\), achieving thereby the proof.
+
+Let us now turn our attention to our main objective, which we may call
+\(\mathcal{Y}(s)\): ``\(\mathcal{V}(\fun{sort}(s)) \mathrel{\wedge}
+\fun{sort}(s) \approx s\).'' Let us tackle its proof by structural
+induction on \(s\). The basis is \(\mathcal{Y}(\el)\) and it is showed
+to hold because of rewrite rule \(\nu\) and axioms \(S_0\) and
+\(P_0\). Let us assume now \(\mathcal{Y}(s)\) and let us prove
+\(\mathcal{Y}(\cons{x}{s})\). We have the rewrite
+\(\fun{sort}(\cons{x}{s}) \smashedrightarrow{\xi}
+\fun{ins}(x,\fun{sort}(s))\). Since we want
+\(\mathcal{V}(\fun{sort}(\cons{x}{s}))\), assuming \(\mathcal{V}(s)\),
+we realise that we need the lemma ``\(\mathcal{V}(s) \Rightarrow
+\forall x \in T.\mathcal{V}(\fun{ins}(x,s))\),'' which we may name
+\(\mathcal{I}(s)\). Similarly, let us assume the lemma
+\(\mathcal{J}(s)\) stating that ``\(\fun{ins}(x,s) \approx
+\cons{x}{s}\).''  In particular, \(\mathcal{J}(\fun{sort}(s))\) is
+\(\fun{ins}(x,\fun{sort}(s)) \approx \cons{x}{\fun{sort}(s)}\). The
+case \(P_2\) and the hypothesis \(\fun{sort}(s) \approx s\) imply
+\(\cons{x}{\fun{sort}(s)} \approx \cons{x}{s}\). By the transitivity
+of \((\approx)\), we draw \(\fun{ins}(x,\fun{sort}(s)) \approx
+\cons{x}{s}\), hence, backtracking, \(\mathcal{Y}(\cons{x}{s})\) holds
+and, by the induction principle, the correctness property \(\forall s
+\in S.\mathcal{Y}(s)\).
+
+To partially complete the previous proof, let us establish the lemma
+\(\mathcal{J}(s)\) by structural induction on \(s\). The basis is
+\(\mathcal{J}(\el)\) and stands since \(\fun{ins}(x,\el)
+\smashedrightarrow{\mu} [x] \approx [x]\), by \(P_0\) and
+\(P_2\). Let us assume now \(\mathcal{J}(s)\) and try to deduce
+\(\mathcal{J}(\cons{x}{s})\). In other words, let us prove
+\(\fun{ins}(x,s) \approx \cons{x}{s} \Rightarrow \forall y \in
+T.\fun{ins}(x,\cons{y}{s}) \approx \cons{x,y}{s}\). If \(x \totaleq
+y\), then \(\fun{ins}(x,\cons{y}{s}) \smashedrightarrow{\mu}
+\cons{x,y}{s} \approx \cons{x,y}{s}\) by \(P_1\). Otherwise, \(y
+\total x\) and \(\fun{ins}(x,\cons{y}{s})
+\smashedrightarrow{\lambda} \cons{y}{\fun{ins}(x,s)}\). By the
+induction hypothesis and \(P_2\), \(\cons{y}{\fun{ins}(x,s)} \approx
+\cons{y,x}{s}\). By \(P_1\), \(\cons{y,x}{s} \approx
+\cons{x,y}{s}\). Transitivity of \((\approx)\) applied to the two last
+statements leads to \(\fun{ins}(x,\cons{y}{s}) \approx
+\cons{x,y}{s}\). Note that we do not need to assume that \(s\) is
+sorted: what matters here is that \(\fun{ins}\) does not lose any of
+the elements it inserts, but misplacement is irrelevant.
+
+To complete the correctness proof, we must prove lemma
+\(\mathcal{I}(s)\), that is, \(\mathcal{V}(s) \Rightarrow \forall x
+\in T.\mathcal{V}(\fun{ins}(x,s))\), by induction on the structure of
+\(s\). The basis \(\mathcal{I}(\el)\) is easy to check: \(S_0\) states
+\(\mathcal{V}(\el)\); we have the rewrite \(\fun{ins}(x,\el)
+\smashedrightarrow{\mu} [x]\) and \(S_1\) implies
+\(\mathcal{V}([x])\). Let us prove now \(\mathcal{I}(\cons{x}{s})\)
+assuming \(\mathcal{I}(s)\). Equivalently, let us assume
+\[
+(H_0) \;\; \mathcal{V}(s),\qquad
+(H_1) \;\; \mathcal{V}(\fun{ins}(x,s)),\qquad
+(H_2) \;\; \mathcal{V}(\cons{y}{s}),
+\]
+and prove \(\mathcal{V}(\fun{ins}(x,\cons{y}{s}))\). If \(x \totaleq
+y\), then we have the rewrite \(\fun{ins}(x,\cons{y}{s})
+\smashedrightarrow{\mu} \cons{x,y}{s}\). Rule~\(S_2\) and hypothesis
+\(H_2\)~imply \(\mathcal{V}(\cons{x,y}{s})\), therefore
+\(\mathcal{V}(\fun{ins}(x,\cons{y}{s}))\). Otherwise \({y \total x}\)
+and we have \(\fun{ins}(x,\cons{y}{s}) \smashedrightarrow{\lambda}
+\cons{y}{\fun{ins}(x,s)}\). Here, things get more complicated because
+we need to consider the structure of~\(s\). If~\({s=\el}\), then
+\(\cons{y}{\fun{ins}(y,s)} \smashedrightarrow{\mu} [y,x]\). Rules
+\(S_1\)~and~\(S_2\) imply \(\mathcal{V}([y,x])\), thus
+\(\mathcal{V}(\fun{ins}(x,\cons{y}{s}))\). Otherwise, there exists an
+item~\(z\) and a stack~\(t\) such that \(s = \cons{z}{t}\). If \(x
+\totaleq z\), then \(\cons{y}{\fun{ins}(x,s)} =
+\cons{y}{\fun{ins}(x,\cons{z}{t})} \smashedrightarrow{\mu}
+\cons{y,x,z}{t} = \cons{y,x}{s}\). Also, hypothesis~\(H_0\) is
+\(\mathcal{V}(\cons{z}{t})\), which, by means of rule~\(S_2\), implies
+\(\mathcal{V}(\cons{x,z}{t})\). Since \({y \total x}\), another
+application of~\(S_2\) yields \(\mathcal{V}(\cons{y,x,z}{t})\), that
+is \(\mathcal{V}(\cons{y,x}{s})\). This and the previous rewrite mean
+that \(\mathcal{V}(\cons{y}{\fun{ins}(x,s)})\). Further backtracking
+until the penultimate rewrite finally yields
+\(\mathcal{V}(x,\cons{y}{s})\). The last remaining case to examine is
+when~\({z \total x}\). Then \(\cons{y}{\fun{ins}(x,s)} =
+\cons{y}{\fun{ins}(x,\cons{z}{t})} \xrightarrow{\lambda}
+\cons{y,z}{\fun{ins}(x,t)}\). Hypothesis \(S_2\)~is
+\(\mathcal{V}(\cons{y,z}{t})\), which, by means of the \emph{inversion
+  lemma} of rule~\(S_2\), leads to~\({y \totaleq z}\). By the last
+rewrite, hypothesis~\(H_1\) is equivalent to
+\(\mathcal{V}(\cons{z}{\fun{ins}(x,t)})\), which, with~\({y \totaleq
+  z}\), enables the use of rule~\(S_2\) again, leading to
+\(\mathcal{V}(\cons{y,z}{\fun{ins}(x,t)})\). The last rewrite then
+allows us to say that \(\mathcal{V}(\cons{y}{\fun{ins}(x,s)})\),
+which, following backwardly the penultimate rewrite yields the
+conclusion \(\mathcal{V}(\fun{ins}(x,\cons{y}{s}))\).
+
+\medskip
+
+\paragraph{Assessment.} In this section, we defined and illustrated
+well\hyp{}founded induction in different guises through a series of
+proofs whose kinds and purposes are common among theoretical computer
+scientists: termination, equivalence and correctness. Perhaps the most
+striking feature of the correctness proof is its length. More
+precisely, two aspects may give rise to questions. First, since the
+program is four lines long and the specification (the
+\(S_i\)~and~\(P_j\)) consists in a total of seven cases, it may be
+unclear how the proof raises our confidence in the program. Second,
+the proof itself is rather long, which might drive us to wonder
+whether any error is hiding in it. The first concern can be addressed
+by noting that the two parts of the specification are disjoint and
+thus as easy to comprehend as the program. Moreover, specifications,
+being logical and not necessarily computable, are likely to be more
+abstract and composable than programs, so a larger proof may reuse
+them in different instances. For instance, the
+predicate~\(\mathcal{Y}\) can easily be abstracted (higher\hyp{}order)
+over the sorting function as \(\mathcal{Y}(f,s)\):
+''\(\mathcal{V}(f(s)) \mathrel{\wedge} f(s) \approx s\)'' and thusly
+applies to many sorting algorithms, with the caveat that~\((\approx)\)
+might not always be suitable. The second concern can be completely
+taken care of by relying on a \emph{proof assistant}, like
+\textsf{Coq}. For instance, the formal specification of~\((\approx)\)
+and the automatic proofs (by means of \texttt{eauto}) of its
+reflexivity and symmetry consists in the following script, where
+\verb|x::s|~stands for \(\cons{x}{s}\), (\verb|->|)~is
+\((\Rightarrow)\) and ``\verb|perm s t|'' is~\({s \approx t}\):
+\begin{verbatim}
+Set Implicit Arguments.
+Require Import List.
+Variable A: Type.
+
+Inductive perm: list A -> list A -> Prop :=
+  P0: perm nil nil
+| P1: forall x s t, perm s t -> perm (x::s) (x::t)
+| P2: forall x y s, perm (x::y::s) (y::x::s)
+| P3: forall s t u, perm s u -> perm u t -> perm s t.
+
+Hint Constructors perm.
+
+Lemma reflexion: forall s, perm s s.
+Proof. induction s; eauto. Qed.
+
+Lemma symmetry: forall s t, perm s t -> perm t s.
+Proof. induction 1; eauto. Qed.
+\end{verbatim}

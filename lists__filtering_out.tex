@@ -1,0 +1,2259 @@
+%%-*-latex-*-
+
+\chapter{Filtering out}
+\label{chap:filtering_out}
+
+\paragraph{First occurrence.}
+
+Let us consider the definition of a function \erlcode{rm\_fst/2} such
+that the call \erlcode{rm\_fst(\(I\),\(L\))} is rewritten into~\(L\)
+if \(I\)~does not belong to the list~\(L\), otherwise it is rewritten
+to a list identical to~\(L\) but without the first occurrence
+of~\(I\). This is our \emph{specification}. For instance, we expect
+the following rewrites:\label{rm_fst_ex}
+\begin{align*}
+\erlcode{rm\_fst(3,[])}         & \twoheadrightarrow \erlcode{[]};\\
+\erlcode{rm\_fst([],[])}        & \twoheadrightarrow \erlcode{[]};\\
+\erlcode{rm\_fst([5,2],[3,[]])} & \twoheadrightarrow \erlcode{[3,[]]};\\
+\erlcode{rm\_fst(4,[[],[1,2],4,[],4])}
+ & \twoheadrightarrow \erlcode{[[],[1,2],[],4]};\\
+\erlcode{rm\_fst([],[4,[1,2],[],[],4])}
+ & \twoheadrightarrow \erlcode{[4,[1,2],[],4]}.
+\end{align*}
+
+\paragraph{First attempt.}
+
+Let us try a direct approach. In particular, at this point, it is
+important \emph{not} to seek a definition in tail form. Tail form must
+be considered as an optimisation and early optimisation is the root of
+all evil. The first idea that may come to mind is to define an
+auxiliary function \erlcode{mem/2} such that the call
+\erlcode{mem(\(I\),\(L\))} checks whether a given item \(I\)~is in a
+given list~\(L\), because that notion of membership appears in the
+wording of the specification. But two problems would arise. Firstly,
+what would be the result of such a function?  Secondly, what would be
+the added delay to use it? For the sake of the argument, let us try
+this line of thought. A list can either be empty or not, so let us
+make two clauses:
+\begin{alltt}
+mem(I,   []) -> \fbcode{mem(I,L)};
+mem(I,[J|L]) -> \fbcode{mem(I,L)}.
+\end{alltt}
+Note that we introduced a variable \erlcode{J}, distinct from variable
+\erlcode{I}. \emph{Two different variables may or may not denote the
+  same value, but two occurrences of the same variable must denote the
+  same value.} Had we written instead
+\begin{alltt}
+mem(I,   []) -> \fbcode{mem(I,L)};
+mem(I,[\textbf{I}|L]) -> \fbcode{mem(I,L)}.\hfill% \emph{Error: two occurrences of} I
+\end{alltt}
+one case would be missing, namely when the head of the list is not the
+item sought for, for instance, \erlcode{mem(3,[4])} would fail due to
+a match failure. Now, what is the first body? The first head matches
+if the list is empty. In particular, this means that the item is not
+in the list, since, by definition, an empty list is a list containing
+no item. How do we signify that? Since the original problem is silent
+on the matter, it is said to be \emph{underspecified}. We may think
+that zero would be a token of choice to denote the absence of the item
+in the list:
+\begin{alltt}
+mem(I,   []) -> \textbf{0};
+mem(I,[\textbf{J}|L]) -> \fbcode{mem(I,L)}.
+\end{alltt}
+But this would be a mistake because there is no natural relationship
+between the concept of emptiness and the number zero. (Why not~\(7\)?)
+Zero is best understood algebraically as the number noted~\(0\) such
+that \(0 + n = n + 0 = n\), for any number~\(n\). Then, let us try the
+empty list:
+\begin{alltt}
+mem(I,   []) -> \textbf{[]};\hfill% I \emph{is not reused}
+mem(I,[J|L]) -> \fbcode{mem(I,L)}.
+\end{alltt}
+The next step is to find a way to actually compare the value
+of~\erlcode{I} to the value of~\erlcode{J}. We can use the rule above
+about variables: two occurrences of the same variable mean that they
+hold the same value. Therefore
+\begin{alltt}
+mem(I,   []) -> [];
+mem(I,[\textbf{I}|L]) -> \fbcode{mem(I,L)}.
+\end{alltt}
+was not so bad, after all? Indeed, but we know now that a case is
+missing, so let us add it at the end:
+\begin{alltt}
+mem(I,   []) -> [];
+mem(I,[I|L]) -> \fbcode{mem(I,L)}\textbf{;}
+\textbf{mem(I,[J|L]) ->} \fbcode{mem(I,L)}.\hfill% I \(\neq\) J
+\end{alltt}
+Since the run\hyp{}time, for instance, a virtual machine, of \Erlang
+scans the heads top\hyp{}down, if the last head matches the current
+call, it means that \erlcode{I}~and~\erlcode{J} denote different
+values. Now, what is the second body? It stands after we found that
+the item we were looking for is present at the head of the list, thus
+it belongs to the list. How do we signify that? We may think of ending
+with the item itself, the rationale being that if the result is the
+empty list, then the item is not in the input list, otherwise the
+result is the item itself (and it is present in the input list):
+\begin{alltt}
+mem(I,   []) -> [];
+mem(I,[I|L]) -> \textbf{I};\hfill% \emph{Ignoring} L
+mem(I,[J|L]) -> \fbcode{mem(I,L)}.
+\end{alltt}
+The last body is easier to guess since it deals with the case where
+the head of the list (\erlcode{J}) is not the item we seek
+(\erlcode{I}), so a recursive call which ignores~\erlcode{J} should
+come to mind:
+\begin{alltt}
+mem(I,   []) -> [];
+mem(I,[I|L]) -> I;
+mem(I,[J|L]) -> \textbf{mem(I,L)}.\hfill% \emph{Ignoring} J
+\end{alltt}
+We could even simplify this definition by replacing variables in the
+heads where they occur only once and which do not occur in their
+corresponding bodies (that is, their value is ignored) with an
+underscore:
+\begin{alltt}
+mem(\textbf{\_},   []) -> [];\hfill% \emph{Here,}
+mem(I,[I|\textbf{\_}]) -> I;\hfill% \emph{here}
+mem(I,[\textbf{\_}|L]) -> mem(I,L).\hfill% \emph{and here}
+\end{alltt}
+That is the reason why we choose the names of the auxiliary functions,
+that is, functions that are not expected to be used by the user
+directly (and are not exported outside their module), to end with two
+underscores: it is a syntactical error in \Erlang to have a pattern
+containing two successive underscores standing for parameters and we
+sometimes use one underscore at a time in the names, so two
+underscores avoid any confusion.
+
+Some tests would increase the confidence that this definition is
+correct and complete with respect to the specification. Let us label
+the clauses first:
+\begin{alltt}
+mem(_,   []) \(\smashedrightarrow{\zeta}\) [];
+mem(I,[I|_]) \(\smashedrightarrow{\eta}\) I;
+mem(I,[_|L]) \(\smashedrightarrow{\theta}\) mem(I,L).
+\end{alltt}
+Then we could try the following cases:
+\begin{alltt}
+     mem(3,[]) \(\smashedrightarrow{\zeta}\) []\textrm{,}
+    mem(3,[1]) \(\smashedrightarrow{\theta}\) mem(3,[])    \(\smashedrightarrow{\zeta}\) []\textrm{,}
+mem(3,[1,3,2]) \(\smashedrightarrow{\theta}\) mem(3,[3,2]) \(\smashedrightarrow{\eta}\) 3\textrm{.}
+\end{alltt}
+The code seems to work: item~\erlcode{I}~is in list~\erlcode{L} if the
+result is~\erlcode{I}, otherwise it is~\erlcode{[]}. However, the
+program is not correct. The hidden and flawed assumption that lead to
+the error is ``items can not be lists,'' in spite of the examples
+given for illustrating the expected behaviour of \erlcode{rm\_fst/2},
+which contained cases where the item was a list. In particular, an
+item can be the empty list and this situation leads to an ambiguity
+with our definition of \erlcode{mem/2}:
+\[
+\erlcode{mem([],[])}   \smashedrightarrow{\zeta} \erlcode{[]},\quad
+\erlcode{mem([],[[]])} \smashedrightarrow{\eta} \erlcode{[]}.
+\]
+It is impossible to distinguish the two cases, the first one meaning
+absence and the second presence of the item, because they both end
+with the empty list. This problem could have been discovered earlier
+or during testing. Empirical evidence advises to test a given
+definition with the empty list in as many locations as possible in the
+input. If we wish to maintain the polymorphism of the solution to our
+problem, that is, if we really want the definition to accept lists of
+any kind of items, there is no way out. Actually, the definition we
+came up with is correct if the items are all integers, but we have no
+way yet to implement this restriction. We shall indeed meet other
+kinds of values later, making this simple question of membership
+straightforward to answer. But, for now, let us backtrack and ask
+ourselves whether using~\erlcode{mem/2}, assuming we have it, is
+really a good idea.
+
+\medskip
+
+\paragraph{Better approach.}
+
+Let us suppose that the input list contains the item at the
+end. Using~\erlcode{mem/2} to find it leads to a complete traversal of
+the input list. Then another traversal from the beginning (the head of
+the list) is needed to make a new list without the last item, so, in
+total, two traversals are performed. But a better idea consists in
+\emph{interleaving} these two passes into one because the problem
+stems from the fact that \erlcode{mem/2}~forgets about the items which
+are not the item of interest, thus, when it is found or known to be
+absent, there is no way to remember the past items in order to make
+the result. By interleaving, we mean that during the traversal, the
+concepts of membership and of ``rebuilding a list without an item''
+are combined, instead of being used separately as two function
+calls. A similar situation was encountered in the design of a function
+reversing a list: the version which made use of a \emph{function} to
+join two lists was less efficient than the version which included the
+\emph{concept} of joining. The algorithm consists in memorising all
+visited items, so they are not forgotten and, if the item is not
+found, the resulting list is rebuilt from them; if found, the result
+is built from them \emph{and} the remaining, unvisited, items. There
+are usually two ways to implement this auxiliary memory of visited
+items: either by using an accumulative parameter, called
+\emph{accumulator}, or, quite simply, by means of the control context
+of a recursive call. At this point, it is important to recall a
+cardinal guideline: Do not try first to design a definition in tail
+form, but opt instead for a direct approach. Once a correct and
+complete definition has been reached, if the data set is too big to
+fit in the call stack as allocated by the operating system, then a
+tail form definition should be obtained by transforming the current
+definition.  In some simple cases, a direct approach can be in tail
+form, but the point still holds in general: at first, let us ignore
+all concerns about the definition being in tail form. Accordingly, let
+us use the control context of a recursive call to record the visited
+items. A list being either empty or not, the following two clauses
+come naturally to mind:
+\begin{alltt}
+rm_fst(I,   []) -> \fbcode{[J|rm_fst(I,L)]};
+rm_fst(I,[J|L]) -> \fbcode{[J|rm_fst(I,L)]}.
+\end{alltt}
+Then, just as we tried with~\erlcode{mem/2}, we must distinguish the
+case when \erlcode{I}~is the same as~\erlcode{J}:
+\begin{alltt}
+rm_fst(I,   []) -> \fbcode{[J|rm_fst(I,L)]};
+\textbf{rm_fst(I,[I|L]) ->} \fbcode{[J|rm_fst(I,L)]}\textbf{;}\hfill% \emph{Equality constraint}
+rm_fst(I,[J|L]) -> \fbcode{[J|rm_fst(I,L)]}.
+\end{alltt}
+Now, we know that the last clause deals with the case when the item
+\erlcode{I}~is not~\erlcode{J}, thus we must memorise~\erlcode{J} and
+go on comparing~\erlcode{I} with the other items in~\erlcode{L} (if
+any). This is where the recursive call with a control context,
+discussed above, is set as \erlcode{[J|\textvisiblespace]}:
+\begin{alltt}
+rm_fst(I,   []) -> \fbcode{[J|rm_fst(I,L)]};
+rm_fst(I,[I|L]) -> \fbcode{[J|rm_fst(I,L)]};
+rm_fst(I,[J|L]) -> \textbf{[J|rm_fst(I,L)]}.
+\end{alltt}
+Very importantly, let us remark that the position of~\erlcode{J} in
+the result is the same as in the input (the head of a list). The
+second clause corresponds to the case where the item we are looking
+for, namely~\erlcode{I}, is found to be the head of the current list,
+which is a sub\hyp{}list of the original input. A list made of
+successive items from the beginning of a given list is called a
+\emph{prefix} of the latter. When a list is a sub\hyp{}list of
+another, that is, it is made of successive items including the last,
+it is called a \emph{suffix}. We know that the~\erlcode{I} in
+\erlcode{[I|L]} is the first occurrence of~\erlcode{I} in the original
+list (the one in the first call), because we wouldn't be dealing with
+this case \emph{again}: the specification states that this first
+occurrence must be absent from the resulting list; since it is now at
+the head of a suffix, we just need to end with~\erlcode{L},
+\emph{which we do not visit}:
+\begin{alltt}
+rm_fst(I,   []) -> \fbcode{[J|rm_fst(I,L)]};
+rm_fst(I,[I|L]) -> \textbf{L};
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)].
+\end{alltt}
+The first clause handles the case where we traversed the whole
+original list (up to \erlcode{[]}) without finding \erlcode{I}. Thus
+the result is simply the empty list because the empty list without
+\erlcode{I} is the empty list:
+\begin{alltt}
+rm_fst(I,   []) -> \textbf{[]};
+rm_fst(I,[I|L]) -> L;
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)].
+\end{alltt}
+We can simplify a little bit by muting variables whose values are
+useless and finally settle for\label{code:rm_fst}
+\begin{alltt}
+rm_fst(\textbf{\_},   []) -> [];\hfill% \emph{Here}
+rm_fst(I,[I|L]) -> L;
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)].
+\end{alltt}
+Note that it is incorrect to write
+\begin{alltt}
+rm_fst(_,   []) -> [];
+rm_fst(\textbf{\_},[\textbf{\_}|L]) -> L;\hfill% \emph{Error}
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)].\hfill% \emph{Becomes useless}
+\end{alltt}
+We must understand the underscore (\erlcode{\_}) as an unknown
+variable, yet unique in the pattern where it occurs. So two
+underscores in the same pattern, as we mistakenly just put, may or
+\emph{may not} denote the same value. Only variables which are not
+used in the body \emph{and} which are not repeated in the head can be
+correctly replaced by underscores. Perhaps is it timely now to comment
+on the name we chose: \erlcode{rm\_fst}. It obviously stands for
+``remove (the) first (occurrence),'' but, as we came to realise, nothing
+is actually removed from the original list: every time a new list is
+reconstructed from it, but without the first occurrence of a given
+item. The usual conception of removing supposes a permanent state, an
+object or entity of some sort, such that, after the removal, some part
+of it is lacking. This idea has no avatar in functional languages,
+like \Erlang, whose run\hyp{}time environments build new values from
+old ones only by copying and sharing. This, of course, bears the
+question of how and when is old data discarded by the
+run\hyp{}time. This task is appointed to the \emph{garbage collector},
+which can be thought of as a concurrent process with access to the
+memory of the program being executed. There are many kinds of
+strategies to determine when some data is definitely useless and we
+shall not expand on this complicated subject here. Just let us imagine
+that there is an invisible oracle which is taking care of the
+deallocation of useless data, that is, releasing memory space for other
+usages. The second question that is also logically entailed is how
+costly is it to copy parts from the old data, for instance, the arguments of a
+function call, to the new data, for instance, the result of a function
+call. For example, in the definition of \erlcode{rm\_fst/2}, the
+second body is \erlcode{L}, which is a suffix of the original (input)
+list. Is it necessarily duplicated in memory or can it be shared
+between the input and the output? We shall answer this question later.
+
+Let us run some tests now and, in order to follow them easily, it is
+handy to label the clauses with some Greek
+letters:\label{code:rm_fst_alpha}
+
+\input{rm_fst_alpha}
+
+\noindent We can then try some of the examples given
+\vpageref{rm_fst_ex}.
+\begin{tabbing}
+\erlcode{rm\_fst([],[4,[1,2],[],[],4])}\\
+\erlcode{rm\_fst([5,2],[3,[]])} \= \(\smashedrightarrow{\gamma}\) \=\kill 
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{[4|rm\_fst([],[[1,2],[],[],4])]}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{[4|[[1,2]|rm\_fst([],[[],[],4])]]}\\
+\> \(=\) \> \erlcode{[4,[1,2]|rm\_fst([],[[],[],4])]}\\
+\> \(\smashedrightarrow{\beta}\) \> \erlcode{[4,[1,2]|[[],4]]}\\
+\> \(=\) \> \erlcode{[4,[1,2],[],4]}.\\
+\erlcode{rm\_fst([5,2],[3,[]])}
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{[3|rm\_fst([5,2],[[]])]}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{[3|[[]|rm\_fst([5,2],[])]]}\\
+\> \(=\) \> \erlcode{[3,[]|rm\_fst([5,2],[])]}\\
+\> \(\smashedrightarrow{\alpha}\) \> \erlcode{[3,[]|[]]}\\
+\> \(=\) \> \erlcode{[3,[]]}.
+\end{tabbing}
+Once we are convinced that our definition is correct and
+complete with respect to the specification, there is a little extra
+worth testing: we can check \emph{what happens for inputs which are
+  not expected by the specification.} Our specification says at one
+point that the second argument of \erlcode{rm\_fst/2} is a list. What
+happens if we supply an integer instead? For example, we have
+\erlcode{rm\_fst([],3)} \(\nrightarrow\). We have a match failure,
+that is, the rewrites are stuck, which means that our definition is
+not \emph{robust}, that is, it fails abruptly on unspecified
+inputs. When programming in the small, as we do here, robustness is
+usually not a concern because we want to focus on learning the
+language and how to express simple algorithms with it, but when
+developing programs whose customers are other people or simply when
+making large applications, even for ourselves, it is important to make
+the code robust by means of error signalling, catching and
+display. Notice that a program can be complete but not robust, because
+completeness is relative to what is specified (all valid inputs must
+be accepted and not lead to an error), whilst robustness is relative
+to what is left unspecified. In the present case, what can be done to
+add robustness to our definition of \erlcode{rm\_fst/2}? We can add a
+\emph{last} clause to handling the case where the second argument is
+not a list and make the body be the empty list:
+\begin{alltt}
+rm_fst(_,   []) -> [];
+rm_fst(I,[I|L]) -> L;
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)]\textbf{;}
+\textbf{rm_fst(_,    _) -> []}.\hfill% \emph{A catch-all clause}
+\end{alltt}
+But why the empty list in the first place? Why not? Any kind of list
+would be fine, actually. The first clause has become useless, because
+the empty list is matched by the underscore, as the underscore is a
+special variable and variables match anything, so we can simplify the
+definition:
+\begin{alltt}
+rm_fst(I,[I|L]) -> L;
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)];
+rm_fst(_,    _) -> [].
+\end{alltt}
+Now \erlcode{rm\_fst/2} never fails but \Erlang does not enforce that
+this function will never be called with a second argument which is not
+a list. Other functional languages, like \Haskell or \OCaml, feature
+\emph{type systems} that enable their compilers to prove that all
+calls are \emph{type\hyp{}safe}, that is, their computations will
+never lead to an error due to the nature of some argument or,
+generally, to values being used with wrong assumptions, for instance, they
+forbid expressions like \erlcode{[] + 1}, which is allowed by \Erlang
+compilers. In \OCaml, the question of the robustness of the definition
+of \erlcode{rm\_fst\_\_/3} would not be raised, since the compiler
+would refuse to compile a program with a call to it with a second
+argument that would not be a list. Thus there would be no need and
+even no way to add a catch\hyp{}all clause as we did here. It may be
+argued, of course, that the caller will not know that it called
+\erlcode{rm\_fst/2} with a wrong second argument. These considerations
+are akin to discussing the merits and weaknesses of scripting
+languages, which try very hard to ignore errors by defaulting on
+special values (like the empty string) to keep running, as opposed to
+programming languages that impose strong requirements at
+compile\hyp{}time about the way values are processed. If defaulting on
+the empty list is considered an issue, \Erlang allows another kind of
+value, in addition to integer and lists: \emph{atoms}. Atoms are
+enumerated values whose name only is known. In other words, an atom is
+known by its name and the fact that it is unique in the whole program,
+that is, another atom with a different name is a different value. By
+contrast, two different variables can denote the same value. Atoms
+follow the same lexical rules as function names, that is: they must
+start with a lowercase letter and may be followed by any number of
+letters, numbers or underscores. For instance \erlcode{error} and
+\erlcode{empty} and \erlcode{hello} are valid atoms and we can trust
+that they are pairwise different, that is, their unknown values are
+distinct when considered two by two: \erlcode{error} \(\neq\)
+\erlcode{empty} etc.
+
+Here is the definition of a function which distinguishes between lists
+and non\hyp{}list arguments:\label{code:is_a_list}
+\begin{verbatim}
+is_a_list(   []) -> yes;
+is_a_list([_|_]) -> yes;
+is_a_list(    _) -> no.
+\end{verbatim}
+As any other kind of value, atoms can be mixed within more complex
+values, for instance, \erlcode{[8,blue,yellow,17,green]}. Atoms are handy to
+signal errors because they are unique identifiers, therefore they
+cannot be confused with any other kind of data the function computes
+and so can be detected easily by the caller. Consider this robust
+version of \erlcode{rm\_fst/2} which distinguishes errors from
+specified computations:
+\begin{alltt}
+rm_fst(_,   []) -> [];
+rm_fst(I,[I|L]) -> L;
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)];
+rm_fst(_,    _) -> \textbf{error}.\hfill% \emph{An atom}
+\end{alltt}
+Then a function calling \erlcode{rm\_fst/2} can make the difference
+between a normal rewrite and an error by using an atom as a pattern:
+\begin{alltt}
+caller(I,L)   -> check(rm_fst(I,L)).
+check(error)  -> \fbcode{[........]};\hfill% \emph{Atom as a pattern}
+check(Result) -> \fbcode{[........]}.
+\end{alltt}
+In order to develop further our programming skills, let us imagine
+that a tail form definition of \erlcode{rm\_fst/2} is needed. The best
+is to start from the version not in tail form and see where it fails
+to be in tail form. Only one body is not in tail form: the last,
+precisely because we use the control context to store the items which
+are not the one we are looking for. We hence need to add an
+accumulative parameter \erlcode{A} to the definition, which becomes
+\erlcode{rm\_fst/3}, and we define a new function
+\erlcode{rm\_fst\_tf/2} which must be, in the end, equivalent to
+\erlcode{rm\_fst/2} but in tail form (we frame the code to be
+reconsidered and in bold is the change):
+\begin{alltt}
+rm_fst_tf(I,L)    -> rm_fst(I,L,\fbcode{[]}).
+rm_fst(_,   [],\textbf{A}) -> \fbox{[]};
+rm_fst(I,[I|L],\textbf{A}) -> \fbox{L};
+rm_fst(I,[J|L],\textbf{A}) -> \fbox{[J|rm_fst_tf(I,L,\textbf{A})]}.
+\end{alltt}
+We learnt from the transformation from \erlcode{join/2} to
+\erlcode{join\_tf/2}, \vpagerefrange{trans_join}{code:join_tf}, that
+we can push the variable in the control context, that is, \erlcode{J},
+onto the accumulator \erlcode{A}:
+\begin{alltt}
+rm_fst_tf(I,L)    -> rm_fst(I,L,\fbcode{[]}).
+rm_fst(_,   [],A) -> \fbox{[]};
+rm_fst(I,[I|L],A) -> \fbox{L};
+rm_fst(I,[J|L],A) -> rm_fst_tf(I,L,\textbf{[J|A]}).
+\end{alltt}
+Now \erlcode{J} is pushed on \erlcode{A}, not on the call anymore,
+therefore the order of the items is reversed: the second argument is
+reversed on the accumulator until either the end is reached or
+\erlcode{I} is found. If the latter (second clause of
+\erlcode{rm\_fst/3}), we cannot just return \erlcode{L} as we did
+because there is no control context to provide the past items anymore:
+we need to use the accumulator. We already know that \erlcode{A}
+contains the previous items in reverse order and \erlcode{L} contains
+the remaining, unvisited, items. So we can try the following:
+\begin{alltt}
+rm_fst_tf(I,L)    -> rm_fst(I,L,\fbcode{[]}).
+rm_fst(_,   [],A) -> \fbox{[]};
+rm_fst(I,[I|L],A) -> \textbf{join(rev(A),L)};
+rm_fst(I,[J|L],A) -> rm_fst_tf(I,L,[J|A]).
+\end{alltt}
+At this point, we should hear a bell ringing because this body reminds
+us of \erlcode{srev/1} defined as \verbatiminput{srev.def} and about
+which we determined that its delay was asymptotically quadratic; in
+other words, it is slow. The reason of its slowness was due to the
+repeated calls to \erlcode{join/2} with the length of the first
+argument ranging from \(n-1\) to \(0\), where \(n\) is the length of
+the input list. This deficiency was remedied by using an auxiliary
+function \erlcode{rev\_join/2} with an accumulator:
+\verbatiminput{rev.def} A look back at \fig~\vref{fig:rev_321ast}
+suggests that if the input list has length \(n\), then the first item
+is pushed \(n-1\) times in total, the second item \(n-2\) etc. until
+the last item is unmoved. So the problem boiled down to the
+reprocessing the same data over and over again, not to the function
+\erlcode{join/2} being slow or evil in itself.
+
+\medskip
+
+\paragraph{Improvements.}
+
+Then what should we do to improve on this slow scheme? The study of
+the previous definition gives the key. The purpose is to reverse a
+list (\erlcode{A}) on top of another (\erlcode{L}). This is what
+\erlcode{rev\_join/2} \emph{efficiently} does:
+\begin{alltt}
+rm_fst_tf(I,L)    -> rm_fst(I,L,\fbcode{[]}).
+rm_fst(_,   [],A) -> \fbox{[]};
+rm_fst(I,[I|L],A) -> \textbf{rev_join(A,L)};
+rm_fst(I,[J|L],A) -> rm_fst_tf(I,L,[J|A]).
+\end{alltt}
+It is incorrect to write \erlcode{rev\_join(L,A)} in stead of
+\erlcode{rev\_join(A,L)}. We can now finish the definition because we
+know exactly the contents of the accumulator: it contains a reversed
+prefix of the list up to the current situation. In the case of the
+second clause, the situation in question is that the end of the
+original list has been reached (\erlcode{[]}). In other words,
+\erlcode{A} contains the complete original list in reverse
+order. Hence, the complete definition is
+\begin{alltt}
+rm_fst_tf(I,L)    -> rm_fst(I,L,\fbcode{[]}).
+rm_fst(_,   [],A) -> \textbf{rev(A)};
+rm_fst(I,[I|L],A) -> rev_join(A,L);
+rm_fst(I,[J|L],A) -> rm_fst_tf(I,L,[J|A]).
+\end{alltt}
+The work is not done yet, as the initial value of the accumulator has
+to be determined. (As a side note, this example shows that a program
+is not compulsorily best written from top to bottom. After all,
+programs are not English essays and programming is perhaps more akin
+to painting.) Since it is a list in which another is being reversed to
+be later reversed again, it is important to start with an empty list,
+otherwise extraneous initial items would be found in the final value:
+\begin{alltt}
+rm_fst_tf(I,L)    -> rm_fst(I,L,\textbf{[]}).
+rm_fst(_,   [],A) -> rev(A);
+rm_fst(I,[I|L],A) -> rev_join(A,L);
+rm_fst(I,[J|L],A) -> rm_fst_tf(I,L,[J|A]).
+\end{alltt}
+Compiling this definition, which needs first to be embedded in a
+module, displays an error:
+\begin{center}
+\texttt{function rm\_fst\_tf/3 undefined}
+\end{center}
+in the last clause. Indeed, it should be \erlcode{rm\_fst}
+instead of \erlcode{rm\_fst\_tf}. So the correct tail form definition
+is\label{code:rm_fst_tf}
+\begin{alltt}
+rm_fst_tf(I,L)    -> rm_fst(I,L,[]).
+rm_fst(_,   [],A) -> rev(A);
+rm_fst(I,[I|L],A) -> rev_join(A,L);
+rm_fst(I,[J|L],A) -> \textbf{rm_fst}(I,L,[J|A]).\hfill% \emph{Fixed}
+\end{alltt}
+More precisely, \erlcode{rm\_fst\_tf/2} is in tail form because
+the definition of a function is in tail form if, and only if,
+\begin{enumerate}
+
+  \item the bodies of its definition are in tail form. A body is in
+    tail form if it is a constant (either a variable, an integer, an
+    atom or a list made of these or empty) or a function call whose
+    arguments are either constants or arithmetic expressions.
+
+  \item the functions called in these bodies are in tail form too.
+
+\end{enumerate}
+The definition of ``being in tail form'' is syntactical in nature, that is,
+it depends only on the shape of the code, not on what it computes, and
+it is recursive. The definition of the function itself does not need
+to be recursive, since, for example, \erlcode{id(X) -> X.}  is a
+definition in tail form which is not recursive. For example, if
+\erlcode{rev/1} were not in tail form, then \erlcode{rm\_fst/3} would
+not be in tail form as well, despite having the right shape (no
+control contexts for the calls) and so would not
+\erlcode{rm\_fst\_tf/2} be in tail form.
+
+\medskip
+
+\paragraph{Membership test.}
+
+Before analysing the performance of \erlcode{rm\_fst/2} and
+\erlcode{rm\_fst\_tf/2}, let us backtrack and find a definition to the
+restive \erlcode{mem/2}. The key is to use some atom to distinguish
+the case when the sought item is present and when it is absent. Let us
+use two atoms, one for each case:
+\begin{alltt}
+mem(_,   []) -> \textbf{false};
+mem(I,[I|_]) -> \textbf{true};
+mem(I,[_|L]) -> mem(I,L).
+\end{alltt}
+Note that the choice of the atom, just like a variable, is important
+for the legibility of the program. It is important not to mislead the
+caller by writing, for instance
+\begin{alltt}
+mem(_,   []) -> \textbf{true};
+mem(I,[I|_]) -> \textbf{false};
+mem(I,[_|L]) -> mem(I,L).
+\end{alltt}
+despite this being a valid definition. Anyhow, whatever the atoms, the
+specification and the comments should state their interpretation
+explicitly. Here, we would expect something like: ``The function
+\erlcode{mem/2} determines the membership of an item to a list. The
+function call \erlcode{mem(\(I\),\(L\))} results in the atom
+\erlcode{true} if, and only if, item \(I\) is an element of list
+\(L\), otherwise the result is the atom \erlcode{false}. If \(L\) is
+not a list, the call fails immediately due to a match failure.'' We
+insist in using slanted letters, for instance, \(I\) or \(L\), instead of
+\erlcode{I} or \erlcode{L}, because \(I\), for example, denotes
+\emph{any} \Erlang value whatsoever, while \erlcode{I} denotes any
+\Erlang value \emph{in a specific clause}. Technically, \(I\) and
+\(L\) are called \emph{metavariables} because they denote \Erlang
+expressions independently of any particular definition, as opposed to
+variables which denote a value in a particular clause of a particular
+definition.
+
+On a last note, we should underline that the multiple occurrences of
+\erlcode{I} in the definition of \erlcode{mem/2} implies an equality
+test at run\hyp{}time that can be slow if \erlcode{I} denotes a large
+value. However, for the sake of simplicity, we will not take this kind
+of implicit computational overhead into account when assessing the
+speed of a function. As a rough approximation of the wall\hyp{}clock
+time, we shall only count the number of functions calls needed to
+evaluate a given function call, what we call its \emph{delay}. As an
+extreme example demonstrating that this is not the whole story, mind
+\begin{alltt}
+tautology(X) -> eq(X,X).
+eq(X,X) -> true;
+eq(_,_) -> false.
+\end{alltt}
+
+\smallskip
+
+\paragraph{Delays.}
+
+Let us assess the delay of \erlcode{rm\_fst/2} and
+\erlcode{rm\_fst\_tf/2}. Contrary to previous functions up to now, the
+delay of \erlcode{rm\_fst(\(I\),\(L\))} depends on the position of the
+first occurrence of item \(I\) in the list \(L\), of length \(n\),
+because of clause \clause{\beta} in
+\begin{alltt}
+rm_fst(_,   []) \(\smashedrightarrow{\alpha}\) [];\hfill% \emph{Absent}
+rm_fst(I,[I|L]) \(\smashedrightarrow{\beta}\) L;\hfill% \emph{Present}
+rm_fst(I,[J|L]) \(\smashedrightarrow{\gamma}\) [J|rm_fst(I,L)].\hfill% \emph{Search further}
+\end{alltt}
+More precisely, there are three cases:
+\begin{itemize}
+
+  \item \(L\) is empty;
+
+  \item \(L\) is not empty and \(I\) is absent;
+
+  \item \(L\) is not empty and \(I\) occurs at position
+    \(k\), counting the head of \(L\) as position \(0\).
+
+\end{itemize}
+In the first case, the delay is \(1\), by clause
+\clause{\alpha}. Otherwise, the recursive call in clause
+\clause{\gamma} is repeated \(n\) times until either clause
+\clause{\alpha} or \clause{\beta} applies. If the item is absent, then
+\clause{\alpha} applies and the delay is \(n+1\). Otherwise, it is
+\(k+1\). All these execution traces can be formally summarised as
+\(\gamma^n\alpha+\gamma^k\beta\), where the addition signifies a
+disjunction, that is, in operational terms, a choice. (Composition of
+clauses do not commute, for instance, \(\gamma\alpha \neq \alpha\gamma\), but
+disjunction does, for instance, \(\alpha + \beta = \beta + \alpha\).) For
+example, the delay of \erlcode{rm\_fst(1,[4,2,1,7,1])} is \(3\)
+because clause \clause{\gamma} is used \(2\) times and, finally,
+clause \clause{\beta} once, which corresponds to the execution trace
+\(\gamma^2\beta\). If we interpret \(k=n\) as meaning that \(I\) is
+absent from a non\hyp{}empty \(L\), then the delay is always \(k+1\),
+which is concisely expressed by \(\abs{\gamma^k(\alpha+\beta)} = k
+\cdot \abs{\gamma} + \abs{\alpha + \beta} = k +1\). The length of a
+disjunction of clauses, for instance, \(\abs{\alpha + \beta}\), is defined
+only if the disjoint sub\hyp{}traces have the same length, here,
+\(\abs{\alpha} = \abs{\beta} = 1\). We cannot extend the formula
+\(k+1\) to be valid when \(L\) is empty, as it would require \(k=0\)
+and this case means that \(I\) is the head of \(L\). If we note
+\(\comp{rm\_fst}{n,k}\) the delay for computing the call
+\erlcode{rm\_fst(\(I\),\(L\))}, where \(L\) contains \(n\) items and
+\(k\) is the position at which the first occurrence of \(I\) occurs in
+\(L\), then\label{comp_rm_fst}
+\[
+\comp{rm\_fst}{n,k} = k + 1,\,\; \text{with} \,\; 0 \leqslant k
+\leqslant n,
+\]
+with the convention that \(k=n\) if it is missing. If the list is
+empty, that is, \(n=0\), then the inequalities imply that \(k=0\), but
+this is not interpreted as \(I\) being the head of \(L\).
+
+It is now easy to deduce what are the best and worst cases for the
+delay, that is, for a given size \(n\) of the input, what are the
+configurations that lead to a minimum or maximum number of rewrites to
+reach the result, that is, a value.
+
+Let us note \(\best{rm\_fst}{n}\) the delay in the best case and
+\(\worst{rm\_fst}{n}\) the delay in the worst case. The above formulas
+define them immediately. The minimum value of \(\comp{rm\_fst}{n,k}\)
+is when \(k=0\) (keep in mind that \(n\) is fixed in this analysis),
+that is, the item we sought is the head of the list. If the list is
+empty, that is, \(n=0\), then there is only one case and the delay is
+\(1\). The worst case happens when \(k=n\), that is, when the item is
+absent from the list. For \(n \geqslant 0\),
+\begin{align*}
+\best{rm\_fst}{n}  &:= 
+  \min_{0 \leqslant k \leqslant n}{\comp{rm\_fst}{n,k}} = 1,\\
+\worst{rm\_fst}{n} &:=
+  \max_{0 \leqslant k \leqslant n}{\comp{rm\_fst}{n,k}} = n + 1
+\mathrel{\sim} n,\,\; \text{as} \,\; n \rightarrow \infty.
+\end{align*}
+The best and worst delays provide bounds for the delay, but more can
+be said. The \emph{average delay} is the arithmetic mean of the delays
+on all possible inputs. Usually, the number of inputs is infinite so
+some additional assumptions are usually necessary, depending on the
+problem at hand. In the case of \erlcode{rm\_fst/2}, the only thing
+that matters is the position of the item to be removed and it does not
+suppose anything about the other items, for instance, their relative order or
+value. The problem is thus equivalent to being given a list \(L\) and
+considering all its items for removal. This leads to define the
+average delay as
+\[
+\ave{rm\_fst}{n}
+  :=
+    \frac{1}{n}\sum_{I \in L}\delay{rm\_fst(\(I\),\(L\))}.
+\]
+Consider that the average delay is not the measure of the delay of a
+single operation because it may be that no configuration of the input
+leads to the average delay. It may also not be the most probable delay
+of a single operation, because this depends on the distribution of all
+the delays. Let us resume our calculation. Since an item in a list is
+uniquely referred to by its position, it is equivalent to write
+\begin{equation}
+\ave{rm\_fst}{n}
+  = \frac{1}{n}\sum_{k=0}^{n-1}{\comp{rm\_fst}{n,k}}
+  = \frac{1}{n}\sum_{k=0}^{n-1}{(k+1)}
+  = \frac{1}{n}\sum_{k=1}^{n}{k}
+  = \frac{n+1}{2}.\label{ave_rm_fst}
+\end{equation}
+We cannot compare \(\ave{rm\_fst}{n}\) and \(\worst{rm\_fst}{n}\)
+because the latter assumed that the item is absent, whilst the former
+assumed the contrary. The worst case when the item is present happens
+when the item is last, that is, \(k=n-1\), the delay is then
+\(
+\worst{rm\_fst}{n} = \comp{rm\_fst}{n,n-1} = (n-1) + 1 = n.
+\)
+Therefore,
+\begin{equation}
+\ave{rm\_fst}{n} \mathrel{\sim} \tfrac{1}{2}\worst{rm\_fst}{n},\,\;
+\text{as} \,\; n \rightarrow \infty.\label{eq:ave_rm_fst}
+\end{equation}
+In other words, the asymptotic average delay is midway between the
+best and worst delays (the best delay is \(1\)).
+
+For the sake of versatility, let us prove that \(\sum_{k=1}^{n}{k} =
+n(n+1)/2\) in yet another way, by telescoping successive terms of the
+series \((n^2)_{n>0}\), that is, summing the differences \((n+1)^2 -
+n^2\). The key is that these differences have a simple, closed
+expression: \((n+1)^2 - n^2 = 2n + 1\).\label{tele_squares}
+\begin{align*}
+  && (1+1)^2 - \boxed{1^2} &= 2^2 - 1^2 = 2 \cdot 1 + 1\\
++ && (2+1)^2 - 2^2         &= 3^2 - 2^2 = 2 \cdot 2 + 1\\
++ &&&\;\;\vdots\\
++ && \boxed{(n+1)^2} - n^2 &= 2 \cdot n + 1
+\intertext{\rule{\linewidth}{0.4pt}}
+\Rightarrow 
+  &&\boxed{(n+1)^2} - \boxed{1^2}
+  &= 2 \sum_{k=1}^{n}{k} + n.
+\end{align*}
+Finally: \(\sum_{k=1}^{n}{k} = n(n+1)/2\). Let us consider now the
+delay for calls \erlcode{rm\_fst\_tf(\(I\),\(L\))}, with
+\begin{alltt}
+rm_fst_tf(I,L)    \(\smashedrightarrow{\alpha}\) rm_fst(I,L,[]).
+rm_fst(_,   [],A) \(\smashedrightarrow{\beta}\) rev(A);
+rm_fst(I,[I|L],A) \(\smashedrightarrow{\gamma}\) rev_join(A,L);
+rm_fst(I,[J|L],A) \(\smashedrightarrow{\delta}\) rm_fst(I,L,[J|A]).
+\end{alltt}
+Just as before, there are three cases:
+\begin{itemize}
+
+  \item \(L\) is empty;
+
+  \item \(L\) is not empty and \(I\) is absent;
+
+  \item \(L\) is not empty and \(I\) occurs at position
+    \(k\), counting the head of \(L\) as position \(0\).
+
+\end{itemize}
+In the first case, clause \clause{\alpha} is used once, then clause
+\clause{\beta} once and finally we have to add the delay of the call
+\erlcode{rev([])}, which is \(2\). The total delay is thus \(4\).
+
+Let us now assume that \(L\) contains \(n > 0\) items and that the
+item \(I\) we are looking for is missing from \(L\). Then the call
+\erlcode{rm\_fst\_tf(\(I\),\(L\))} leads to
+\begin{itemize}
+
+  \item clause \clause{\alpha} being used once,
+
+  \item clause \clause{\delta} being used \(n\) times,
+
+  \item clause \clause{\beta} being used once,
+
+  \item clause \clause{\gamma} being unused.
+
+\end{itemize}
+This execution trace is formally \(\alpha\delta^n\beta\), but it is
+partial as we must take into account the delays of the calls other
+than to \erlcode{rm\_fst/3}: only \erlcode{rev(A)} remains and we know
+that its delay is always the length of \erlcode{A} plus \(2\) (on page
+\pageref{delay:rev_join}). What is the length of the accumulator in
+the body of clause \clause{\beta}? The body of clause \clause{\delta}
+gives the answer: the accumulator contains all the items from the
+input list but in reverse order, that is, its length is also
+\(n\). Therefore the total delay is \((1)+(n)+(1+(n+2)) = 2n + 4\).
+
+Now let us suppose that \(I\) does occur in \(L\) at position \(k\),
+counting the head of the list as being at position \(0\). Then
+\begin{itemize}
+
+  \item clause \clause{\alpha} is used once;
+
+  \item clause \clause{\delta} is used \(k\) times, from positions
+    \(0\) to \(k-1\);
+
+  \item clause \clause{\beta} is unused;
+
+  \item clause \clause{\gamma} is used once.
+
+\end{itemize}
+Formally, this is the partial execution trace
+\(\alpha\delta^k\gamma\), which must be completed by taking into
+account the call \erlcode{rev\_join(A,L)}. We know from equation
+\eqref{delay:rev_join} \vpageref{delay:rev_join} that
+\(\comp{rev\_join}{n} = n + 1\), where \(n\) is the length of the
+first argument. In clause \clause{\gamma} this argument is \erlcode{A}
+and we know that it contains the first \(k\) items of \(L\), because
+clause \clause{\delta} was used \(k\) times. Therefore, we have to add
+\(k+1\) steps to the previous count, so the total delay is \(1 + k + 1
++ (k+1) = 2k + 3\), with \(k < n\).
+
+We may wonder why there is a difference in the additive constants of
+the two last cases: \(2n+4\) versus \(2k+3\). Looking again at our
+calculations reveals that the difference comes from calling
+\erlcode{rev(A)} in clause \clause{\beta}, which in turn calls
+\erlcode{rev\_join(A,[])}: this adds one more rewrite, whereas we
+could call \erlcode{rev\_join/2} directly, just like in clause
+\clause{\gamma}. It is in fact equivalent to define
+\erlcode{rm\_fst\_tf/2} as follows (change in bold):
+\begin{alltt}
+rm_fst_tf(I,L)    \(\smashedrightarrow{\alpha}\) rm_fst(I,L,[]).
+rm_fst(_,   [],A) \(\smashedrightarrow{\beta}\) \textbf{rev\_join(A,[])};
+rm_fst(I,[I|L],A) \(\smashedrightarrow{\gamma}\) rev_join(A,L);
+rm_fst(I,[J|L],A) \(\smashedrightarrow{\delta}\) rm_fst(I,L,[J|A]).
+\end{alltt}
+Now the delay when the item is absent becomes \(2n+3\), mirroring
+nicely the delay when it first occurs at position \(k\), that is,
+\(2k+3\). Note that making the previous change in order to save one
+function call is not something useful in general. We did it because it
+helped evince that there is a common concept shining through the
+different cases: if we take the convention that \(k=n\) means that
+\(I\) is not in \(L\), then the delay is \(2k+3\) if \(L\) is not
+empty. If it is empty, the delay is \(1+1+(0+1)=3\), which would be
+obtained by taking \(k=0\) in \(2k+3\), but this would normally be
+interpreted as meaning that \(I\) is the first item of \(L\), that is,
+the head of \(L\). Hence the empty list seems to be a special case. If
+we really want to have one single formula for the delay, we can take
+the additional convention that \(k=-1\) means that the list is
+empty. This leads to a delay of \(2 \cdot (-1)+3=1\). Can we modify
+the definition so that becomes true without changing the other cases?
+Yes, by adding a clause:
+\begin{alltt}
+\textbf{rm_fst_tf(I,[])   -> [];}
+rm_fst_tf(I, L)   -> rm_fst(I,L,[]).
+rm_fst(_,   [],A) -> rev_join(A,[]);
+rm_fst(I,[I|L],A) -> rev_join(A,L);
+rm_fst(I,[J|L],A) -> rm_fst(I,L,[J|A]).
+\end{alltt}
+Again, this last modification is only made with a didactic purpose in
+mind and it may not be worthwhile in general, but it does allow one to
+roundly say that
+\[
+\comp{rm\_fst\_tf}{n,k} = 2k+3,\,\; \text{where} \,\; -1 \leqslant k
+\leqslant n,
+\]
+\(k\) being the position of \(I\) in \(L\), whose length is \(n\);
+\(k=-1\) means that \(L\) is empty, so \(n=0\); \(k=n\) means that
+\(I\) is absent from a non\hyp{}empty \(L\).
+
+We can now deduce what are the best and worst cases, by respectively
+minimising and maximising the two previous delays when \(k\)
+varies---recall that the best and worst cases are defined for a given
+\(n\). The best case is when \(k=0\) and the worst is when
+\(k=n\). Thus, the best case happens when \(I\) is the head of \(L\)
+and the worst case is when \(I\) is absent from \(L\). If the list is
+empty, that is, \(k=-1\), it means that \(L\) is empty, that is, \(n=0\),
+and, thus, there is only one case which is both the best and the
+worst. If we note \(\worst{rm\_fst\_tf}{n}\) the delay in the worst
+case and \(\best{rm\_fst\_tf}{n}\) the delay in the best case, we
+have, for \(n > 0\),
+\begin{gather*}
+\comp{rm\_fst\_tf}{0,-1} = \best{rm\_fst\_tf}{0} =
+\worst{rm\_fst\_tf}{0} = 1,\\
+\best{rm\_fst\_tf}{n}  = 3,\quad \worst{rm\_fst\_tf}{n} = 2n+3
+\mathrel{\sim} 2n,\,\; \text{as} \,\; n \rightarrow \infty.
+\end{gather*}
+How does \erlcode{rm\_fst/2} and \erlcode{rm\_fst\_tf/2} compare in
+terms of delays? When comparing delays, we must be cautious because,
+while it is always mathematically possible to relate real numbers,
+doing so is not necessarily meaningful. For instance, let us suppose
+that we have two functions \erlcode{f/1} and \erlcode{g/1} and we
+determined their exact delays \(\comp{f}{n}\) and \(\comp{g}{n}\). If
+both functions are equivalent, that is, if for all the same inputs
+they compute the same outputs, it is meaningful to compare their exact
+delays and also their asymptotic delays. If their delays are only
+known in some worst case, it is important to make sure that the worst
+case of \erlcode{f/1} is the worst case of \erlcode{g/1} as well,
+otherwise the comparison is meaningless. For instance, it may be
+possible that the best case of \erlcode{f/1} is the worst case of
+\erlcode{g/1}. The same applies to best cases. Here, we have the exact
+delays of \erlcode{rm\_fst/2} and \erlcode{rm\_fst\_tf/2}. We simply
+deduce that
+\begin{align*}
+  \comp{rm\_fst}{0,-1} &= \comp{rm\_fst\_tf}{0,-1},
+& \comp{rm\_fst}{n,k} &< \comp{rm\_fst\_tf}{n,k},\,\; \text{for} \,\;
+  n > 0.
+\end{align*}
+Therefore, \(\comp{rm\_fst}{n,k} \leqslant \comp{rm\_fst\_tf}{n,k}\),
+for all \(n \geqslant 0\). More precisely, we can study the asymptotic
+behaviour of
+\[
+\comp{rm\_fst\_tf}{n,k}/\comp{rm\_fst}{n,k} = (2k+3)/(k+1)
+\mathrel{\sim} 2,\,\; \text{as} \,\; k \rightarrow \infty.
+\]
+In other words:
+\(
+\comp{rm\_fst\_tf}{n,k} \mathrel{\sim} 2 \cdot \comp{rm\_fst}{n,k},
+\,\; \text{as} \,\; k \rightarrow \infty \,\; \text{and} \,\; k <
+n.
+\)
+Asymptotically, \erlcode{rm\_fst/2} is thus twice as fast as
+\erlcode{rm\_fst\_tf/2}, although it needs to store in the call stack
+\(n\) items, whilst \erlcode{rm\_fst\_tf/2}, being in tail form, uses
+a small constant amount of call stack---just one call, actually.
+
+Assuming now that some item \(I\) is in the list \(L\), what is the
+average delay of \erlcode{rm\_fst\_tf(\(I\),\(L\))}? We already expect
+this to be the arithmetic mean of the delays for all positions. Let us
+denote \(\ave{rm\_fst\_tf}{n}\) this quantity, which is not an integer
+in general. Formally, it is defined as
+\[
+\ave{rm\_fst\_tf}{n}
+  = \frac{1}{n}\sum_{k=0}^{n-1}{\comp{rm\_fst\_tf}{n,k}}
+  = \frac{1}{n}\sum_{k=0}^{n-1}{(2k+3)} = n + 2.
+\]
+When the item is present in the list, the worst case happens when it
+is the last, that is, \(k=n-1\), so the delay is then
+\[
+\worst{rm\_fst\_tf}{n} 
+  = \comp{rm\_fst\_tf}{n,n-1} = 2(n-1)+3 = 2n + 1.
+\]
+Therefore, \(\ave{rm\_fst\_tf}{n} \mathrel{\sim} \tfrac{1}{2}
+\worst{rm\_fst\_tf}{n}\), as \(n \rightarrow \infty\). This is the
+same situation as with \(\ave{rm\_fst}{n}\).
+
+\medskip
+
+\paragraph{Alternate definition.}
+
+Let us envisage an alternative definition of
+\erlcode{rm\_fst/2}:\label{rm_fst_alt}
+\begin{alltt}
+rm_fst_alt(I,L)     \(\smashedrightarrow{\alpha}\) rm_fst__(I,L,[]).
+rm_fst__(_,   [],A) \(\smashedrightarrow{\beta}\) \textbf{A};
+rm_fst__(I,[I|L],A) \(\smashedrightarrow{\gamma}\) \textbf{join(A,L)};
+rm_fst__(I,[J|L],A) \(\smashedrightarrow{\delta}\) rm_fst__(I,L,\textbf{join(A,[J])}).
+\end{alltt}
+The expressions in bold in clauses \clause{\beta}, \clause{\gamma} and
+\clause{\delta} differ from the definition of \erlcode{rm\_fst/3}. The
+rationale behind its design is to consider the accumulator \erlcode{A}
+as a prefix of the original list, not as a reversed prefix as we did
+before. That is why, instead of pushing \erlcode{J} on \erlcode{A} in
+clause \(\delta\), \erlcode{join/2} is called so that \erlcode{[J]} is
+appended \emph{at the end} of \erlcode{A}. Consequently, the result is
+\erlcode{A}, instead of \erlcode{rev(A)}, in clause \(\beta\) and
+\erlcode{join(A,L)}, instead of \erlcode{rev\_join(A,L)}, in clause
+\(\gamma\). This solution is appealing on two grounds. Firstly, the
+order of the items is not reversed, which makes it easier to bear them
+in mind. Secondly, in the worst case, we avoid reversing two times the
+items as we did in \erlcode{rm\_fst/3}: the items of the original
+input were reversed into the accumulator and then the accumulator is
+reversed to make the final result. Let us compute the delays
+\(\comp{rm\_fst\_alt}{n,k} :=
+\delay{rm\_fst\_alt(\(I\),\(L\))}\), where \(n\) is the length of
+\(L\) and \(k\) is the location where \(I\) occurs in \(L\) (\(k = n\)
+if absent), and \(\comp{rm\_fst\_\_}{n,m} :=
+\delay{rm\_fst(\(I\),\(P\),\(Q\))}\), where \(n\) is the length of
+\(P\) and \(m\) the length of \(Q\). There are three cases:
+\begin{itemize}
+
+  \item \(L\) is empty;
+
+  \item \(L\) is not empty and \(I\) is absent;
+
+  \item \(L\) is not empty and \(I\) occurs at position
+    \(k\), counting the head of \(L\) as position \(0\).
+
+\end{itemize}
+In the first case, the execution trace is \(\alpha\beta\): the delay
+is \(\abs{\alpha\beta} = 2\). Let us now suppose that \(I\) is absent
+from \(L\), that is, \(k = n\).
+\begin{itemize}
+
+  \item clause \clause{\alpha} is used once;
+
+  \item clause \clause{\delta} is used \(n\) times;
+
+  \item clause \clause{\beta} is used once;
+
+  \item clause \clause{\gamma} is unused
+.
+\end{itemize}
+This execution trace is \(\alpha\delta^n\beta\), which must be
+completed with the call \erlcode{join(A,L)}. We know that
+\(\comp{join}{q} = q + 1\), where \(q\) is the length of \erlcode{A},
+from equation \eqref{delay:join} \vpageref{delay:join}. Assuming that
+\erlcode{L} contains \(p\) items, all this translates into the
+following recurrent equations, where \(p,q \geqslant 0\).
+\begin{align*}
+\comp{rm\_fst\_alt}{p,n}  &\eqn{\alpha} 1 + \comp{rm\_fst\_\_}{p,0},
+\qquad \comp{rm\_fst\_\_}{0,q} \eqn{\beta} 1,\\
+\comp{rm\_fst\_\_}{p+1,q} &\eqn{\delta} 1 + \comp{join}{q} +
+                             \comp{rm\_fst\_\_}{p,q+1}
+                          = 1 + (q+1) + \comp{rm\_fst\_\_}{p,q+1}.
+\end{align*}
+Note that we only used the information about whether a clause is used
+or not. Now we are going to use the fact that clause \clause{\delta}
+is used \(n\) times. Indeed, these recurrence equations should remind
+us of equations \eqref{eq:rev_join_p_q} of \erlcode{rev\_join/2}
+\vpageref{eq:rev_join_p_q}, albeit the slight difference has important
+consequences. We can use the same technique, called
+\emph{telescoping}, on the equation drawn from clause \clause{\delta},
+\(n\) times:
+\begin{align*}
+  && \boxed{\comp{rm\_fst\_\_}{n,m}} - \comp{rm\_fst\_\_}{n-1,m+1} &\eqn{\delta}
+  2 + (m+0) = m + 2\\
++ && \comp{rm\_fst\_\_}{n-1,m+1} - \comp{rm\_fst\_\_}{n-2,m+2}
+&\eqn{\delta} 2 + (m+1) = m + 3\\
++ &&&\;\;\vdots\\
++ &&\comp{rm\_fst\_\_}{1,m+(n-1)} - \boxed{\comp{rm\_fst\_\_}{0,m+n}} 
+&\eqn{\delta} 2 + (m+(n-1)) = m + (n + 1)
+\intertext{\rule{\linewidth}{0.4pt}}
+\Rightarrow 
+  &&\boxed{\comp{rm\_fst\_\_}{n,m}} - \boxed{\comp{rm\_fst\_\_}{0,m+n}}
+  &= nm + \sum_{p=2}^{n+1}{p} = nm + \sum_{p=1}^{n}{(1+p)}\\
+&&&= nm + \left(n + \sum_{p=1}^{n}{p}\right)\\
+\Leftrightarrow &&\comp{rm\_fst\_\_}{n,m} - 1 &= nm + n + n(n+1)/2\\
+\Leftrightarrow &&2 \cdot \comp{rm\_fst\_\_}{n,m}
+  &= 2 + 2nm + 2n + n^2 + n\\
+&&&= 2nm + n^2 + 3n + 2, \,\; \text{with} \;\, n > 0.
+\intertext{Since that replacing \(n\) by \(0\) in the last formula
+  leads to the expected \(\comp{rm\_fst\_\_}{0,m} \eqn{\beta} 1\), we
+  can gather all the cases into just one formula:}
+&&2 \cdot \comp{rm\_fst\_\_}{n,m} &= 2nm + n^2 + 3n + 2,\,\;
+\text{where} \, n, m \geqslant 0.
+\end{align*}
+What we want finally is \(\comp{rm\_fst\_alt}{n,n}\) for \(n \geqslant 0\):
+\begin{align*}
+\comp{rm\_fst\_alt}{n,n} 
+   &\eqn{\alpha} 1 + \comp{rm\_fst\_\_}{n,0} = 1 + (n^2 + 3n + 2)/2
+   = (n^2 + 3n + 4)/2.\\
+\comp{rm\_fst\_alt}{n,n}
+   &\mathrel{\sim} \tfrac{1}{2} n^2,
+\,\; \text{as} \;\, n \rightarrow \infty.
+\end{align*}
+The asymptotic delay of \erlcode{rm\_fst\_alt/2} is therefore
+quadratic. Now let us suppose that \(I\) does occur in \(L\) at
+position \(k\), counting the head of the list as being at position
+\(0\). Then \(0 \leqslant k < n\) and
+\begin{itemize}
+
+  \item clause \clause{\alpha} is used once;
+
+  \item clause \clause{\delta} is used \(k\) times;
+
+  \item clause \clause{\gamma} is used once;
+
+  \item clause \clause{\beta} is unused.
+
+\end{itemize}
+The execution trace is \(\alpha\delta^k\gamma\), to which must be
+added the delays of the calls \erlcode{join(A,L)} and of the repeated
+calls \erlcode{join(A,[J])}. We know that \(\comp{join}{q} = q + 1\),
+where \(q\) is the length of \erlcode{A}. In clause \clause{\gamma},
+this argument is \erlcode{A} and we know that it contains the first
+\(k\) items of \(L\), because clause \clause{\delta} was used \(k\)
+times. Assuming that \erlcode{L} contains \(p\) items, all this
+translates into the following recurrent equations, where \(p,q
+\geqslant 0\) and \(k\) is fixed.\label{delay:rm_fst_alt}
+\begin{align*}
+\comp{rm\_fst\_alt}{p,k}  &\eqn{\alpha} 1 + \comp{rm\_fst\_\_}{p,0},
+\qquad
+\comp{rm\_fst\_\_}{n-k,q} \eqn{\gamma} 1 + \comp{join}{q} = 2 + q,\\
+\comp{rm\_fst\_\_}{p+1,q} &\eqn{\delta} 1 + \comp{join}{q} +
+                             \comp{rm\_fst\_\_}{p,q+1}
+                          = 2 + q + \comp{rm\_fst\_\_}{p,q+1}.
+\end{align*}
+Note that we only used the information about whether a clause is used
+or not. Now we are going to use the fact that clause \clause{\delta}
+is used \(k\) times, by telescoping the equation drawn from clause
+\clause{\delta}, \(k\) times, with \(0 \leqslant k <
+n\):
+\begin{align*}
+  && \boxed{\comp{rm\_fst\_\_}{n,m}} - \comp{rm\_fst\_\_}{n-1,m+1}
+  &\eqn{\delta} 2 + (m+0) = m + 2\\
++ && \comp{rm\_fst\_\_}{n-1,m+1} - \comp{rm\_fst\_\_}{n-2,m+2}
+&\eqn{\delta} 2 + (m+1) = m + 3\\
++ &&&\;\;\vdots\\
++ &&\comp{rm\_fst\_\_}{n-k+1,m+k-1} -
+\boxed{\comp{rm\_fst\_\_}{n-k,m+k}} &\eqn{\delta} 2 + (m+(k-1)) = m +
+(k + 1)
+\intertext{\rule{\linewidth}{0.4pt}}
+\Rightarrow 
+  &&\boxed{\comp{rm\_fst\_\_}{n,m}} - \boxed{\comp{rm\_fst\_\_}{n-k,m+k}}
+  &= km + \sum_{p=2}^{k+1}{p} = km + \sum_{p=1}^{k}{(1+p)}\\
+&&&= km + \left(n + \sum_{p=1}^{k}{p}\right)\\
+\Leftrightarrow &&\comp{rm\_fst\_\_}{n,m} - (2+(m+k)) &= km + k +
+k(k+1)/2,\,\; \text{by} \,\; (\eqn{\gamma}),\\
+\Leftrightarrow &&2 \cdot \comp{rm\_fst\_\_}{n,m}
+  &= k^2 + (2m+5)k + 2m + 4.
+\end{align*}
+What we want finally is \(\comp{rm\_fst\_alt}{n,k}\):
+\begin{align*}
+\comp{rm\_fst\_alt}{n,k}
+  &\eqn{\alpha} 1 + \comp{rm\_fst\_\_}{n,0}
+   = 1 + (k^2 + 5k + 4)/2 = (k+2)(k+3)/2.\\
+\comp{rm\_fst\_alt}{n,k} &\mathrel{\sim} \frac{1}{2}
+k^2,\,\; \text{as} \;\, k \rightarrow \infty \,\; \text{and} \,\;
+k < n.
+\end{align*}
+We can actually extend this asymptotic expression to the
+  case \(k = n\), as the previous case analysis proved, so
+\[
+\comp{rm\_fst\_alt}{n,k} \mathrel{\sim} \tfrac{1}{2} k^2,\,\;
+\text{as} \;\, k \rightarrow \infty \,\; \text{and} \,\; k
+\leqslant n.
+\]
+In the worst case, \(k = n-1\), that is, the item \(I\) is at the end
+of the list \(L\), so the delay is then \((n+1)(n+2)/2 = (n^2 + 3n +
+2)/2\). Notice how this is exactly \(1\) less than the delay when
+\(I\) is missing in \(L\), that is, \(\comp{rm\_fst\_alt}{n,n} = (n^2
++ 3n + 4)/2\). Therefore, the worst case happens when \(I\) is missing
+from \(L\). There is no best case when \(I\) is absent from \(L\);
+when present, it is \(k=0\), so the delay is \((0+2)(0+3)/2 =
+3\). Thus the best case is when \(I\) is the head of \(L\). If the
+list is empty, that is, \(n=0\), then there is only one case, which is
+thus both the best and the worst, and the delay is \((0^2 + 3 \cdot 0
++ 4)/2 = 2\). For \(n > 0\),
+\[
+\best{rm\_fst\_alt}{0} = 2,\; \best{rm\_fst\_alt}{n} = 3,\;
+\worst{rm\_fst\_alt}{n} = \frac{n^2 + 3n + 4}{2} \mathrel{\sim}
+\frac{1}{2} n^2.
+\]
+This proves that the delay of \erlcode{rm\_fst\_alt/2} in the worst
+case is asymptotically quadratic, as opposed to the linear behaviour
+of \erlcode{rm\_fst/2}. Thus, despite the items being reversed twice
+in the latter, the delay is much lower. Just like with
+\erlcode{srev/1}, \vpageref{code:srev}, the root of the problem here
+is that \erlcode{join/2} is moving the same items a number of times
+which is not constant, actually proportional to their position in the
+input list, and which, once compounded, yields a quadratic
+term. Instead, when pushing the items to the accumulator and from it
+to the result, we have moved each item exactly twice, which is a
+(small) constant number of times, hence the linear term.
+
+Assuming that the item \(I\) is in the list \(L\), what is the
+expected delay of \erlcode{rm\_fst\_alt(\(I\),\(L\))}? This is the
+arithmetic mean of the delays for all positions. Let us denote
+\(\ave{rm\_fst\_alt}{n}\) this quantity, which is not an integer in
+general. Mathematically, it is defined as follows:
+\begin{align*}
+\ave{rm\_fst\_alt}{n}
+  &:= \frac{1}{n}\sum_{k=0}^{n-1}{\comp{rm\_fst\_alt}{n,k}}
+   = \frac{1}{n}\sum_{k=0}^{n-1}{\frac{(k+2)(k+3)}{2}}\\
+  &= \frac{1}{2n}\sum_{k=0}^{n-1}{(k^2 + 5k + 6)}
+   = \frac{1}{2n}\left(\sum_{k=0}^{n-1}{k^2} + 5 \sum_{k=0}^{n-1}{k} +
+     6n\!\right)\\
+  &= \frac{1}{2n}\left(\sum_{k=0}^{n-1}{k^2} + 5 \cdot \frac{n(n-1)}{2} +
+     6n\!\right).
+\end{align*}
+We need to find a closed expression of the sum of the first \(n\)
+squares. We can use the telescoping technique as shown
+\vpageref{tele_squares}, but on the series \((n^3)_{n>0}\). We start
+with the equality \((n+1)^3 = n^3 + 3n^2 + 3n + 1\), hence \((n+1)^3 -
+n^3 = 3n^2 + 3n + 1\). Then we can sum these differences:
+\begin{align*}
+  && (1+1)^3 - \boxed{1^3} &= 3 \cdot 1^2 + 3 \cdot 1 + 1\\
++ && (2+1)^3 - 2^3         &= 3 \cdot 2^2 + 3 \cdot 2 + 1\\
++ &&&\;\;\vdots\\
++ && \boxed{(n+1)^3} - n^3 &= 3n^2 + 3n + 1
+\intertext{\rule{\linewidth}{0.4pt}}
+\Rightarrow 
+  &&\boxed{(n+1)^3} - \boxed{1^3}
+  &= 3 \sum_{k=1}^{n}{k^2} + 3 \sum_{k=1}^{n}{k} + n\\
+  && n^3 + 3n^2 + 3n
+  &= 3 \sum_{k=1}^{n}{k^2} + 3 \cdot \frac{n(n+1)}{2} + n\\
+\Leftrightarrow && \sum_{k=1}^{n}{k^2} &= \frac{n(n+1)(2n+1)}{6}.
+\end{align*}
+We can now resume or calculation of \(\ave{rm\_fst\_alt}{n}\):
+\begin{align*}
+\ave{rm\_fst\_alt}{n}
+  &= \frac{1}{2n}\left(\frac{(n-1)n(2n-1)}{6} + 5 \cdot
+     \frac{n(n-1)}{2} + 6n\!\right)\\
+  &= \frac{1}{6}{n^2} + n + \frac{11}{6} \mathrel{\sim}
+     \frac{1}{6}n^2,\,\; \text{as} \,\; n \rightarrow \infty.
+\end{align*}
+We found earlier that the worst case when the item is present is when
+it is located at the end of the list and the delay is then
+\[
+\worst{rm\_fst\_alt}{n} = \tfrac{1}{2}{n^2} + \tfrac{3}{2}{n} + 1.
+\]
+Therefore, \(\ave{rm\_fst\_alt}{n} \mathrel{\sim} \tfrac{1}{3}
+\worst{rm\_fst\_alt}{n}\), as \(n \rightarrow \infty\). That is to
+say, asymptotically, the average delay is about 33\% the worst
+delay. In other words, the worst does not happen very often.
+
+\medskip
+
+\paragraph{Last occurrence.}
+
+Let us consider the definition of a function \erlcode{rm\_lst/2} such
+that the call \erlcode{rm\_lst(\(I\),\(L\))} is rewritten to \(L\) if
+\(I\) does not belong to the list \(L\), otherwise it is rewritten to
+a list identical to \(L\) but without the last occurrence of
+\(I\). This is our \emph{specification}. For instance, we expect the
+following rewrites:\label{rm_lst_ex}
+\begin{align*}
+\erlcode{rm\_lst(3,[])}         & \twoheadrightarrow \erlcode{[]};\\
+\erlcode{rm\_lst([],[])}        & \twoheadrightarrow \erlcode{[]};\\
+\erlcode{rm\_lst([5,2],[3,[]])} & \twoheadrightarrow \erlcode{[3,[]]};\\
+\erlcode{rm\_lst(4,[[],[1,2],4,[],4])}
+ & \twoheadrightarrow \erlcode{[[],[1,2],4,[]]};\\
+\erlcode{rm\_lst([],[4,[1,2],[],[],4])}
+ & \twoheadrightarrow \erlcode{[4,[1,2],[],4]}.
+\end{align*}
+Let us go for a direct way to the solution. First of all, does this
+problem reminds us of another? Filtering out the first occurrence
+seems close. How then could we reuse \erlcode{rm\_fst/2} to solve our
+current problem? The key is to see that, provided that the input list
+is first reversed, applying \erlcode{rm\_fst/2} will filter out the
+item which was the last occurrence in the original list, since the
+last occurrence becomes the first due to the reversing. The last step
+thus consists in reversing the result so the order of the items is
+restored.\label{rm_lst}
+\begin{verbatim}
+rm_lst(I,L) -> rev(rm_fst(I,rev(L))).
+\end{verbatim}
+What is the delay of the calls to this function? Since we compose
+three functions, the delays are simply added. Let us suppose that the
+length of the input list \(L\) is \(n\). Let us compute the delay
+\(\comp{rm\_lst}{n,k} := \delay{rm\_lst(\(I\),\(L\))}\), where
+\(n\) is the length of \(L\) and \(k\) is the location where \(I\)
+occurs in \(L\), \(k = n\) if absent. Since the first call is
+\erlcode{rev(L)}, the definition of \erlcode{rm\_lst/2} leads to the
+equation
+\[
+\comp{rm\_lst}{n,k} = 1 + \comp{rev}{?} + \comp{rm\_fst}{?,?} +
+\comp{rev}{n}.
+\]
+We need to determine the length of the arguments to the composed
+functions. Because the length of \erlcode{rev(\(L\))} is the same as
+the length of \(L\), we know that the list argument of
+\erlcode{rm\_fst/2} has length \(n\), so we have
+\[
+\comp{rm\_lst}{n,k} = 1 + \comp{rev}{?} + \comp{rm\_fst}{n,?} +
+\comp{rev}{n}.
+\]
+Now we need to consider different cases. Indeed, depending on the
+presence or absence of \(I\) in \(L\), the length of
+\erlcode{rm\_fst(\(I\),rev(\(L\)))} is different: if present, it is
+\(n-1\), otherwise it is \(n\). But there is another case to consider
+first: the input list may be empty. In this case, \(n = k = 0\), but
+this is not interpreted as \(I\) being the head of \(L\). We have
+\[
+\comp{rm\_lst}{0,0} = 1 + 2 + 1 + 2 = 6.
+\]
+Next, let us assume that \(I\) is absent, that is, \(k = n\). We found
+\vpageref{comp_rm_fst}:
+\[
+\comp{rm\_fst}{n,k} = k + 1,\,\; \text{with} \,\; 0 \leqslant k
+\leqslant n,
+\]
+where \(k\) is the position at which \(I\) occurs last in \(P\) in the
+call \erlcode{rm\_fst(\(I\),\(P\))}, with the convention \(k=n\) if it
+does not. Thus, \(\comp{rm\_fst}{n,n} = n + 1\) and
+\begin{align*}
+\comp{rm\_lst}{n,n} 
+  &= 1 + \comp{rev}{n} + \comp{rm\_fst}{n,n} + \comp{rev}{n}\\
+  &= 1 + (n+2) + (n+1) + (n+2)
+   = 3n + 6,\,\; \text{with} \,\; n > 0.
+\end{align*}
+Because we just found that \(\comp{rm\_lst}{0,0} = 6\), we can extend
+this formula to the case \(n=0\), that is, the empty list:
+\[
+\comp{rm\_lst}{n,n} = 3n + 6,\,\; \text{with} \,\; n \geqslant 0.
+\]
+Let us suppose now that \(I\) occurs last in \(L\) at position
+\(k\). Then the length of \erlcode{rm\_fst(\(I\),rev(\(L\)))} is
+\(n-1\). Furthermore, \(I\) occurs in \erlcode{rev(\(L\))} at position
+\(n-k-1\), so \(\comp{rm\_fst}{n,n-k-1} = (n-k-1) + 1 = n-k\). We
+deduce, for \(0 \leqslant k < n\),
+\begin{align}
+\comp{rm\_lst}{n,k} 
+  &= 1 + \comp{rev}{n-1} + \comp{rm\_fst}{n,n-k-1} + \comp{rev}{n}\notag\\
+  &= 1 + ((n-1)+2) + (n-k) + (n+2) = 3n - k + 4.\label{eq:rm_lst}
+\end{align}
+Let us note \(\best{rm\_lst}{n}\) and \(\worst{rm\_lst}{n}\) the
+delays, respectively, in the best and worst cases. By definition, they
+are, respectively, the minimum and the maximum delay, when \(n\) is
+fixed and \(k\) varies, that is
+\begin{align*}
+\best{rm\_lst}{n}
+  &:= \min_{0 \leqslant k \leqslant n}{\comp{rm\_lst}{n,k}}
+   = \min_{0 \leqslant k < n}{\{3n+6, 3n-k+4\}}\\
+  &= 3n - (n-1) + 4
+   = 2n + 5 \mathrel{\sim} 2n,\,\; \text{as} \,\; n \rightarrow
+     \infty;\\
+\worst{rm\_lst}{n}
+  &:= \max_{0 \leqslant k \leqslant n}{\comp{rm\_lst}{n,k}}
+   = \max_{0 \leqslant k < n}{\{3n+6, 3n-k+4\}}\\
+  &= 3n + 6 \mathrel{\sim} 3n,\,\; \text{as} \,\; n \rightarrow
+     \infty.
+\end{align*}
+The best case is thus when \(k=n-1\), that is, when the item is the
+last in the list, and the worst case happens when the item is
+missing. Let us denote \(\ave{rm\_lst}{n}\) the average delay, which
+is the arithmetic mean of the delays for all
+positions. Mathematically, it is defined as follows:
+\begin{align}
+\ave{rm\_lst}{n}
+  &= \frac{1}{n}\sum_{k=0}^{n-1}{\comp{rm\_lst}{n,k}}
+   = \frac{1}{n}\sum_{k=0}^{n-1}{(3n-k+4)}
+   = 3n+4 - \frac{1}{n}\sum_{k=0}^{n-1}{k}\notag\\
+  &= 3n + 4 - \frac{n-1}{2}
+   = \frac{5}{2}{n} + \frac{9}{2}
+     \mathrel{\sim} \frac{5}{2}{n},\,\; \text{as} \,\;
+     n \rightarrow \infty.\label{eq:ave_rm_lst}
+\end{align}
+When the item is present, the worst case is when it is the head:
+\begin{equation*}
+\worst{rm\_lst}{n}
+  = \comp{rm\_lst}{n,0}
+  = 3n+4 \mathrel{\sim} 3n,\,\; \text{as} \,\; n \rightarrow \infty.
+\end{equation*}
+This implies \(\ave{rm\_lst}{n} \mathrel{\sim} \tfrac{5}{6}
+\worst{rm\_lst}{n}\), as \(n \rightarrow \infty\), which means that,
+unfortunately, the average delay is asymptotically 83.3\% of the worst
+delay. Contrast this with the average delay of \erlcode{rm\_fst/2},
+equation \eqref{eq:ave_rm_fst} \vpageref{eq:ave_rm_fst}, which is only
+50\% of the worst delay.
+
+\medskip
+
+\paragraph{Adding a sequential search.}
+
+We found that the worst case of \erlcode{rm\_lst/2} happens when the
+item is missing in the list of length \(n\) and the delay is then
+\(3n+6\). This means that three complete traversals of the lists are
+made, whilst only one would be enough to realise that the item is
+indeed absent. Similarly, the best case is when the item occurs in the
+last position in the list, in which case the delay is \(2n+5\), that
+is, two complete traversals are performed, despite only one would be
+necessary. This suggests that there may be some room for
+improvement. Perhaps the first try consists in keeping the previous
+algorithm while adding some shortcuts. For instance, we can delay the
+composition of \erlcode{rev/1} and \erlcode{rm\_fst/2} until we
+actually find an occurrence of the item; otherwise, we keep going
+until the end of the list:
+\begin{alltt}
+rm_lst1(_,   []) \(\smashedrightarrow{\alpha}\) [];
+rm_lst1(I,[I|L]) \(\smashedrightarrow{\beta}\) \textbf{rev(rm_fst(I,rev([I|L])));}
+rm_lst1(I,[J|L]) \(\smashedrightarrow{\gamma}\) [J|rm_lst1(I,L)].
+\end{alltt}
+The part of the definition not in bold is the typical \emph{sequential
+  search} we have seen at play in \erlcode{rm\_fst/2}: all the items
+of a list are visited in turn until one of interest is
+found. Importantly, the visited items are not discarded, but kept,
+with the same relative order, in the control context of the last
+clause. The body in bold is the action we want to perform in case we
+find the item we sought. What is the delay of \erlcode{rm\_lst1/2}? As
+usual in sequential searches, two cases are a priori relevant: either
+the item is present or not.
+
+Let us assume that the item occurs first at position \(f\) in the list
+and last at position \(k\), counting the head as position
+\(0\). Clause \clause{\gamma} is then used \(f\) times and clause
+\clause{\beta} once. Then \erlcode{rev(rm\_fst(I,rev([I|L])))} is
+rewritten into a value. The delay of reversing \erlcode{[I|L]} is
+\((n-f)+2\). The last occurrence of \erlcode{I} in \erlcode{[I|L]} is
+\(k-f\), so the first occurrence in \erlcode{rev([I|L])} is
+\(((n-1)-f)-(k-f)=n-k-1\). We can check these expressions on a small
+example in \fig~\vref{fig:rm_lst_ex}.
+\begin{figure}
+\centering
+\includegraphics{rm_lst_ex}
+\caption{Filtering out the last \textsf{b} in \textsf{eabdcbr}
+\label{fig:rm_lst_ex}}
+\end{figure}
+We used \erlcode{e}, \erlcode{a}, \erlcode{b} etc. for the contents of
+the list, instead of numbers, in order to avoid confusion with the
+indexes. The item whose last occurrence is \(k\) is \erlcode{b}. We
+already know that \(\comp{rm\_fst}{n,k} = k + 1\). Let
+\(\comp{rm\_lst1}{n,f,k}\) be the delay when the item occurs first in
+position \(f\) and last in position \(k\) in a list of length
+\(n\). We have
+\begin{align*}
+\comp{rm\_lst1}{n,f,k} 
+  &= f + 1 + \comp{rev}{n-f} + \comp{rm\_fst}{n-f,n-k-1}
+     + \comp{rev}{n-f-1}\\
+  &= f + 1 + ((n-f)+2) + ((n-k-1)+1)\\
+  &\phantom{= f\;} + ((n-f-1)+2)
+   = 3n - f - k + 4,\,\; \text{with} \,\; n > 0.
+\end{align*}
+We found earlier that the delay of \erlcode{rm\_lst/2}, when the item
+was occurring last at position \(k\) in a list of length \(n\) was
+\(3n - k + 4\). Thus, we have in this case \(\comp{rm\_lst1}{n,f,k} =
+\comp{rm\_lst}{n,k} - f\). This was expected because the reduction in
+delay due to \(f\) comes from the wrapping of a sequential search for
+the item around \erlcode{rm\_lst/2}.
+
+Let us suppose now that the item does not occur in the list. Then
+clause \clause{\beta} is unused and we have a sequential search ending
+in a failure, that is, \(\comp{rm\_lst1}{n,n,n} = n + 1\). (Using the
+convention that an occurrence at position \(n\) means ``absent.'') If we
+suppose now that the item does occur in the list, first at position
+\(f\) and last at position \(k\), then, by definition, the best case
+happens when \(\comp{rm\_lst1}{n,f,k}\) is minimum and the worst case
+when it is maximum:
+\begin{align*}
+\best{rm\_lst1}{n}
+  &:= \min_{0 \leqslant f \leqslant k \leqslant  n}{\comp{rm\_lst1}{n,f,k}}
+   = \min_{0 \leqslant f \leqslant k < n}{\{n+1,3n - f - k + 4\}}\\
+  &= \min\{n+1,3n-(n-1)-(n-1)+4\}
+   = n+1.\\
+\worst{rm\_lst1}{n}
+  &:= \max_{0 \leqslant f \leqslant k \leqslant  n}{\comp{rm\_lst1}{n,f,k}}
+   = \max_{0 \leqslant f \leqslant k < n}{\{n+1,3n - f - k + 4\}}\\
+  &= \max\{n+1,3n - 0 - 0 + 4\}
+   = 3n + 4.
+\end{align*}
+As a conclusion, the best case of \erlcode{rm\_lst1/2} happens when
+the item is missing and the worst case when the item occurs
+\emph{uniquely} as the head of the list (\(f=k=0\)). Notice that it is
+not possible to compare these results with the delays of
+\erlcode{rm\_lst/2} because the best and worst cases differ (the worst
+case of \erlcode{rm\_lst/2} is the best case of \erlcode{rm\_lst1/2})
+and
+\[
+\best{rm\_lst1}{n} < \best{rm\_lst}{n} < \worst{rm\_lst1}{n} <
+\worst{rm\_lst}{n}.
+\]
+(It would have been possible to compare \erlcode{rm\_lst/2} and
+\erlcode{rm\_lst1/2} in an absolute sense had the worst delay of one
+been smaller than the best delay of the other.) Perhaps an analysis of
+the average delay would enable a comparison.
+
+Assuming that the item occurs at least once in the list, what is the
+average delay of \erlcode{rm\_lst1/2}? The first occurrence position,
+\(f\), ranges from \(0\) to \(n-1\), whilst the last occurrence
+position \(k\) ranges from \(f\) to \(n-1\). The pairs \((f,k)\) can
+be counted as follows: \((0,0) \dots (0,n-1)\), then \((1,1) \dots
+(1,n-1)\), etc. until \((n-1,n-1)\). Thus the number of pairs with
+\(f=0\) is \(n\), the number of pairs with \(f=1\) is \(n-1\) etc. up
+to \(1\) when \(f=n-1\). This means that the total number of pairs
+\((f,k)\) is \(1 + 2 + \dots + n = n(n+1)/2\). We can now lay out the
+definition
+\begin{align*}
+\ave{rm\_lst1}{n}
+  &:=
+     \frac{2}{n(n+1)}\!\!\sum_{f=0}^{n-1}\sum_{k=f}^{n-1}{\comp{rm\_lst}{n,f,k}}
+   = \frac{2}{n(n+1)}\!\!\sum_{f=0}^{n-1}\sum_{k=f}^{n-1}{(3n - f - k +
+     4)}\\
+  &= 3n + 4 - \frac{2}{n(n+1)}\sum_{f=0}^{n-1}\sum_{k=f}^{n-1}{(f+k)}\\
+  &= 3n + 4
+     - \frac{2}{n(n+1)}\sum_{f=0}^{n-1}\left(f(n-f) +
+     \sum_{k=f}^{n-1}{k}\right)\\
+  &= 3n + 4 - \frac{2}{n(n+1)}\sum_{f=0}^{n-1}\left(nf-f^2 +
+     \frac{n(n-1)}{2} - \frac{f(f-1)}{2}\right)\\
+  &= 3n + 4 - \frac{2}{n(n+1)} \cdot \frac{n^2(n-1)}{2}\\
+  &\phantom{= 3}
+     + \frac{2}{n(n+1)}\sum_{f=0}^{n-1}\left(\frac{3}{2}f^2
+                               -\left(\frac{1}{2} + n\right)f\right)\\
+  &= 3n + 4 - \frac{n(n-1)}{n+1} +
+                               \frac{3}{n(n+1)}\sum_{f=0}^{n-1}{f^2}
+   - \frac{2n+1}{n(n+1)}\sum_{f=0}^{n-1}{f}\\
+  &= 3n + 4 - \frac{n(n-1)}{n+1} +
+     \frac{3}{n(n+1)}\cdot\frac{(n-1)n(2n-1)}{6}\\
+  &\phantom{= 3}
+     - \frac{2n+1}{n(n+1)} \cdot \frac{n(n-1)}{2}\\
+  &= 3n + 4 - \frac{n(n-1)}{n+1} + \frac{(n-1)(2n-1)}{2(n+1)}
+     - \frac{(n-1)(2n+1)}{2(n+1)}\\
+  &= 3n + 4 + \frac{(n-1)(-2n+2n-1-2n-1)}{2(n+1)}
+   = 2n + 5.
+\end{align*}
+We found earlier that \(\ave{rm\_lst}{n} = \tfrac{5}{2}n +
+\tfrac{9}{2}\), therefore \(\ave{rm\_lst1}{n} < \ave{rm\_lst}{n}\),
+for \(n > 1\). In other words, \erlcode{rm\_lst1/2} is in average
+faster than \erlcode{rm\_lst/2}. Finally, we remark that
+\(\ave{rm\_lst1}{n} \mathrel{\sim} \tfrac{2}{3}\worst{rm\_lst1}{n}\),
+as \(n \rightarrow \infty\), that is, the average delay of
+\erlcode{rm\_lst1/2} is 66\% of the worst delay.
+
+\medskip
+
+\paragraph{Tail form.}
+
+For the sake of further training, let us transform the definition of
+\erlcode{rm\_lst/2} into tail form. The starting point consists in
+copying the original definition and rename it \erlcode{rm\_lst\_tf/2}:
+\begin{verbatim}
+rm_lst_tf(I,L) -> rev(rm_fst(I,rev(L))).
+\end{verbatim}
+The first call to be performed is \erlcode{rev(L)}. The first thing to
+check is whether \erlcode{rev/1} is in tail form or not. It is,
+because we found the following, \vpageref{code:rev}:
+\verbatiminput{rev.def} Secondly, we locate the control context of the
+innermost call, that is, \erlcode{rev(L)}: it is
+\erlcode{rev(rm\_fst(I,\textvisiblespace))}. It is handy to visualise
+on the code the variables it contains by framing them, while the first
+call is in bold:
+\begin{alltt}
+rm_lst_tf(I,L) -> rev(rm_fst(\fbox{I},\textbf{rev(L)})).
+\end{alltt}
+Now let us add a list accumulator to \erlcode{rev/1}, whose purpose is
+to hold the variables present in the control context of the innermost
+call. Here, there is only one variable, \erlcode{I}:
+\begin{alltt}
+rm_lst_tf(I,L)    -> rev(rm_fst(I,rev(L\textbf{,[I]}))).
+rev(L\textbf{,A})          -> rev_join(L,[]).\hfill% A \emph{still unused}
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).
+\end{alltt}
+Let us follow the clauses that rewrite the innermost call,
+\erlcode{rev(L,[I])} and let us inscribe within a box the first body
+which is not a recursive call:
+\begin{alltt}
+rm_lst_tf(I,L)    -> rev(rm_fst(I,rev(L,[I]))).
+rev(L,A)          -> \fbox{rev_join(L,[])}.
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).
+\end{alltt}
+Since the definition of \erlcode{rev/2} is made of a unique clause, we
+can move the control context of \erlcode{rev(L,[I])} to apply to it,
+for which we need to use the variable \erlcode{I} in the accumulator:
+\begin{alltt}
+rm_lst_tf(I,L)    -> \textbf{rev(L,[I])}.
+rev(L,\textbf{[I]})        -> \textbf{rev(rm_fst(I,}rev_join(L,[])\textbf{))}.
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).
+\end{alltt}
+We must start again the same operations on the new body where the
+innermost call is \erlcode{rev\_join(L,[])} and whose control context
+is \erlcode{rev(rm\_fst(I,\textvisiblespace))}. We must check whether
+the call to perform first is in tail form or not. The definition of
+\erlcode{rev\_join/2} is in tail form, so the next step is to add an
+accumulator \erlcode{A} to \erlcode{rev\_join/2}, initialised with the
+variables in the control context (here, only \erlcode{I}). This
+accumulator is passed, unchanged to any recursive calls:
+\begin{alltt}
+rm_lst_tf(I,L)      -> rev(L,[I]).
+rev(L,[I])          -> rev(rm_fst(I,rev_join(L,[]\textbf{,[I]}))).
+rev_join(   [],Q\textbf{,A}) -> Q;\hfill% A \emph{yet unused}
+rev_join([I|P],Q\textbf{,A}) -> rev_join(P,[I|Q]\textbf{,A}).\hfill% \emph{Unchanged}
+\end{alltt}
+Then we repeat the same steps, that is, we identify the first bodies
+used to rewrite the innermost call, that is,
+\erlcode{rev\_join(L,[],[I])}, which are not recursive (this is why it
+is paramount that \erlcode{rev\_join/2} is already in tail form: its
+bodies are either a call without control context or a value or an
+arithmetic expression):
+\begin{alltt}
+rm_lst_tf(I,L)      -> rev(L,[I]).
+rev(L,[I])          -> rev(rm_fst(I,rev_join(L,[],[I]))).
+rev_join(   [],Q,A) -> \fbox{Q};
+rev_join([I|P],Q,A) -> rev_join(P,[I|Q],A).
+\end{alltt}
+Next, we move the control context
+\erlcode{rev(rm\_fst\_tf(I,\textvisiblespace))} to apply to the framed
+bodies (here, only \erlcode{Q}), making sure that the variable
+\erlcode{I} is bound with the help of the accumulator \erlcode{A}:
+\begin{alltt}
+rm_lst_tf(I,L)        -> rev(L,[I]).
+rev(L,[I])            -> \textbf{rev_join(L,[],[I])}.
+rev_join(   [],Q,\textbf{[I]}) -> \textbf{rev(rm_fst(I,}Q\textbf{))};
+rev_join([I|P],Q,  A) -> rev_join(P,[I|Q],A).
+\end{alltt}
+The good news is that the only body which is not in tail form now is
+made of only two calls instead of three originally. Now the innermost
+call is \erlcode{rm\_fst(I,Q)}, so we must check first whether
+\erlcode{rm\_fst/2} is in tail form. It is not, as we found
+\vpageref{code:rm_fst_alpha}:
+\begin{alltt}
+rm_fst(_,   []) -> [];
+rm_fst(I,[I|L]) -> L;
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)].\hfill% \emph{Not in tail form}
+\end{alltt}
+Therefore, we must transform now the definition of \erlcode{rm\_fst/2}
+into an equivalent one in tail form. If we don't, this is what
+happens: the control context \erlcode{rev(\textvisiblespace)} is moved
+so it applies to the bodies of \erlcode{rm\_fst/2} which contain no
+calls. We have
+\begin{alltt}
+rm_lst_tf(I,L)        -> rev(L,[I]).
+rev(L,[I])            -> rev_join(L,[],[I]).
+rev_join(   [],Q,[I]) -> \textbf{rm_fst(I,Q)};
+rev_join([I|P],Q,  A) -> rev_join(P,[I|Q],A).
+rm_fst(_,   [])       -> \textbf{rev(}[]\textbf{)};\hfill% \emph{Wrong}
+rm_fst(I,[I|L])       -> \textbf{rev(}L\textbf{)};\hfill% \emph{Wrong}
+rm_fst(I,[J|L])       -> [J|rm_fst(I,L)].
+\end{alltt}
+This is wrong because the last clause of \erlcode{rm\_fst/2} is not in
+tail form, so when no calls are needed, as in the two first clauses of
+the original \erlcode{rm\_fst/2}, there is still work to do: the
+control context \erlcode{[J|\textvisiblespace]} holds values
+``waiting'' to be pushed. But, what we meant here was to
+apply~\erlcode{rev/1} to the \emph{value} of \erlcode{rm\_fst(I,Q)},
+that is, the final result, when nothing else is left to be computed by
+\erlcode{rm\_fst/2}---hence the error. The version of
+\erlcode{rm\_fst/2} in tail form was already encountered
+\vpageref{code:rm_fst_tf} and named \erlcode{rm\_fst\_tf/2}:
+\verbatiminput{rm_fst_tf.def} So we now simply change the call
+\erlcode{rm\_fst(I,Q)} in the definition above of
+\erlcode{rev\_join/3} into the call \erlcode{rm\_fst\_tf(I,Q)} and
+resume our process:
+\begin{alltt}
+rm_lst_tf(I,L)        -> rev(L,[I]).
+rev(L,[I])            -> rev_join(L,[],[I]).
+rev_join(   [],Q,[I]) -> rev(\textbf{rm_fst_tf}(I,Q));\hfill% \emph{Renaming}
+rev_join([I|P],Q,  A) -> rev_join(P,[I|Q],A).
+\end{alltt}
+Because \erlcode{rm\_fst\_tf/2} is defined by a single clause, we can
+replace the call \erlcode{rm\_fst\_tf(I,Q)} by its definition:
+\begin{alltt}
+rm_lst_tf(I,L)        -> rev(L,[I]).
+rev(L,[I])            -> rev_join(L,[],[I]).
+rev_join(   [],Q,[I]) -> rev(\textbf{rm_fst(I,Q,[])});
+rev_join([I|P],Q,  A) -> rev_join(P,[I|Q],A).
+\end{alltt}
+Since \erlcode{rm\_fst/3}~is also in tail form and since the control
+context~\erlcode{rev(\textvisiblespace)} contains no variable, we can
+repeat the same operation and move the control context so it applies
+to the non\hyp{}recursive bodies of \erlcode{rm\_fst/3}:
+\begin{alltt}
+rm_lst_tf(I,L)        -> rev(L,[I]).
+rev(L,[I])            -> rev_join(L,[],[I]).
+rev_join(   [],Q,[I]) -> rm_fst(I,Q,[]);
+rev_join([I|P],Q,  A) -> rev_join(P,[I|Q],A).
+rm_fst(_,   [],A)     -> \textbf{rev(}rev(A)\textbf{)};\hfill% \emph{Added context}
+rm_fst(I,[I|L],A)     -> \textbf{rev(}rev_join(A,L)\textbf{)};\hfill% \emph{Added context}
+rm_fst(I,[J|L],A)     -> rm_fst(I,L,[J|A]).
+\end{alltt}
+The new definition of \erlcode{rm\_fst/3} is not in tail form, but we
+can trust that composing twice~\erlcode{rev/1} on a list yields a list
+equal to the original list, so \erlcode{rev(rev(A))}~is equivalent
+to~\erlcode{A}. Moreover, a little figure on paper would convince us
+that \erlcode{rev(rev\_join(A,L))}~is equivalent to
+\erlcode{rev\_join(L,A)}, that is, these two expressions are always
+rewritten to the same value. Finally, taking into account these
+simplifications, we reach
+\begin{alltt}
+rm_lst_tf(I,L)        -> rev(L,[I]).
+rev(L,[I])            -> rev_join(L,[],[I]).
+rev_join(   [],Q,[I]) -> rm_fst(I,Q,[]);
+rev_join([I|P],Q,  A) -> rev_join(P,[I|Q],A).
+rm_fst(_,   [],A)     -> \textbf{A};\hfill% \emph{Algebraic simplification}
+rm_fst(I,[I|L],A)     -> \textbf{rev_join(L,A)};\hfill% \emph{Idem}
+rm_fst(I,[J|L],A)     -> rm_fst(I,L,[J|A]).
+\end{alltt}
+All these definitions are in tail form now. A quick inspection reveals
+that \erlcode{rev/2}~is called only once and is defined by means of a
+single clause, thus, we can replace its only call by its body:
+\begin{alltt}
+rm_lst_tf(I,L)        -> \textbf{rev_join(L,[],[I])}.
+rev_join(   [],Q,[I]) -> \textbf{rm_fst(I,Q,[])};
+rev_join([I|P],Q,  A) -> rev_join(P,[I|Q],A).
+rm_fst(_,   [],A)     -> A;
+rm_fst(I,[I|L],A)     -> rev_join(L,A);
+rm_fst(I,[J|L],A)     -> rm_fst(I,L,[J|A]).
+\end{alltt}
+Note how we actually took care of replacing the call by the body
+\emph{where the parameters are replaced by their corresponding
+  arguments}. Moreover, consider how, in the first clause of
+\erlcode{rev\_join/3}, \erlcode{Q}~becomes the input list of the new
+\erlcode{rm\_fst/3}. There is still room for a tiny improvement: the
+accumulator of \erlcode{rev\_join/3} named~\erlcode{A} always contains
+exactly one item:~\erlcode{I}. So why not replace it by~\erlcode{I}
+itself? Also, in order enhance legibility, we can rename
+variable~\erlcode{L} in \erlcode{rm\_fst/3} into~\erlcode{Q} and
+variable~\erlcode{I} in \erlcode{rev\_join/3}
+into~\erlcode{J}. Finally, we obtain these simpler tail form
+definitions:\label{code:rm_lst_tf}
+\begin{alltt}
+rm_lst_tf(I,L)      \(\smashedrightarrow{\alpha}\) rev_join(L,[],\textbf{I}).
+rev_join(   [],Q,\textbf{I}) \(\smashedrightarrow{\beta}\) rm_fst(I,Q,[]);
+rev_join([\textbf{J}|P],Q,\textbf{I}) \(\smashedrightarrow{\gamma}\) rev_join(P,[\textbf{J}|Q],\textbf{I}).
+rm_fst(_,   [],A)   \(\smashedrightarrow{\delta}\) A;
+rm_fst(I,[I|\textbf{Q}],A)   \(\smashedrightarrow{\epsilon}\) rev_join(\textbf{Q},A);
+rm_fst(I,[J|\textbf{Q}],A)   \(\smashedrightarrow{\zeta}\) rm_fst(I,\textbf{Q},[J|A]).
+\end{alltt}
+
+\medskip
+
+\paragraph{Delays.}
+
+Let us compute the delay \(\comp{rm\_lst\_tf}{n,k} :=
+\delay{rm\_lst\_tf(\(I\),\(L\))}\), where \(n\)~is the length of~\(L\)
+and \(k\)~is the greatest location where \(I\)~occurs in~\(L\) (\(k =
+n\) if absent). There are three cases to consider:
+\begin{itemize}
+
+  \item \(L\)~is empty;
+
+  \item \(L\)~is not empty and \(I\)~is absent;
+
+  \item \(L\)~is not empty and \(I\)~occurs at position~\(k\),
+    counting the head of~\(L\) as position~\(0\).
+
+\end{itemize}
+If the list is empty, clause~\clause{\alpha} is used once,
+clause~\clause{\beta} is used once and clause~\clause{\delta} is used
+once.  In total, the delay is~\(3\). In other words:
+\(\comp{rm\_lst\_tf}{0,0} = 3\).
+
+\noindent If the list~\(L\) is not empty and \(I\)~is absent, that is,
+\(k = n > 0\), then
+\begin{itemize}
+
+  \item clause~\clause{\alpha} is used once;
+
+  \item clause~\clause{\gamma} is used \(n\)~times;
+
+  \item clause~\clause{\beta} is used once;
+
+  \item clause~\clause{\zeta} is used \(n\)~times;
+
+  \item clause~\clause{\delta} is used once.
+
+\end{itemize}
+This execution trace is formally \(\alpha\gamma^n\beta\zeta^n\delta\).
+In total, \(\comp{rm\_lst\_tf}{n,n} = 2n + 3\), with~\(n > 0\). We see
+that this formula is valid even if~\(n=0\), so we can merge the two
+first cases into one: \(\comp{rm\_lst\_tf}{n,n} = 2n + 3\), with~\(n
+\geqslant 0\). If the list~\(L\) is not empty and the item~\(I\)
+lastly occurs in~\(L\) at position~\(k\), with~\(0 \leqslant k < n\),
+assuming that the head has position~\(0\), then
+\begin{itemize}
+
+  \item clause~\clause{\alpha} is used once,
+
+  \item clause~\clause{\gamma} is used \(n\)~times,
+
+  \item clause~\clause{\beta} is used once,
+
+  \item clause~\clause{\zeta} is used \(n-k\)~times,
+
+  \item clause~\clause{\epsilon} is used once.
+
+\end{itemize}
+This is \(\alpha\gamma^n\beta\zeta^{n-k}\epsilon\). The delay of the
+call \erlcode{rev\_join(Q,A)} in the body of clause~\clause{\epsilon}
+must be counted and added. Since \erlcode{Q}~contains \(k\)~items,
+equation \eqref{delay:rev_join} \vpageref{delay:rev_join} states that
+\(\comp{rev\_join}{k} = k + 1\), so the total is
+\[
+\comp{rm\_lst\_tf}{n,k} = 1 + n + 1 + (n-k) + 1 + (k+1) = 2n + 4,\,\;
+\text{with} \,\; n > 0.
+\]
+Interestingly, the delays here do not depend on \(k\), that is, the
+position of the last occurrence of the item. This is not the case for
+\erlcode{rm\_lst/2}, as equation \eqref{eq:rm_lst}
+\vpageref{eq:rm_lst} is
+\[
+\comp{rm\_lst}{n,k} = 3n - k + 4, \,\; \text{with} \,\; 0 \leqslant k
+\leqslant n.
+\]
+The worst case for \erlcode{rm\_lst\_tf/2} happens when the item is
+present \emph{anywhere} in the list, because \(2n + 3 < 2n + 4\). In
+any case,
+\[
+\comp{rm\_lst\_tf}{n,k} \mathrel{\sim} 2n, \,\; \text{as} \,\; n
+\rightarrow \infty \,\; \text{and} \,\; k < n.
+\]
+Note that there are only two possible delays, for any input. Since the
+position of the item in the list does not impact the delay of
+\erlcode{rm\_lst\_tf/2}, the average delay is the normal delay:
+\[
+\ave{rm\_lst\_tf}{n} = \comp{rm\_lst\_tf}{n,k} = 2n + 4.
+\]
+Equation \eqref{eq:ave_rm_lst} \vpageref{eq:ave_rm_lst} was
+\(
+\ave{rm\_lst}{n} = \tfrac{5}{2}{n} + \tfrac{9}{2},
+\)
+so it yields now
+\[
+\ave{rm\_lst\_tf}{n} \mathrel{\sim} \tfrac{4}{5}
+\ave{rm\_lst}{n},\,\; \text{as} \,\; n \rightarrow \infty,
+\]
+which means that the average delay of \erlcode{rm\_lst\_tf/2} is~80\%
+of the average delay of \erlcode{rm\_lst/2}---in other words, it
+is~20\% smaller.
+
+As we found above, the worst case of \erlcode{rm\_lst\_tf/2} when the
+item is present does not depend on its position inside the list. This
+in stark contrast with \erlcode{rm\_lst/2}, whose worst case is when
+the item is the head of the list. The best case for both functions is
+when the item is absent from the list. Let us note
+\(\best{rm\_lst\_tf}{n}\) the delay in the best case for an input of
+size~\(n\) and \(\worst{\rm\_lst\_tf}{n}\) the delay in the worst
+case. We found that, for~\(n > 0\),
+\begin{equation*}
+  \best{rm\_lst\_tf}{n} = 2n + 3 \mathrel{\sim} 2n,
+\quad
+  \worst{rm\_lst\_tf}{n} = 2n + 4 \mathrel{\sim} 2n,\,\; \text{as}
+  \,\; n \rightarrow \infty.
+\end{equation*}
+We can now precisely compare \erlcode{rm\_lst\_tf/2} and
+\erlcode{rm\_lst/2} in terms of delay. We have, for~\(n > 0\),
+\begin{align*}
+\best{rm\_lst}{n}     &= 2n + 5, & \worst{rm\_lst}{n}     &= 3n + 6,\\
+\best{rm\_lst\_tf}{n} &= 2n + 3, & \worst{rm\_lst\_tf}{n} &= 2n + 4.
+\end{align*}
+The keen reader may object now that the worst case
+of \erlcode{rm\_lst/2} is \emph{not} the same as
+for \erlcode{rm\_lst\_tf/2}, since, for the former, it is defined as
+the item being the head of the list, whilst for the latter it is when
+the item occurs \emph{anywhere} in the list. Indeed. To understand
+why, imagine that the last occurrence of the item is not at the head
+of the list, whereas it is one possible worst case
+for \erlcode{rm\_lst\_tf/2} but not for
+\erlcode{rm\_lst/2}. Therefore, \erlcode{rm\_lst/2} might outperform
+\erlcode{rm\_lst\_tf/2} on this particular example. Nevertheless, we
+can compare both functions globally because the worst delay
+of \erlcode{rm\_lst\_tf/2} is smaller than the best delay
+of \erlcode{rm\_lst/2}:
+\[
+\worst{rm\_lst\_tf}{n} < \best{rm\_lst}{n}.
+\]
+We can also compare directly the two functions on the
+\emph{intersection} of their worst cases, that is, when the item we
+look for is the head of the list. In this special case, then a
+sensible difference is likely, especially for large values of~\(n\),
+as
+\[
+\worst{rm\_lst\_tf}{n} \mathrel{\sim}
+\tfrac{2}{3}{\worst{rm\_lst}{n}},\,\; \text{as} \,\; n \rightarrow
+\infty.
+\]
+We can compare directly \(\best{rm\_lst}{n}\) and
+\(\best{rm\_lst\_tf}{n}\), because these delays correspond to the same
+case, that is, when the item is missing from the non\hyp{}empty list,
+and we also find that \erlcode{rm\_lst\_tf/2}~is barely faster
+than~\erlcode{rm\_lst/2}.
+
+As a conclusion, the version in tail form is always more efficient
+(between 0\%~and~\(33.3\%\), in average~\(20\%\)), although we said
+earlier that it should not be surprising that it is in fact slower,
+since the main purpose of being in tail form is to save call stack
+space, not rewrites. The reason why \erlcode{rm\_lst\_tf/2} is both
+faster and uses a small constant amount of call stack is because we
+did not follow our method until the end and, instead, relied on the
+following algebraic identities, used from left to right, for a
+speedup:
+\begin{align*}
+\erlcode{rev(rev(\(P\)))} &\mathrel{\equiv} P,\\
+\erlcode{rev(rev\_join(\(P\),\(Q\)))} 
+                          &\mathrel{\equiv} \erlcode{rev\_join(\(Q\),\(P\))},
+\end{align*}
+for all lists \(P\)~and~\(Q\).
+
+We could wonder now: what if we added a sequential search to
+\erlcode{rm\_lst\_tf/2}? Here is the definition again, as found
+\vpageref{code:rm_lst_tf}:
+\begin{alltt}
+rm_lst_tf(I,L)      -> rev_join(L,[],I).
+rev_join(   [],Q,I) -> rm_fst(I,Q,[]);
+rev_join([J|P],Q,I) -> rev_join(P,[J|Q],I).
+rm_fst(_,   [],A)   -> A;
+rm_fst(I,[I|Q],A)   -> rev_join(Q,A);
+rm_fst(I,[J|Q],A)   -> rm_fst(I,Q,[J|A]).
+\end{alltt}
+We could save time by not reversing~\erlcode{L} by means of
+\erlcode{rev\_join/3} and instead start with a sequential search for
+item~\erlcode{I}. If it is found, then \emph{the rest of the list} is
+worth reversing. This would be
+\begin{alltt}
+rm_lst2(_,   [])  \(\smashedrightarrow{\alpha}\) [];
+rm_lst2(I,[I|L])  \(\smashedrightarrow{\beta}\) \textbf{rm_fst(I,rev_join(L,[I]),[])};
+rm_lst2(I,[J|L])  \(\smashedrightarrow{\gamma}\) [J|rm_lst2(I,L)].
+rm_fst(_,   [],A) \(\smashedrightarrow{\delta}\) A;
+rm_fst(I,[I|Q],A) \(\smashedrightarrow{\epsilon}\) rev_join(Q,A);
+rm_fst(I,[J|Q],A) \(\smashedrightarrow{\zeta}\) rm_fst(I,Q,[J|A]).
+\end{alltt}
+Again, the part of the definition not in bold is the typical scheme of
+a sequential search, whilst the body in bold is a specific action
+performed if the first occurrence of the sought item is found. Note
+that we did not care of preserving the tail form, but only to reuse
+\erlcode{rm\_fst/2}. What is the delay of \erlcode{rm\_lst\_tf/2}?  If
+the item is absent from the list, the delay is that of a failed
+sequential search in a list of length~\(n\), that is,~\(n+1\). If the
+item occurs first at position~\(f\), the delay is
+\begin{align*}
+\comp{rm\_lst2}{n}
+  &= f + \comp{rev\_join}{n-f-1} + \comp{rm\_fst}{n-f}.
+\intertext{We already know that \(\comp{rev\_join}{n} = n + 1\), so}
+\comp{rm\_lst2}{n}
+  &= f + ((n-f-1)+1) + \comp{rm\_fst}{n-f}
+   = n + \comp{rm\_fst}{n-f}.
+\end{align*}
+The execution trace of \erlcode{rm\_fst/2} in this context is
+\(\zeta^{n-1-k}\epsilon\), followed by the trace of the call
+\erlcode{rev\_join(Q,A)} in clause~\clause{\epsilon}, so
+\[
+\comp{rm\_fst}{n} = (n-1-k) + 1 + \comp{rev\_join}{k-f}
+= n - k + ((k-f)+1) = n - f + 1,
+\]
+where the length of~\erlcode{Q} is~\(k-f\). Finally,
+\(\comp{rm\_lst2}{n} = n + (n - k + 1) = 2n - k + 1\). Therefore, the
+best and worst delays \emph{when the item is present} are
+\(\best{rm\_lst2}{n} = 2n-(n-1)+1=n+2, \worst{rm\_lst2}{n} = 2n + 1\).
+Assuming now that the item is absent from the list, the delay is
+simply that of a failed sequential search, that is,
+\(\comp{rm\_lst2}{n} = n + 1\). Which allows us to conclude that, in
+any case, for~\(n \geqslant 0\),
+\[
+\best{rm\_lst2}{n} = n+1,\qquad \worst{rm\_lst2}{n} = 2n + 1.
+\]
+The average delay when the item occurs in the list is
+\begin{align*}
+\ave{rm\_lst2}{n}
+  &:= \frac{1}{n}\sum_{k=0}^{n-1}{\comp{rm\_lst2}{k}}
+   = \frac{1}{n}\sum_{k=0}^{n-1}{(2n - k + 1)}\\
+  &= 2n + 1 - \frac{1}{n}\sum_{k=0}^{n-1}{k}
+   = 2n + 1 - \frac{n-1}{2} = \frac{3}{2}{n} + \frac{3}{2}.
+\end{align*}
+Up to now, the findings can be related in the table of
+\fig~\vref{fig:delays_rm_lst}, bearing in mind that two best cases or
+two worst delays cannot always be compared because the configuration
+of the input may be different.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 615 375 721]{rm_lst_partial}
+\caption{Delays of different definitions for filtering out an item
+\label{fig:delays_rm_lst}}
+\end{figure}
+We can deduce nevertheless that \erlcode{rm\_lst2/2} is always faster
+than \erlcode{rm\_lst/2} and \erlcode{rm\_lst\_tf/2} because
+\(\worst{rm\_lst2}{n} < \best{rm\_lst}{n}\) and \(\worst{rm\_lst2}{n}
+< \best{rm\_lst\_tf}{n}\). Moreover, two average delays can always be
+compared (they suppose here that the item does occur in the list),
+thus \erlcode{rm\_lst2/2} is the fastest of all in average. Finally,
+we want to insist again that ``average delay'' should not be confused
+with ``delay of the average case,'' because it might be that there is no
+average case, that is, a configuration of the input entailing a delay
+which is the average delay. The average delay is defined as an
+arithmetic computation the delays corresponding to all possible input
+configurations, under some equi\-probability hypotheses.
+
+\medskip
+
+\paragraph{Tail form redux.}
+
+Until now we have seen slightly different ways to convert a given
+definition into tail form:
+\begin{enumerate}
+
+  \item from \erlcode{sum/1} to \erlcode{sum\_tf/1} and from
+    \erlcode{fact/1} to \erlcode{fact\_tf/1};
+
+  \item from \erlcode{join/2} to \erlcode{join\_tf/2};
+
+  \item from \erlcode{rm\_fst/2} to \erlcode{rm\_fst\_tf/2};
+
+  \item from \erlcode{rm\_lst/2} to \erlcode{rm\_lst\_tf/2}.
+
+\end{enumerate}
+All these transformations rely on an additional parameter but their
+design seem to differ in the nature of this accumulator: it represents
+either a partial result or a temporary list. The reason for the
+dissimilarity actually lies in the use of dedicated improvements for
+each case, but there is a common scheme for all these transformations
+into tail form.
+
+\medskip
+
+\paragraph{Factorial.}
+
+For instance, if we do not rely on associativity of the arithmetic
+operators involved in \erlcode{sum/1} and \erlcode{fact/1}, that is,
+addition and multiplication, we then need to keep the integers in a
+list so that they can be processed in the proper, reversed,
+order. First, let us recall the original definition of
+\erlcode{fact/1}:
+\begin{alltt}
+fact(1)            \(\smashedrightarrow{\alpha}\) 1;
+fact(N) when N > 1 \(\smashedrightarrow{\beta}\) N * fact(N-1).
+\end{alltt}
+and the example \vpageref{trace:fact_5}:
+
+\input{fact_5}
+
+\noindent We derived the following definition of \erlcode{fact\_tf/1}
+in tail form, \vpageref{code:fact_tf_alpha}:
+\verbatiminput{fact_tf.def} The order in which the multiplications are
+carried out by~\erlcode{fact\_tf/2} is not the same as done
+by~\erlcode{fact/1}, as it was assumed that multiplication is
+associative. If we do want not rely on associativity, we need to
+create and store the integers in a list and then multiply them, for
+instance, by reusing~\erlcode{mult\_tf/1}, defined
+\vpageref{code:mult_tf}. This way the multiplications will be
+performed exactly in the same order as in \erlcode{fact/1} because
+pushing the numbers on the accumulator actually reverses their order:
+\begin{alltt}
+fact_alt_tf(N) when N > 0 \(\smashedrightarrow{\alpha}\) fact_alt_tf(N-1,\textbf{[N]}).
+fact_alt_tf(\textbf{1},A)          \(\smashedrightarrow{\beta}\) \textbf{mult_tf(A,1)};
+fact_alt_tf(N,A)          \(\smashedrightarrow{\gamma}\) fact_alt_tf(N-1,\textbf{[N|A]}).
+mult_alt_tf(   [],A)      \(\smashedrightarrow{\delta}\) A;
+mult_alt_tf([N|L],A)      \(\smashedrightarrow{\epsilon}\) mult_alt_tf(L,\textbf{N*A}).\hfil% \emph{Changed}
+\end{alltt}
+Here, we have instead
+\begin{tabbing}
+\erlcode{fact\_alt\_tf(5)}\\
+\erlcode{fact\_a} \= \(\smashedrightarrow{\alpha}\) \= \erlcode{mult\_alt\_tf([3,4,5],2*1)} \=\kill
+\> \(\smashedrightarrow{\alpha}\) \> \erlcode{fact\_alt\_tf(4,[5])}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{fact\_alt\_tf(3,[4,5])}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{fact\_alt\_tf(2,[3,4,5])}\\
+\> \(\smashedrightarrow{\gamma}\) \> \erlcode{fact\_alt\_tf(1,[2,3,4,5])}\\
+\> \(\smashedrightarrow{\beta}\) \> \erlcode{mult\_alt\_tf([2,3,4,5],1)}\\
+\> \(\smashedrightarrow{\epsilon}\) \> \erlcode{mult\_alt\_tf([3,4,5],2*1)}
+\> \(=\) \erlcode{mult\_alt\_tf([3,4,5],2)}\\
+\> \(\smashedrightarrow{\epsilon}\) \> \erlcode{mult\_alt\_tf([4,5],3*2)}
+\> \(=\) \erlcode{mult\_alt\_tf([4,5],6)}\\
+\> \(\smashedrightarrow{\epsilon}\) \> \erlcode{mult\_alt\_tf([5],4*6)}
+\> \(=\) \erlcode{mult\_alt\_tf([5],24)}\\
+\> \(\smashedrightarrow{\epsilon}\) \> \erlcode{mult\_alt\_tf([],5*24)}
+\> \(=\) \erlcode{mult\_alt\_tf([],120)}\\
+\> \(\smashedrightarrow{\delta}\) \> \erlcode{120}\textrm{.}
+\end{tabbing}
+We see that the multiplications are \(5 \cdot (4 \cdot (3 \cdot (2
+\cdot 1)))\), just as they were when rewriting~\erlcode{fact(5)}, but
+this faithfully ordered sequence comes at a cost: if the number is
+\(n\), a list of length~\(n\) has to be created (\(n\)~rewrites)
+before it is traversed (\(n\)~additional rewrites) to perform the
+multiplications. Therefore, this solution incurs a~50\% slowdown,
+compared to \erlcode{fact\_tf/1} (\(2n\)~versus~\(n+1\) exactly) and
+requires additional memory to hold the temporary list. Nevertheless,
+\erlcode{fact\_alt\_tf/1}~illustrates our point, that is, the control
+context can be transformed into an operation upon a linear
+accumulator. More precisely, there are three phases: (1)~a new
+function is created, which calls an auxiliary function with an empty
+list as initial accumulator; (2)~the values of the control context are
+pushed onto the accumulator of the call; (3)~these values are popped
+from the accumulator in the non\hyp{}recursive bodies and are applied
+the original control context. In the case of
+\erlcode{fact\_alt\_tf/1}, the first phase is done by
+clause~\clause{\alpha}, the second by clause~\clause{\gamma} and the
+third by clauses \clause{\beta},
+\clause{\delta}~and~\clause{\epsilon}. If the control context is an
+associative function or operator, then the accumulator can be
+specialised, like we did with~\erlcode{fact\_tf/1}, and it may even
+not need to be a list if it only holds one value all along.
+
+\medskip
+
+\paragraph{Joining two lists.}
+
+Let us examine now \erlcode{join/2} and \erlcode{join\_tf/2}. We had
+the following definitions:
+\begin{alltt}
+join(   [],Q)       \(\smashedrightarrow{\alpha}\) Q;
+join([I|P],Q)       \(\smashedrightarrow{\beta}\) [I|join(P,Q)].
+
+join_tf(P,Q)        \(\smashedrightarrow{\gamma}\) join(P,Q,[]).
+join(   [],Q,   []) \(\smashedrightarrow{\delta}\) Q;
+join(   [],Q,[I|A]) \(\smashedrightarrow{\epsilon}\) join([],[I|Q],A);
+join([I|P],Q,    A) \(\smashedrightarrow{\zeta}\) join(P,Q,[I|A]).
+\end{alltt}
+This transformation illustrates perfectly the general method we
+underline here: (1)~a linear accumulator, \erlcode{A}, was added in a
+new clause \clause{\gamma}; (2)~the values in the control context
+(here only~\erlcode{I} in clause~\clause{\beta}) were stored in it by
+clause~\clause{\zeta}; (3)~and later popped out to be processed as in
+the original control context in clause~\clause{\epsilon}, that is,
+pushed on the partial result---which is~\erlcode{Q} because of
+clause~\clause{\delta} that derives from clause~\clause{\alpha}.
+
+\medskip
+
+\paragraph{Filtering out the first occurrence.}
+
+Let us consider in turn the transformation from \erlcode{rm\_fst/2} to
+\erlcode{rm\_fst\_tf/2}. Here is the definition of the former, as
+found \vpageref{code:rm_fst_alpha}:
+\begin{alltt}
+rm_fst(_,   []) \(\smashedrightarrow{\alpha}\) [];
+rm_fst(I,[I|L]) \(\smashedrightarrow{\beta}\) L;
+rm_fst(I,[J|L]) \(\smashedrightarrow{\gamma}\) [J|rm_fst(I,L)].
+\end{alltt}
+and of the latter \vpageref{code:rm_fst_tf}:
+\begin{alltt}
+rm_fst_tf(I,L)       \(\smashedrightarrow{\delta}\) rm_fst_tf(I,L,[]).
+rm_fst_tf(_,   [],A) \(\smashedrightarrow{\epsilon}\) rev(A);
+rm_fst_tf(I,[I|L],A) \(\smashedrightarrow{\zeta}\) rev_join(A,L);
+rm_fst_tf(I,[J|L],A) \(\smashedrightarrow{\eta}\) rm_fst_tf(I,L,[J|A]).
+
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).
+\end{alltt}
+We have here another illustration of our method, although it is a
+little bit obscured: (1)~a list accumulator has been added in
+clause~\clause{\delta}; (2)~the values in the control context
+(only~\erlcode{J}) are pushed onto it in clause~\clause{\eta};
+(3)~these values are popped from the accumulator and the original
+control context they belonged to is applied to them in clauses
+\clause{\epsilon}~and~\clause{\zeta}. The usage
+of \erlcode{rev\_join/2} itself is a handy shortcut, because it was
+already defined and it corresponds exactly to the last step we
+mentioned: the values from the control context, stored in the
+accumulator, have to be popped (this is the first phase of the
+definition of \erlcode{rev\_join/2}) and applied to the partial result
+as if in the original control context, that is, pushed on it (because
+of clause~\clause{\beta}).
+
+\medskip
+
+\paragraph{Filtering out the last occurrence.}
+
+The last illustrations we have to reconsider are the definitions of
+\erlcode{rm\_lst/2} and \erlcode{rm\_lst\_tf/2}. The former is
+\begin{alltt}
+rm_lst(I,L) -> rev(rm_fst(I,rev(L))).
+\end{alltt}
+while the latter is found \vpageref{code:rm_lst_tf}:
+\verbatiminput{rm_lst_tf.def} This transformation is longer than the
+previous ones but it also underlines our general method. Two aspects
+make it slightly different in appearance, though. Firstly, we applied
+to the first two clauses of \erlcode{aux2/3} two algebraic equalities
+to speed up the code:
+\begin{align*}
+\erlcode{rev(rev(A))}         &\mathrel{\equiv} \erlcode{A},\\
+\erlcode{rev(rev\_join(A,L))} &\mathrel{\equiv}
+\erlcode{rev\_join(L,A)}.
+\end{align*}
+Secondly, we realised that the accumulator of \erlcode{rev\_join/3}
+only contained a single item, so it was transformed further into that
+item. We also removed an auxiliary definition which was expanded
+\emph{in situ}. Lastly, we renamed some functions and variables to
+enhance the readability.
+
+\medskip
+
+\paragraph{Exercises.}
+\label{ex:filtering_out}
+
+\noindent [Answers \vpageref{ans:filtering_out}.]
+\begin{enumerate}
+
+  \item Derive an equivalent definition \erlcode{diff\_tf/1} in tail
+    from \erlcode{diff/1}:
+\begin{verbatim}
+diff([M,N]) -> M - N;
+diff([M|L]) -> M - diff(L).
+\end{verbatim}
+Next, make sure that the function never fails by ending instead with
+an atom~\erlcode{list\_too\_short}. Compare the delays of
+\erlcode{diff/1} and \erlcode{diff\_tf/1}.
+
+  \item Transform the definition of \erlcode{srev/1} into tail form
+    \erlcode{srev\_tf/1} and give its delay.
+\verbatiminput{srev.def}
+\verbatiminput{join_2.def}
+
+  \item Another idea for filtering out the last occurrence of an item
+    in a list consists in combining a sequential search with a
+    membership test: if an occurrence is found, it is checked whether
+    it is the last or not by performing another sequential search
+    \emph{on the remaining items}. (This kind of tactic is commonly
+    called in Computer Science a \emph{lookahead}.) If the item is
+    found not to be the last, it is retained in the partial result and
+    the main sequential search is resumed, otherwise it stops and the
+    item is left out. Implement this idea as
+    function~\erlcode{rm\_lst3/2} and compute its delay, in particular
+    in its best and worst cases, as well as its average delay. Compare
+    it to the prior equivalent functions of this section.
+
+  \item Define a function \erlcode{drop/2} such that the call
+    \erlcode{drop(\(L\),\(n\))} is rewritten in the list made of the
+    items of list~\(L\) in the same order, except the items occurring
+    every \(n\)~positions, the first item being counted as occurring
+    at position~\(1\). For instance
+    \begin{align*}
+      \erlcode{drop([a,b,c,d,e,f,g,h],3)} &\twoheadrightarrow
+      \erlcode{[a,b,d,e,g,h]};\\ \erlcode{drop([a,b,c,d,e,f,g,h],1)}
+      &\twoheadrightarrow \erlcode{[]}.
+    \end{align*}
+   What do you think should be done when the period is~\(0\)? What
+   about the empty list? What if the period is greater than the length
+   of the list? Or negative? Justify your choices and make sure no
+   special case is left out, that is, your definition is complete. Find
+   the delay in the worst case.
+
+  \item Check the following definitions and assess their correctness
+    and completeness. If a definition is incorrect, provide a
+    counter\hyp{}example and explain why, in your opinion, the
+    programmer made that mistake. If a definition is overly complex or
+    too long, improve upon it. Check also delay, number of pushes and
+    memory usage. Which definitions are in tail form?
+    \begin{enumerate}
+      \item
+\begin{verbatim}
+rm_fst(I,   []) -> error;
+rm_fst(I,  [I]) -> [];
+rm_fst(A,  [I]) -> [I];
+rm_fst(I,[I|L]) -> L;
+rm_fst(A,[I|L]) -> [I|rm_fst(A,L)].
+\end{verbatim}
+
+\medskip
+
+      \item
+\begin{verbatim}
+rm_fst(X,[X|T]) -> rm_fst(T);
+rm_fst(X,[Y|T]) -> [Y|rm_fst(X,T)];
+rm_fst(T,   []) -> [].
+rm_fst([X|T])   -> [X|rm_fst(T)];
+rm_fst(   [])   -> [].
+\end{verbatim}
+
+\medskip
+
+      \item
+\begin{verbatim}
+rm_fst(_,   [])   -> [];
+rm_fst(I,[I|L])   -> L;
+rm_fst(A,[I|L])   -> rm_fst(A,L,[I]).
+rm_fst(I,[I|L],C) -> rev_join(C,L);
+rm_fst(A,[I|L],C) -> rm_fst(A,L,[I|C]);
+rm_fst(_,   [],M) -> rev(M).
+\end{verbatim}
+
+\medskip
+
+      \item
+\begin{verbatim}
+rm_fst(I,L)       -> rm_fst(I,L,[]).
+rm_fst(I,[I|L],A) -> join(A,L);
+rm_fst(I,[J|L],A) -> rm_fst(I,L,join(A,[J])).
+\end{verbatim}
+
+\medskip
+
+      \item
+\begin{verbatim}
+rm_fst(I,  [I]) -> [];
+rm_fst(_,  [I]) -> [I];
+rm_fst(I,[I|L]) -> rm_fst(L);
+rm_fst(J,[I|L]) -> [I|rm_fst(J,L)].
+rm_fst(L)       -> L.
+\end{verbatim}
+    \end{enumerate}
+
+  \item Define a function~\erlcode{rm\_all/2} such that
+    \erlcode{rm\_all(\(I\),\(L\))}, where \(I\)~is any expression and
+    \(L\)~an~expression rewritable to a list, is rewritten into a list
+    containing the elements of~\(L\), except all occurrences of~\(I\),
+    in the same order. For example, \erlcode{rm\_all(7,[7,7,1,7,2])}
+    \(\twoheadrightarrow\) \erlcode{[1,2]}. Is there a worst case,
+    that is, a set of inputs which maximise the number of rewrites?
+    Find the delay and the number of pushes to reach the result. Give
+    an equivalent definition~\erlcode{rm\_all\_tf/2} in tail form and
+    answer the same questions.
+
+\end{enumerate}

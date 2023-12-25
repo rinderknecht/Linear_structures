@@ -1,0 +1,5 @@
+\begin{alltt}
+rm_fst(_,   []) \(\smashedrightarrow{\alpha}\) [];
+rm_fst(I,[I|L]) \(\smashedrightarrow{\beta}\) L;
+rm_fst(I,[J|L]) \(\smashedrightarrow{\gamma}\) [J|rm_fst(I,L)].
+\end{alltt}

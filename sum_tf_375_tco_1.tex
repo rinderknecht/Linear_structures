@@ -1,0 +1,91 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\raisebox{-3pt}{\(=\)}\hspace*{3pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\Tn}{
+  \pstree{\erlnode{|}}{
+    \TR{\erlcode{3}}
+    \pstree{\erlnode{|}}{
+      \erlnode{7}
+      \pstree{\TR{\rnode[r]{fiveRoot1}{\erlcode{|}}}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-20pt}
+\phantom{%
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\erlnode{sum\_tf}}{
+  \Tn
+  \Tn
+}}
+\hspace*{-2pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[rb]{arg1}{\erlbox{sum\_tf}}}{
+  \psset{nodesepB=2pt}
+  \erlnode{10}
+  \Tn
+}
+%
+\hspace*{5pt}
+\raisebox{-3pt}{\(\stackrel{\gamma}{\dashrightarrow}\)}
+\hspace*{-3pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\Tn}{
+  \pstree{\erlnode{|}}{
+    \erlnode{3}
+    \pstree{\erlnode{|}}{
+      \erlnode{7}
+      \pstree{\erlnode{|}}{
+        \TR{\rnode[tr]{five}{\erlcode{5}}}
+        \erlnode{\rnode[r]{empty5}{[]}}
+      }
+    }
+  }
+}
+\hspace*{-20pt}
+\phantom{%
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\erlnode{sum\_tf}}{
+  \Tn
+  \Tn
+}}
+\hspace*{-2pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\Tn}{
+  \TR{\rnode[rb]{ten}{\erlcode{10}}}
+  \Tn
+}
+\hspace*{-2pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[rb]{arg2}{\erlbox{sum\_tf}}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+    {\rnode[lb]{plusA2}{\rnode[rb]{plusB2}{\erlnode{+}}}}{
+      \Tn
+      \Tn
+  }
+  \Tn
+}
+%
+\nccurve[angleA=-45,angleB=20,ncurvA=1,nodesepA=7pt]{->}{arg1}{fiveRoot1}
+%
+\nccurve[angleA=-135,angleB=-60,ncurv=1.5,nodesepA=4pt]{->}{plusA2}{ten}
+\nccurve[angleA=-45,angleB=20,nodesepA=4pt]{->}{plusB2}{five}
+\nccurve[angleA=-45,angleB=10,ncurv=1,nodesepA=7pt]{->}{arg2}{empty5}
+\endTeXtoEPS
+
+\end{document}

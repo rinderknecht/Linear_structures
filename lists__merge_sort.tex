@@ -1,0 +1,2358 @@
+%%-*-latex-*-
+
+\chapter{Merge Sort}
+
+\paragraph{Merging.}
+
+Let us recall one\hyp{}way insertion sort, as seen
+\vpageref{code:insert}:
+\begin{verbatim}
+insert(I,[J|S]) when I > J -> [J|insert(I,S)];
+insert(I,    S)            -> [I|S].
+isort(   [])               -> [];
+isort([I|L])               -> insert(I,isort(L)).
+\end{verbatim}
+The purpose of \erlcode{insert/2} is to insert one item into a list of
+items ordered nondecreasingly. Sorting by insertion consists in
+inserting items to be sorted one by one into an already sorted list. A
+generalisation is concerned with inserting a series of items
+\emph{already sorted} in nondecreasing order. This basic operation is
+called \emph{merging} and it is more efficient than inserting items
+one at a time, because we don't need to move backwards to
+insert. Consider the following example, where two increasingly sorted
+lists, \erlcode{[22,47,50]} and \erlcode{[16,36,59,70]} are merged
+step by step into one increasingly sorted list which appears at the
+right. The numbers being compared are the heads of the lists and they
+are set in a bold typeface:
+\begin{equation*}
+\left.
+\begin{aligned}
+&\erlcode{[\textbf{22},47,50]}\\
+&\erlcode{[\textbf{16},36,59,70]}
+\end{aligned}
+\right\}
+\;\erlcode{[]}
+\quad \text{then} \quad
+\left.
+\begin{aligned}
+&\erlcode{[\textbf{22},47,50]}\\
+&\erlcode{[\textbf{36},59,70]}
+\end{aligned}
+\right\}
+\;\erlcode{[16]}
+\end{equation*}
+\begin{equation*}
+\left.
+\begin{aligned}
+&\erlcode{[\textbf{47},50]}\\
+&\erlcode{[\textbf{36},59,70]}
+\end{aligned}
+\right\}
+\;\erlcode{[16,22]}
+\quad \text{then} \quad
+\left.
+\begin{aligned}
+&\erlcode{[\textbf{47},50]}\\
+&\erlcode{[\textbf{59},70]}
+\end{aligned}
+\right\}
+\;\erlcode{[16,22,36]}
+\end{equation*}
+\begin{equation*}
+\left.
+\begin{aligned}
+&\erlcode{[\textbf{50}]}\\
+&\erlcode{[\textbf{59},70]}
+\end{aligned}
+\right\}
+\;\erlcode{[16,22,36,47]}
+\quad \text{then} \quad
+\left.
+\begin{aligned}
+&\erlcode{[]}\\
+&\erlcode{[59,70]}
+\end{aligned}
+\right\}
+\;\erlcode{[16,22,36,47,50]}.
+\end{equation*}
+When a list is empty, we can append it to the current result and
+obtain \erlcode{[16,22,36,47,50,59,70]}. Otherwise, we compare the
+heads of both lists, select the smallest as being the head of the
+result from now on and recur to the same process without that
+number. Here is the \Erlang code to implement this algorithm:
+
+\label{code:merge}
+\input{merge_alpha}
+
+\noindent Notice that we do not actually need to join lists, as the
+control context of the recursive calls suffice for obtaining the
+desired order. The difference with \erlcode{insert/2} above is that we
+don't stop after the first item is inserted, but keep inserting
+forward until one list or the other is empty, because the remaining
+list is already sorted. Let us illustrate this method on a short
+example:
+\begin{alltt}
+\erlcode{merge([3,4,7],[1,2,5,6])} \(\smashedrightarrow{\delta}\) \erlcode{[1|merge([3,4,7],[2,5,6])]}
+                         \(\smashedrightarrow{\delta}\) \erlcode{[1,2|merge([3,4,7],[5,6])]}
+                         \(\smashedrightarrow{\gamma}\) \erlcode{[1,2,3|merge([4,7],[5,6])]}
+                         \(\smashedrightarrow{\gamma}\) \erlcode{[1,2,3,4|merge([7],[5,6])]}
+                         \(\smashedrightarrow{\delta}\) \erlcode{[1,2,3,4,5|merge([7],[6])]}
+                         \(\smashedrightarrow{\delta}\) \erlcode{[1,2,3,4,5,6|merge([7],[])]}
+                         \(\smashedrightarrow{\beta}\) \erlcode{[1,2,3,4,5,6,7]}\textrm{.}
+\end{alltt}
+As can be surmised now, merging can efficiently be used as a basic
+operation for sorting, instead of insertion. Before we proceed to see
+how, note that we could have defined \erlcode{merge/2} as follows:
+\begin{verbatim}
+merge(    P,     [])            -> P;
+merge([I|P],Q=[J|_]) when I < J -> [I|merge(P,Q)];
+merge(    P,  [J|Q])            -> [J|merge(P,Q)].
+\end{verbatim}
+This is the previous definition without its first clause
+\clause{\alpha}. This shorter version is slower when the first list is
+shorter than the other: the second list will have all its items
+examined, although it is unnecessary since they are the only remaining
+ones. It is faster to stop as soon as the first list becomes empty. We
+recall that, \vpageref{code:join}, we defined \erlcode{join/2} as
+\begin{verbatim}
+join(   [],Q) -> Q;
+join([E|P],Q) -> [E|join(P,Q)].
+\end{verbatim}
+instead of
+\begin{alltt}
+\textbf{join(    P,[]) -> P;}
+join(   [], Q) -> Q;
+join([E|P], Q) -> [E|join(P,Q)].
+\end{alltt}
+even if the later is faster when the second list is empty from the
+beginning. The reason was that this simplification, despite slowing
+down the program in this special case, made the expression of the
+delay dependent only upon the length of the first list. This avoided
+making two cases and allowed us to simply define \(\comp{join}{n}\)
+instead of \(\comp{join}{n,m}\). The difference with \erlcode{merge/2}
+is that \erlcode{join/2} is not symmetric in general, that is,
+\erlcode{join(\(P\),\(Q\))} \(\not\equiv\)
+\erlcode{join(\(Q\),\(P\))}, when both \(P\) and \(Q\) are not empty,
+whilst \erlcode{merge(\(P\),\(Q\))} \(\equiv\)
+\erlcode{merge(\(Q\),\(P\))} always holds. The symmetry of
+\erlcode{merge/2} means that we should not arbitrarily distinguish one
+list with respect to the other, so the delay of
+\erlcode{merge(\(P\),\(Q\))} is unconditionally the same as the delay
+of \erlcode{merge(\(Q\),\(P\))}, that is, \(\comp{merge}{m,n} =
+\comp{merge}{n,m}\). This results in easier delay calculations and
+faster computations.
+
+\begin{figure}[H]
+\centering
+\includegraphics[bb=75 702 289 723]{merged}
+\caption{Two ordered lists merged into one\label{fig:merged}}
+\end{figure}
+
+%\medskip
+
+\paragraph{Best delay.}
+
+Let \(\best{merge}{m,n}\) be the delay in the best case of
+\erlcode{merge(\(P\),\(Q\))}, where \(P\) and \(Q\) contain
+respectively \(m\) and \(n\) items. The goal here is to minimise the
+use of clauses \clause{\gamma} and \clause{\delta}, that is, the
+number of comparisons. Graphically, we represent an item from \(P\) as
+a \emph{white node} \((\circ)\) and an item from \(Q\) as a
+\emph{black node} \((\bullet)\). Nodes of these kinds are printed in
+an horizontal line, the leftmost node being the smallest. Comparisons
+are always performed between black and white nodes and are represented
+as \emph{edges} in \fig~\vref{fig:merged}. An incoming arrow means
+that the node is smaller than the other end of the edge, so all edges
+point leftward and the number of comparisons is the number of nodes
+with an incoming edge. This abstract representation suggests that the
+more items from one list we have at the end of the result, the less
+comparisons we needed for merging (there are two consecutive white
+nodes at the right without any edges). Indeed, \emph{the minimum delay
+  is achieved when the shortest list comes first in the result, that is,
+  it is a \emph{prefix.}} See \fig~\vref{fig:best_merge}
+\begin{figure}[!b]
+\centering
+\includegraphics[bb=74 698 290 722]{best_merge}
+\caption{Best\hyp{}case merging: \(\min\{m,n\}\)
+  comparisons\label{fig:best_merge}}
+\end{figure}
+for the best case with \(m=9\) and \(n=4\), which are the same lengths
+as in \fig~\vref{fig:merged}.  If both lists have the same length, any
+of them can be considered the shortest and the previous statement
+applies as well.\label{merge:best_case}
+\begin{equation}
+\best{merge}{m,n} = 1 + \min\{m,n\}.\label{eq:best_merge}
+\end{equation}
+We can check that \(\best{merge}{m,n} = \best{merge}{n,m}\) and
+\(\best{merge}{0,n} = \best{merge}{m,0} = 1\), as
+expected.
+
+\medskip
+
+\paragraph{Worst delay.}
+
+Let \(\worst{merge}{m,n}\) be the delay of
+\erlcode{merge(\(P\),\(Q\))} in the worst case, where \(P\) and \(Q\)
+contain respectively \(m\) and \(n\) items. Clearly, this delay is
+one, by clause \clause{\alpha} or \clause{\beta}, plus the number of
+times clauses \clause{\gamma} and \clause{\delta} are used, which is
+the number of comparisons needed. For the purpose of illustration, let
+us consider an example where \(m=9\) and \(n=4\). A possible merging
+of \(P\) and \(Q\) is shown in \fig~\vref{fig:merged}. We can see that
+we can increase the number of comparisons with respect to \(m+n\) by
+removing those nodes from \(Q\) which find their place at the end of
+the result \emph{without being compared}. This is shown in
+\fig~\vref{fig:worst_merged2}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=74 702 255 723]{worst_merged2}
+\caption{A worst\hyp{}case merging in \(m+n-1\)
+  comparisons\label{fig:worst_merged2}}
+\end{figure}
+After this shortening, we have \(m+n=11\), that is, down by \(2\), and
+the number of comparisons is unchanged (\(m+n-1=10\)). This is the
+maximum number because it corresponds to a situation where all the
+nodes, except the rightmost, are the destination of an edge. (The last
+node cannot be pointed at because edges must go from right to left.)
+Actually, it is possible to interchange the last two nodes as well,
+because this removes one out\hyp{}going edge from the white node but
+adds one to the black, so the number of comparisons is still
+\(m+n-1\). This can be visualised in \fig~\vref{fig:worst_merged1}.
+\emph{The worst case of merging \(P\) and \(Q\) is when the last item
+  of one list becomes the last item of the result and the last item of
+  the other list becomes the penultimate item of the result.} The
+total number of comparisons is then \(m+n-1\), where \(m\) and \(n\)
+are, respectively, the number of items in \(P\) and \(Q\). When one
+list is empty, the delay is \(1\). Therefore, when \(m > 0\) and \(n >
+0\),
+\begin{figure}[b]
+\centering
+\includegraphics[bb=74 700 255 725]{worst_merged1}
+\caption{The two rightmost nodes in \fig~\vref{fig:worst_merged2} have
+  been swapped\label{fig:worst_merged1}}
+\end{figure}
+\begin{equation}
+\worst{merge}{0,n} = \worst{merge}{m,0} = 1;\quad
+\worst{merge}{m,n} = 1 + (m + n - 1) = m + n.\label{eq:worst_merge}
+\end{equation}
+It is important to realise that the above reckoning is unchanged if we
+swap \(P\) and \(Q\), thus \(m\) and \(n\); formally, we expect
+\(\worst{merge}{m,n} = \worst{merge}{n,m}\).
+
+\medskip
+
+\paragraph{Average delay.}
+
+One question remains to be answered: Is the average delay closer to
+the lower or the upper bound of the delay? Let us consider a smaller
+example in \fig~\vref{fig:average_merged}, 
+\begin{figure}
+\centering
+\includegraphics[bb=67 649 350 723]{average_merged}
+\caption{All possible merges with \(m=3\) (\(\circ\)) and \(n=2\)
+  (\(\bullet\))
+\label{fig:average_merged}}
+\end{figure}
+with \(m=3\) white nodes and \(n=2\) black nodes which are interleaved
+in all possible manners.  Note how the figure was structured. The
+first column lists the configurations where the rightmost black node
+is the last of the result. The second column lists the cases where the
+rightmost black node is the penultimate node of the result. The third
+column is divided in two groups itself, the first of which lists the
+cases where the rightmost black node is the antepenultimate. The total
+number of comparisons is \(35\) and the number of configurations is
+\(10\), thus the average number of comparisons is \(35/10 =
+7/2\).\label{seven_two} Let us devise a method to find this ratio for
+any \(m\) and \(n\). First, the number of configurations: how many
+ways are there to combine \(m\) white nodes and \(n\) black nodes?
+This is the same as asking how many ways there are to paint in black
+\(n\) nodes picked amongst \(m+n\) white nodes. More abstractly, this
+is equivalent to wonder how many ways there are to choose \(n\)
+objects amongst \(m+n\). This number is usually a \emph{combination}
+and noted \(\binom{m+n}{n}\). For example, let us consider the set
+\(\{a,b,c,d,e\}\) and the combinations of \(3\) objects taken from it
+are
+\begin{gather*}
+\{a,b,c\},\{a,b,d\},\{a,b,e\},\{a,c,d\},\{a,c,e\},\{a,d,e\},\\
+\{b,c,d\},\{b,c,e\},\{b,d,e\},\\
+\{c,d,e\}.
+\end{gather*}
+This enumeration establishes that \(\binom{5}{3} = 10\). (Notice that
+we use mathematical sets, therefore the order of the elements or their
+repetition are not meaningful.) It is not difficult to count the
+combinations if we recall how we counted the permutations,
+\vpageref{permutations}. Let us determine \(\binom{r}{k}\). We can
+pick the first object amongst \(r\), the second amongst \(r-1\)
+etc. until we pick the \(r\)th object amongst \(r-k+1\), so there are
+\(r(r-1)\dots(r-k+1)\) choices. But these arrangements contain
+duplicates, for example, we may form \(\{a,b,c\}\) and \(\{b,a,c\}\),
+which are to be considered identical combinations. Therefore, we must
+divide the number we just obtained by the number of redundant
+arrangements, which is the number of permutations of \(k\) objects,
+\(k!\). In the end:
+\[
+\binom{r}{k} := \frac{r(r-1)\ldots(r-k+1)}{k!} =
+\frac{r!}{k!(r-k)!}.
+\]
+We can check now that in \fig~\vref{fig:average_merged}, we must have
+\(10\) cases: \(\binom{5}{2} = 5!/(2!3!) = 10\). The symmetry of the
+problem means that merging a list of \(m\) items with a list of \(n\)
+leads to exactly the same results as merging a list of \(n\) items
+with a list of \(m\) items.
+\[
+\binom{m+n}{n} = \binom{m+n}{m}.
+\]
+This can be easily proved by means of the definition:
+\[
+\binom{m+n}{n} := \frac{(m+n)!}{n!(m+n-n)!} =
+\frac{(m+n)!}{m!n!} := \binom{m+n}{m},\quad
+\text{\textsc{qed.}}
+\]
+Going forth, let us determine the total number \(\mathcal{L}(m,n)\) of
+comparisons needed to merge \(m\) and \(n\) items in all possible
+manners. This is the number of times clauses \clause{\gamma} and
+\clause{\delta} are used, so we have to count the nodes which are the
+destination of an edge in our graph representation. In
+\emph{enumerative combinatorics}, that is, the art of counting
+configurations, it is often worthy to consider the complementary
+set. In this case, it may be easier to count the nodes without
+incoming edges, that is, the number of times clauses \clause{\alpha} and
+\clause{\beta} are used. These nodes are circled, so they are easily
+distinguished, in \fig~\vref{fig:average_merge_circled}.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=68 650 354 723]{average_merge_circled}
+\caption{All merges with nodes handled by clauses \clause{\alpha} and
+  \clause{\beta} circled\label{fig:average_merge_circled}}
+\end{figure}
+We can check for each merge that their number is always \(m+n\) minus
+the number of nodes with incoming edges. This is easy to justify
+because there are \(m+n\) nodes and each is either processed by
+clauses \clause{\alpha}\hyp{}\clause{\beta} or else clauses
+\clause{\gamma}\hyp{}\clause{\delta}. Summing over all the
+\(\binom{m+n}{n}\) merges, we draw that the total number of circled
+nodes is
+\[
+(m + n) \binom{m+n}{n} - \mathcal{L}(m,n).
+\]
+It is simple to characterise these circled nodes: they make up the
+longest rightmost contiguous series of nodes of the same colour. Since
+there are only two colours, the problem of determining the total
+number \(W(m,n)\) of white circled nodes is symmetric to the
+determination of the total number \(B(m,n)\) of black circled nodes:
+\(W(m,n) = B(n,m)\). Bear in mind that, in our running example, \(m\)
+is the number of white nodes and \(n\) the number of black nodes. We
+expect then
+\[
+(m + n) \binom{m+n}{n} - \mathcal{L}(m,n) = W(m,n) + B(m,n),
+\]
+hence,\label{average_delay_merge} dividing by \(\binom{m+n}{n}\) and
+reordering the terms yields
+\[
+\biggl[\mathcal{L}(m,n)\biggr]\left/\binom{m+n}{n}\right.
+= m + n - \biggl[W(m,n) + B(m,n)\biggr]\left/\binom{m+n}{n}\right..
+\]
+The left\hyp{}hand side is the average number of comparisons we are
+looking for in the end. We can decompose \(W(m,n)\) by counting the
+circled white nodes vertically, which is another common technique used
+in combinatorics. In \fig~\vref{fig:average_merge_circled}, \(W(3,2)\)
+is the sum of the numbers of merges with
+\begin{itemize}
+
+  \item one ending circled white node (\(6\)),
+
+  \item two ending circled white nodes (\(3\)),
+
+  \item three ending circled white nodes (\(1\)).
+\end{itemize}
+Indeed, the examination of the two last columns in
+\fig~\vref{fig:average_merge_circled} brings \(W(3,2) = 6 + 3 + 1 =
+10\) and the first column \(B(3,2) = 4 + 1 = 5\). How can we
+generalise to arbitrary \(m\) and \(n\)? The number of merges with one
+ending circled white node is the answer to the question: ``How many
+ways are there to combine \(n\) black nodes with \(m-1\) white
+nodes?'' We know, by definition of combinations, this to be
+\(\binom{n+(m-1)}{n}\). Similarly, the number of merges with two
+ending circled white nodes is the answer to the question: ``How many
+ways are there to combine \(n\) black nodes with \(m-2\) white nodes?''
+This is \(\binom{n+(m-2)}{n}\). So on until
+\(\binom{n+(m-m)}{n}\):
+\begin{align}
+W(m,n) %&= \sum_{i=1}^{m}{\binom{n+m-i}{n}}\\
+  &= \binom{n+m-1}{n} + \binom{n+m-2}{n} + \dots + \binom{n+0}{n}\notag\\
+  &= \binom{n+0}{n} + \dots + \binom{n+m-2}{n} + \binom{n+m-1}{n}\notag,\\
+W(m,n)
+  &= \sum_{j=0}^{m-1}{\binom{n+j}{n}}.\label{eq:W}
+\end{align}
+This sum can actually be simplified, more precisely, it has a closed
+form, but in order to understand its underpinnings, we need firstly to
+develop our intuition about combinations. By computing combinations
+\(\binom{r}{k}\) for small values of \(r\) and \(k\) using the
+definition, we can fill a table traditionally known as \emph{Pascal's
+  triangle} and displayed in \fig~\vref{fig:pascal_triangle}.
+\begin{figure}
+\centering
+\includegraphics{pascal}
+\caption{The corner of Pascal's Triangle (in bold)\label{fig:pascal_triangle}}
+\end{figure}
+Note how we set the convention \(\binom{r}{k} = 0\) if \(k >
+r\). Pascal's Triangle contains many interesting properties relative
+to the sum of some of its values. For instance, if we choose a number
+in the triangle and look at the one on its right, then the one below
+the latter is their sum. For the sake of illustration, let us extract
+from \fig~\vref{fig:pascal_triangle} the lines \(r=7\) and \(r=9\):
+\begin{center}
+\begin{tabular}{||c|c||rrrrrrrrrr||}
+\cline{5-6}\cline{8-9}
+      & 7 & \textbf{1} & \textbf{7} & \multicolumn{1}{|c}{\textbf{21}} & \multicolumn{1}{c|}{\textbf{35}} &  \textbf{35} &  \multicolumn{1}{|c}{\textbf{21}} & \multicolumn{1}{c|}{\textbf{7}} &  \textbf{1} & 0 & 0\\
+\cline{5-5}\cline{8-8}
+      & 8 & \textbf{1} & \textbf{8} & \textbf{28} & \multicolumn{1}{|c|}{\textbf{56}} &  \textbf{70} &  \textbf{56} & \multicolumn{1}{|c|}{\textbf{28}} &  \textbf{8} & \textbf{1} & 0\\
+\cline{6-6}\cline{9-9}
+\end{tabular}
+\end{center}
+We surrounded two examples of the additive property of combinations we
+discussed: \(21 + 35 = 56\) and \(21 + 7 = 28\). We would then bet
+that
+\[
+\binom{r-1}{k-1} + \binom{r-1}{k} = \binom{r}{k}.
+\]
+This is actually not difficult to prove if we go back to the
+definition:
+\begin{align*}
+\binom{r}{k} &:= \frac{r!}{k!(r-k)!}
+              = \frac{r}{k} \cdot \frac{(r-1)!}{(k-1)!((r-1)-(k-1))!}
+              = \frac{r}{k} \binom{r-1}{k-1}.\\
+\binom{r}{k} &:= \frac{r!}{k!(r-k)!}
+              = \frac{r}{r-k} \cdot \frac{(r-1)!}{k!((r - 1) - k)!}
+              = \frac{r}{r-k} \binom{r-1}{k}.
+\end{align*}
+The first equality is valid if \(k > 0\) and the second if \(r \neq
+k\). We can now replace \(\binom{r-1}{k-1}\) and \(\binom{r-1}{k}\) in
+terms of \(\binom{r}{k}\) in the sum
+\[
+\binom{r-1}{k-1} + \binom{r-1}{k} = \frac{k}{r}\binom{r}{k}
++ \frac{r-k}{r}\binom{r}{k} = \binom{r}{k},\quad \text{\textsc{qed.}}
+\]
+The sum is valid if \(r > 0\). There is direct proof of the formula,
+which does not involve computations but pure logic. Let us suppose
+that we \emph{already} have all the subsets of \(k\) items chosen
+among \(r\). By definition, there are \(\binom{r}{k}\) of them. We
+choose to distinguish an arbitrary item amongst \(r\) and we want to
+split the collection in two subsets: on one side, all the combinations
+containing this particular item, on the other side, all the
+combinations without it. The former subset has cardinal
+\(\binom{r-1}{k-1}\) because its combinations are built from the fixed
+item and further completed by choosing \(k-1\) remaining items amongst
+\(r-1\). The latter subset is made of \(\binom{r-1}{k}\) combinations
+which are made from \(r-1\) items, of which \(k\) have to be selected
+because we ignore the distinguished item. This yields the same
+additive formula. Now, let us return to our pending sum
+\[
+\sum_{j=0}^{m-1}{\binom{n+j}{n}}.
+\]
+\parpic[l][bl]{\includegraphics[bb=75 659 104 721]{triangle1}}
+\noindent In terms of navigation across Pascal's Triangle, we
+understand that this sum operates on numbers in the same column. More
+precisely, it starts from the diagonal with the number
+\(\binom{n}{n}\) and goes down until a total of \(m\) numbers have
+been added. So let us choose a simple example and fetch two adjacent
+columns were the sum is small. On the left is an excerpt for \(n=4\)
+(the left column is the fifth in Pascal's Triangle) and \(m=4\)
+(height of the left column). Interestingly, the sum of the numbers in
+bold in the left column, that is, the sum under study, equals the number
+in bold at the bottom of the second column: \(1 + 5 + 15 + 35 =
+56\). By checking other columns, we may feel justified to think that
+this is a general pattern. Before attempting a general proof, let us
+see how it may work on our particular example. Let us start from the
+bottom of the second column, that is, \(56\), and use the addition
+formula in reverse, that is, express \(56\) as the sum of the numbers
+in the row above it: \(56 = 35 + 21\).
+
+\parpic(30pt,32pt)[lb][bl]{\includegraphics[bb=75 695 104 721]{triangle2}}
+\noindent Graphically, this sum is seen as the triangle at the left,
+extracted from the previous one. The number \(35\) has just appeared
+and we would like to keep it because it is part of the equality to
+prove. So let us apply the addition formula again to \(21\) and draw
+\(21 = 15 + 6\). Let us keep \(15\) and resume the same procedure on
+\(6\) so \(6 = 5 + 1\). Finally, \(1 = 1 + 0\). We just checked \( 56
+= 35 + (15 + (5 + (1 + 0))), \) which is exactly what we
+wanted. Because we want the number corresponding to \(35\) in our
+example to be \(\binom{n+m-1}{n}\), we have the derivation
+\begin{align*}
+\binom{n+m}{n+1}
+  &= \binom{n+m-1}{n} + \binom{n+m-1}{n+1}\\
+  &= \binom{n+m-1}{n} + \left[\binom{n+m-2}{n} +
+     \binom{n+m-2}{n+1}\right]\\
+  &= \binom{n+m-1}{n} + \binom{n+m-2}{n} + \dots +
+     \left[\binom{n}{n} + \binom{n}{n+1}\right],\\
+\binom{n+m}{n+1}
+  &= \sum_{j=0}^{m-1}{\binom{n+j}{n}} = W(m,n),\,\; \text{by eq.
+     \eqref{eq:W} on page \pageref{eq:W}}.
+\end{align*}
+By symmetry, \(B(m,n) = W(n,m)\), therefore \(B(m,n) =
+\binom{m+n}{m+1}\). We can check these formulas for \(m=3\) and
+\(n=2\): \(W(3,2) = \binom{5}{3} = 5!/(3!2!) = 10\) and \(B(3,2) =
+\binom{5}{4} = 5!/(4!1!) = 5\), both being correct. Let
+\(\Aideal^{\gamma\delta}(m,n)\) be the average number of
+comparisons to merge \(m\) and \(n\) numbers, which is the same as the
+number of times clauses \clause{\gamma} or \clause{\delta} are used.
+We found \vpageref{average_delay_merge} that
+\begin{align*}
+\Aideal^{\gamma\delta}(m,n)
+  &= m + n - \biggl[W(m,n) + B(m,n)\biggr]\left/\binom{m+n}{n}\right..
+\intertext{We can now replace \(W(m,n)\) and \(B(m,n)\) and obtain a
+  closed form:}
+\Aideal^{\gamma\delta}(m,n)
+  &= m + n - \left[\binom{m+n}{n+1} + \binom{m+n}{m+1}\right]\left/\binom{m+n}{n}\right.\\
+  &= m + n - \frac{n!m!}{(n+1)!(m-1)!} - \frac{n!m!}{(m+1)!(n-1)!},\\
+\Aideal^{\gamma\delta}(m,n)
+  &= m + n - \frac{m}{n+1} - \frac{n}{m+1} = \frac{mn}{m+1} +
+\frac{mn}{n+1}.
+\end{align*}
+Let us check this pretty formula with \(\Aideal^{\gamma\delta}(3,2) =
+6/4 + 6/3 = 7/2\), which is the value we computed
+\vpageref{seven_two}. Let us recall the program as found
+\vpageref{code:merge}:
+
+\input{merge_alpha}
+
+\noindent Because each call to \erlcode{merge/2} ends either with a
+rewrite by clause \clause{\alpha} or \clause{\beta}, the relationship
+between the average delay of \erlcode{merge/2}, noted
+\(\ave{merge}{m,m}\), and \(\Aideal^{\gamma\delta}(m,n)\) is simply
+\begin{equation}
+\ave{merge}{m,n} = 1 + \Aideal^{\gamma\delta}(m,n)
+                 = \frac{mn}{m+1} + \frac{mn}{n+1} + 1.
+\label{eq:ave_merge}
+\end{equation}
+First, let us check that \(\ave{merge}{m,n} = \ave{merge}{n,m}\),
+which was expected because every symmetric problem has a symmetric
+solution. Next, we can now verify what happens when \(m=0\) or
+\(n=0\), as we expect the number of comparisons to be zero and we
+indeed deduce \(\ave{merge}{0,n} = \ave{merge}{m,0} = 1\). This proves
+that the average delay in this case coincides with the minimum delay
+and, consequently, the lower bound in \(\best{merge}{m,n} \leqslant
+\ave{merge}{m,n} \leqslant \worst{merge}{m,n}\). In fact, if \(m > 0\)
+and \(n \geqslant 0\) or \(n > 0\) and \(m \geqslant 0\), we have
+\[
+1 + \min\{m,n\} \leqslant \ave{merge}{m,n} \leqslant m + n,
+\]
+and the bounds are actually tight. Another case is worth pondering:
+\(m=1\) or \(n=1\). Indeed, we may realise then that merging a
+singleton list with another list leads to the same result as inserting
+the single item into the other list. Let us recall the
+\erlcode{insert/2} function used in insertion sort,
+\vpageref{code:insert}:
+\begin{alltt}
+insert(I,[J|S]) when I > J \(\smashedrightarrow{\beta}\) [J|insert(I,S)];
+insert(I,    S)            \(\smashedrightarrow{\gamma}\) [I|S].
+\end{alltt}
+We then have, for all items \(I\) and all lists \(L\), the equivalence
+\[
+\erlcode{insert(\(I\),\(L\))} \mathrel{\equiv}
+\erlcode{merge([\(I\)],\(L\))}.
+\]
+Therefore, \emph{insertion is a special case of merging.}
+Nevertheless, the average delays are not exactly the same:
+\[
+\ave{insert}{n} = \frac{1}{2}{n} + 1,\quad
+\ave{merge}{1,n} = \frac{1}{2}{n} + 2 - \frac{1}{n+1},
+\]
+as we found \vpageref{ave_insert}. Therefore, \erlcode{merge/2} is
+slightly slower in average than \erlcode{insert/2} in this special
+case:
+\[
+\ave{merge}{1,n} - \ave{insert}{n} = 1 - \frac{1}{n+1} < 1.
+\]
+Nonetheless, asymptotically, this difference is insignificant:
+\[
+\ave{merge}{1,n} \mathrel{\sim} \ave{insert}{n},
+\,\; \text{as} \;\; n \rightarrow \infty.
+\]
+Also, it may be interesting to see what happens when \(m=n\), that is,
+when the two lists to be merged have the same length:
+\begin{equation}
+\ave{merge}{n,n}
+  = \frac{2n^2}{n+1} + 1
+  \mathrel{\sim} 2n,\,\; \text{as} \,\; n \rightarrow \infty.
+\label{eq:ave_merge_n_n}
+\end{equation}
+In other words, the average delay of merging two lists of identical
+length is asymptotically the total number of items being merged.
+
+Merging can be used to sort a list of items if this list can be
+previously split evenly in two sub\hyp{}lists which are in turn
+sorted, taking into account that a singleton list is always sorted by
+definition. This recursive approach to sorting is said
+\emph{top\hyp{}down} because of the way it is usually depicted, the
+original list being written at the top of the page, the singletons
+being located at the bottom. Another view first maps the list to be
+sorted into a list of singletons, directly at the bottom. As we
+noticed before, these can be readily merged pairwise and their results
+too etc. until one sorted list remains at the top. Here, the sorted
+list is at the top, not the input list. This approach is said
+\emph{bottom\hyp{}up} because, after the singletons have been
+constructed, the merging takes place directly. In the top\hyp{}down
+way, these singletons are reached after a succession of
+splittings. Anyway, the same detail proves thorny: how to manage the
+cases when, in the top\hyp{}down fashion, a list to be evenly divided
+contains an odd number of items or how, in the bottom\hyp{}up way, an
+odd number of lists can be merged pairwise.
+
+\medskip
+
+\paragraph{Bottom\hyp{}up merge sort of \(\boldsymbol{2^p}\) items.} 
+
+Let us ignore these problems for now and explore a small example with
+a number of items which is a power of \(2\), like
+\erlcode{[7,3,5,1,6,8,4,2]}. Sorting by merging, be it top\hyp{}down
+or bottom\hyp{}up, results in the same kind of graphical
+representation: a \emph{complete binary tree}. We introduced trees
+\vpageref{def:tree} and a binary tree is a tree whose nodes have
+either no subtree or exactly two, as shown in
+\fig~\vref{fig:bottom_up1}. This structure mirrors faithfully the
+strategy: if reading top\hyp{}down, we divide a problem (to sort a
+list) into two subproblems (to sort two smaller lists); if reading
+bottom\hyp{}up, we reduce two solutions (two small sorted lists) into
+one solution (a bigger sorted list). \Fig~\vref{fig:bottom_up1}
+illustrates the bottom\hyp{}up approach of starting off from
+singletons and merging them and the resulting lists in turn etc. until
+the root of the tree is an ordered list.
+\begin{figure}
+\centering
+\includegraphics[bb=73 637 252 721]{bottom_up1}
+\caption{Sorting bottom\hyp{}up \erlcode{[7,3,5,1,6,8,4,2]} by merging
+\label{fig:bottom_up1}}
+\end{figure}
+Perhaps the first question arising is how to obtain all these
+singletons at the leaves of the tree. This is actually quite easy if
+we already rely on a map, as seen \vpageref{maps}:
+\begin{verbatim}
+map(_,   []) -> [];
+map(F,[I|L]) -> [F(I)|map(F,L)].
+\end{verbatim}
+Then, the function \erlcode{solo/1} reduces simply to one call:
+\begin{verbatim}
+solo(L) -> map(fun(I) -> [I] end,L).
+\end{verbatim}
+Otherwise, we opt for the equivalent handmade
+\begin{verbatim}
+solo(   []) -> [];
+solo([I|L]) -> [[I]|solo(L)].
+\end{verbatim}
+The delay of \(\erlcode{solo(\(L\))}\) when \(L\) contains \(n\) items
+is \(\comp{solo}{n} = n + 1\) with the latter definition. We can now
+refocus on \fig~\vref{fig:bottom_up1} and try to quantify some of its
+aspects. For instance, we may wonder about the \emph{height} of the
+tree or the total number of merges. We assumed that the we sorted
+\(2^p\) numbers, with \(p > 0\). In our example \(p=3\). Since at each
+step upward in the tree, all the nodes at one level are merged
+pairwise, there are half the number of parents. There are \(2^p\)
+leaves, which have \(2^{p-1}\) parents, which have \(2^{p-2}\) parents
+etc. until \(2^0 = 1\), which is the root. This observation allows us
+to answer our two questions at once. First, it means that there are
+\(p+1\) levels in the tree, including the root. Second, it implies
+that there are \(p\) merge phases making, bottom\hyp{}up, \(2^{p-1}\),
+\(2^{p-2}\), \ldots, \(2^0\) merges, amounting to \(2^{p-1} + 2^{p-2}
++ \dots + 2^0\) merges in total. This sum has a simple closed
+form. Let us consider the general case \(Q_x(p) := x^{p-1} +
+x^{p-2} + \dots + x^0\). Then \(xQ_x(p) - Q_x(p) = x^p - x^0\), that
+is, when \(x \neq 1\),
+\begin{equation}
+\sum_{k=0}^{p-1}{x^k} = \frac{x^p - 1}{x-1}.\label{eq:sum_power}
+\end{equation}
+In particular, \(x=2\) let us know that there are \(2^p-1\) merges in
+total. If, as it is custom, we express the size of the input as
+\(n=2^p\), we prefer to express these previous expressions in terms of
+\(n\) instead of \(p\). This is easy, since we then have \(p = \lg
+n\), where \(\lg x\) is the \emph{binary logarithm} of \(x\), which
+can be defined as the inverse function of \(x \mapsto 2^x\), for \(x >
+0\). Now we can conclude that the height of the tree is \(1 + \lg n\)
+and the number of merges is \(n-1\). We may also want to quantify the
+amount of memory needed to sort by merging \(n=2^p\)~keys. First, the
+number of stacks created is the number of nodes of the merge tree:
+\(2^p + 2^{p-1} + \ldots + 2^0 = 2^{p+1}-1 = 2n - 1\). Because the
+keys and the empty stack are shared with the input, we should count
+the references to them. Also, we have to account for the pushes,
+namely the nodes~(\texttt{|}): there is one for each reference to a
+key. This leads us to determine the sum of the lengths of all the
+created stacks: \((p+1)2^p = n\lg n + n\). We must add \(2n - 1\) for
+all the references to~\texttt{[]}, so the total number of references
+created is \(n\lg n + 3n - 1\) and the number of nodes~(\texttt{|}) is
+\(n\lg n + n\). Finally, we might compute the total delay to sort
+\(2^p\)~items because we know that, bottom\hyp{}up, the length of the
+lists doubles and we already studied the delay of merging, in
+particular when the two lists have the same length,
+\(\comp{merge}{n,n}\). Consequently, all we need is to resume our
+calculation of the number of merges whilst making sure to ponder each
+stage with the corresponding delay of merging. In order to focus on
+the concepts at stake, we shall leave out the delay \(\comp{solo}{2^p}
+= 2^p + 1\) for now, which can be thought of as preprocessing time. So
+let us note \(\Dideal(n)\) the delay to sort \(n\) items without
+taking into account \erlcode{solo/1}. We have, for \(p > 0\),
+\begin{align}
+\Dideal(2^p)
+  &= 2^{p-1} \cdot \comp{merge}{1,1} + 2^{p-2} \cdot
+     \comp{merge}{2,2} + \dots + 2^0 \cdot
+     \comp{merge}{2^{p-1},2^{p-1}}\notag\\
+  &= \sum_{k=0}^{p-1}{\left(2^{p-1-k} \cdot \comp{merge}{2^k,2^k}\right)}
+   = 2^{p-1}
+   \sum_{k=0}^{p-1}{\frac{1}{2^k}\comp{merge}{2^k,2^k}}.
+\label{eq:delay_power_2}
+\end{align}
+This sum spurs us to investigate further the best and worst cases of
+\erlcode{merge/2} when its arguments have the same length. The result
+we deduced \vpageref{merge:best_case} applies here as well, so
+\[
+\best{merge}{n,n} = 1 + \min\{n,n\} = n + 1.
+\]
+This most favourable configuration arises when all the numbers in the
+shortest list are smaller than the smallest number of the longest. In
+the present case, both lists have the same length, so it happens
+whenever all the numbers in one list are smaller than the smallest
+number in the other. For example, if both lists are singletons, we
+find ourselves in the best case and the delay is \(2\). This gives us
+already \(\comp{merge}{1,1} = \best{merge}{1,1} = 2\). One possible
+configuration is when the list is already sorted, as shown in
+\fig~\vref{fig:bottom_up_best1}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=73 637 252 721]{bottom_up_best1}
+\caption{A best case for bottom\hyp{}up merge sort
+\label{fig:bottom_up_best1}}
+\end{figure}
+If the list is sorted in decreasing order, it is also a best case, as
+can be verified in \fig~\vref{fig:bottom_up_best2}.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=73 637 252 721]{bottom_up_best2}
+\caption{Another best case for bottom\hyp{}up merge sort
+\label{fig:bottom_up_best2}}
+\end{figure}
+Other variations are possible: in \fig~\vref{fig:bottom_up_best1},
+start from the root and exchange any pair of subtrees which have the
+same parent and this is still a best case. Importantly, \emph{a best
+  case has the property that it is made of subtrees which are
+  themselves instances of a best case}. This allows us to construct
+all the best cases. (How many are there when \(n\) numbers are given?)
+Let us note \(\Bideal(n)\) the best delay for sorting \(n\) items
+without taking into account the preprocessing by \erlcode{solo/1}.  We
+can write the delay of bottom\hyp{}up merge sort in the best case as
+follows:
+\[
+\Bideal(2^p)
+  = 2^{p-1}\!\sum_{k=0}^{p-1}{\frac{1}{2^k}\best{merge}{2^k,2^k}}
+   = 2^{p-1}\!\sum_{k=0}^{p-1}{\frac{1}{2^k}(2^k+1)}\\
+  = 2^{p-1} \!\left(p +\!\!\sum_{k=0}^{p-1}{\frac{1}{2^k}}\right)\!.
+\]
+We can reuse equation \eqref{eq:sum_power} \vpageref{eq:sum_power}
+with \(x=1/2\), which implies
+\begin{equation}
+\sum_{k=0}^{p-1}{\frac{1}{2^k}} = 2 - \frac{1}{2^{p-1}}.
+\label{eq:sum0.5k}
+\end{equation}
+Let us finish now:
+\begin{align}
+\Bideal(2^p)
+  &= 2^{p-1} \left(p +  2 - \frac{1}{2^{p-1}}\right)
+   = p2^{p-1} + 2^p - 1;\label{eq:best_power}\\
+\Bideal(n)
+  &= \frac{1}{2}n\lg n + n - 1,\,\; \text{with} \,\; n=2^p.\notag
+\end{align}
+How does \(n \lg n\) compares to the more familiar \(n^2\)? Let us
+prove that, for all real \(x > 0\), we have \(x < 2^x\). Let us define
+a function \(\xi(x) = 2^x - x\), for \(x \geqslant 0\). Its derivative
+is \(\xi'(x) = 2^x - 1\). Because \(x \mapsto 2^x\) is a strictly
+increasing function, \(x > 0 \Rightarrow 2^x > 2^0 = 1\). Thus,
+\(\xi'(x) > 0\). Since \(\xi(0) = 0\), all this implies \(\xi(x) > 0\)
+for \(x > 0\), hence the expected result. Because the logarithm is the
+inverse of the exponentiation, which is an increasing function, the
+logarithm is an increasing function. Therefore we can apply it on both
+sides of an inequality, provided they are positive: \(0 < x < 2^x\)
+implies \(\lg x < x\). Furthermore, \(n \lg n < n^2\) for all \(n>0\).
+
+Let us delve now into the worst case of sorting bottom\hyp{}up by
+merging when \(n=2^p\), for \(p>0\). Equation \eqref{eq:worst_merge}
+\vpageref{eq:worst_merge} was \(\worst{merge}{m,n} = m + n\), thus
+\(\worst{merge}{n,n} = 2n\). The corresponding configuration supposes
+that the last number of one of the two lists being merged is the last
+item of the result and that the last number of the other list finds
+its place as the penultimate in the result. Obviously, this happens
+when both lists are singleton, that is, \(n=1\), that is, for the leaves
+of any tree capturing the essence of bottom\hyp{}up sorting by
+merging: \(\comp{merge}{1,1} = \worst{merge}{1,1} = 2\). It is easy to
+derive a worst case from the one presented in
+\fig~\vref{fig:bottom_up1}: just exchange the leaves \erlcode{[4]} and
+\erlcode{[6]}. The result is shown in
+\fig~\vref{fig:bottom_up_worst1}.
+\begin{figure}
+\centering
+\includegraphics[bb=73 637 252 721]{bottom_up_worst1}
+\caption{A worst case for bottom\hyp{}up merge sort
+\label{fig:bottom_up_worst1}}
+\end{figure}
+Just as with the best case, constructing a global worst case is
+achieved by constructing worst cases for all the subtrees. Let us note
+\(\Wideal(n)\) the worst delay for sorting \(n\) items without
+counting in the delay due to \erlcode{solo/1}.
+\begin{align}
+\Wideal(2^p)
+  &= 2^{p-1}\!\sum_{k=0}^{p-1}{\frac{1}{2^k}\worst{merge}{2^k,2^k}}
+  = 2^{p-1}\!\sum_{k=0}^{p-1}{\frac{1}{2^k}(2^k+2^k)}
+  = p2^p.\label{eq:worst_power}\\
+\Wideal(n)
+  &= n\lg n,\;\, \text{with} \,\; n = 2^p.\notag
+\end{align}
+In sum, we have found the following bounds when \(n=2^p\):
+\begin{equation}
+\Bideal(n) = \tfrac{1}{2}{n \lg n} + n - 1
+\leqslant \Dideal(n) \leqslant 
+n \lg n = \Wideal(n).\label{ineq:D}
+\end{equation}
+Notice how the lower bound is only a bit more than half the upper
+bound. Contrast this with insertion sort, where the lower bound was
+linear in the input size, whilst the upper bound was quadratic. Before
+jumping to conclusions, bear in mind that we have analysed only a
+special case of merge sort, when \(n\) is a power of \(2\). We shall
+deal with the general case latter. But, before doing so, let us make
+full profit of our analysis of the delay of merging by drawing the
+average delay of bottom\hyp{}up merge sort when \(n=2^p\). Equation
+\eqref{eq:ave_merge_n_n} \vpageref{eq:ave_merge_n_n} was:
+\[
+\ave{merge}{n,n} = \frac{2n^2}{n+1} + 1 = 2n - 1 + \frac{2}{n+1}.
+\]
+Let us note \(\Aideal(n)\) the average delay to sort \(n\) items
+without adding up the delay of the calls to \erlcode{solo/1}. The
+average delay, being a delay, obeys the same recurrent equations as
+the general delay, so it is made of all the average delays of
+processing the sub\-structures:
+  %% &= 2^{p-1}\left(2p + \sum_{k=0}^{p-1}{\frac{1}{2^k}}
+  %%    - 2\sum_{k=0}^{p-1}\frac{1}{2^k+1}\right)\notag\\
+  %% &= 2^{p-1}\left(2p + \left(2 - \frac{1}{2^{p-1}}\right)
+  %%    - 2\sum_{k=0}^{p-1}\frac{1}{2^k+1}\right),\notag\\
+  %% = 2^{p-1}
+  %%   \sum_{k=0}^{p-1}{\frac{1}{2^k}\left(2\cdot2^k - 1
+  %%   + \frac{2}{2^k+1}\right)}\notag\\
+\begin{align}
+\Aideal(2^p)
+  &= 2^{p-1}\sum_{k=0}^{p-1}{\frac{1}{2^k}\ave{merge}{2^k,2^k}}
+  = 2^{p-1}\left(2p - \sum_{k=0}^{p-1}{\frac{1}{2^k}}
+     + 2\sum_{k=0}^{p-1}{\frac{1}{2^k(2^k+1)}}\right)\notag\\
+  &= 2^{p-1}\left(2p - \sum_{k=0}^{p-1}{\frac{1}{2^k}}
+     + 2\sum_{k=0}^{p-1}\left(\frac{1}{2^k}
+     - \frac{1}{2^k+1}\right)\right),\notag\\
+\Aideal(2^p)
+  &= p2^p + 2^p - 1 - 2^p \sum_{k=0}^{p-1}\frac{1}{2^k+1},\,\;
+\text{with} \,\; p > 0.
+\label{eq:ave_power}
+\end{align}
+There is no closed form known for the remaining sum but, for \(k
+\geqslant 0\), we can work out rough bounds for it and thus for
+\(\Aideal(2^p)\):
+\begin{gather*}
+2^{k+1} = 2^k + 2^k \geqslant 2^k + 1 > 2^k
+\Rightarrow
+\frac{1}{2}\sum_{k=0}^{p-1}{\frac{1}{2^{k}}}
+\leqslant \sum_{k=0}^{p-1}{\frac{1}{2^k+1}} <
+\sum_{k=0}^{p-1}{\frac{1}{2^k}}\\
+1 - \frac{1}{2^{p}}
+\leqslant \sum_{k=0}^{p-1}{\frac{1}{2^k+1}} <
+2 - \frac{1}{2^{p-1}},\,\; \text{by eq.}~\eqref{eq:sum0.5k}.
+\end{gather*}
+Because \(1/(2^k + 1) > 0\), the partial sums
+\(\sum_{k=0}^{p-1}\frac{1}{2^k+1}\) are positive and increasing in
+function of \(p\). They are also converging (absolutely) because the
+limit of the upper bound we found is finite: \(\lim_{p \rightarrow
+  \infty}{(2 - 1/2^{p-1})} = 2\). The limit of the lower bound being
+\(1\), it proves that \(\sum_{k \geqslant 0}\frac{1}{2^k+1}\) is a
+number between \(1\) and \(2\) and Peter Borwein proved that it is
+actually an irrational number. Let us call it \(\alpha \simeq
+1.2644997803484442092\). Then, we can discard the upper bound \(2 -
+1/2^{p-1}\) in favour of \(\alpha\):
+\begin{gather*}
+1 - \frac{1}{2^p} \leqslant \sum_{k=0}^{p-1}{\frac{1}{2^k+1}}
+< \alpha
+\Rightarrow
+-\alpha2^p < -2^p\sum_{k=0}^{p-1}{\frac{1}{2^k+1}} \leqslant
+-2^p\left(1 - \frac{1}{2^p}\right).
+\end{gather*}
+%(p2^p + 2^p - 1) - \alpha 2^p &< \Aideal(2^p) \leqslant (p2^p + 2^p - 1) - 2^p + 1\notag\\
+\begin{equation}
+p2^p - (\alpha - 1)2^p - 1 < \Aideal(2^p) \leqslant
+p2^p.\label{ineq:A_power}
+\end{equation}
+Finally, setting \(n=2^p\), we conclude
+\begin{equation}
+n \lg n - (\alpha - 1) n - 1 < \Aideal(n) \leqslant n \lg n.
+\label{ineq:A}
+\end{equation}
+This means that the average delay cannot be as small as the best
+delay, whilst it can be as large as the worst delay. In fact,
+inequalities \eqref{ineq:A} allow us at last to derive the asymptotic
+approximation of \(\Aideal(n)\):
+\[
+\Aideal(n) \mathrel{\sim} n \lg n \mathrel{\sim}
+\Wideal(n),\;\, \text{as} \,\; n=2^p \,\; \text{and} \,\; p
+\rightarrow \infty.
+\]
+Therefore, \emph{the average delay is asymptotically equivalent to the
+  worst case delay when sorting \(2^p\) items.} It can be proved that
+the worst delay of \erlcode{merge/2} is the worst delay of any
+\emph{optimal} merge algorithm when both lists have the same length
+(the maximum delay is minimum in this case) and all merges are done on
+lists of equal lengths when \(n=2^p\). Therefore, the worst delay
+\(\Wideal(n)\) is minimum. After the general case of merge sort has
+been presented, we will also show that the worst delay of merge sort
+is asymptotically as good as the worst delay of any optimal sorting
+algorithm. Another interesting fact we can already underline is that
+the worst case of merge sort is not sensitive to a possible lack of
+randomness of the input data. For instance, we saw that the worst
+delay of insertion sort happens when the data is already sorted. We
+also mentioned before that insertion was a special case of merging,
+which may lead to a quadratic delay. Therefore, it is crucial for
+merge sort not to degenerate into insertion sort, by making sure that
+the maximum number of merges are performed on lists of almost the same
+length. See the problem in \fig~\vref{fig:wrong_mergings}, where the
+delay is quadratic and, thus, is not an instance of merge sort. This
+observation will be our guideline in the design of the general
+bottom\hyp{}up merge sort.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=73 612 170 721]{wrong_mergings}
+\caption{Mergings equivalent to the worst case of insertion sort
+\label{fig:wrong_mergings}}
+\end{figure}
+
+\medskip
+
+\paragraph{General bottom\hyp{}up merge sort.}
+
+In general, any number can be uniquely expressed as the sum of
+distinct powers of \(2\), for example, \(7=2^2+2^1+2^0\), and this is the
+foundation of the \emph{binary number system}. Let us assume
+\(n=\sum_{i=0}^{m-1}{b_i2^i}\), where the \(b_i \in \{0,1\}\) are
+called \emph{bits}. Then \(n = 2(b_{m-1}2^{m-2} + \dots + b_1) +
+b_0\), which means that \(b_0\) is the remainder of the Euclidean
+division of \(n\) by \(2\), traditionally noted \(b_0 = n \mod
+2\). This uniquely defines \(b_0\) because a number is either odd or
+even. The same division process is repeated on the quotient
+\(\floor{n/2}\), establishing the remaining bits. In binary, \(7\) is
+expressed as the series of bits \((111)_2\).
+
+How can we manage the general case of merge sort, that is, when the
+number of items is not a power of \(2\)?  \Fig~\vref{fig:bottom_up_7}
+\begin{figure}[b]
+\centering
+\includegraphics[bb=73 637 228 721]{bottom_up_7}
+\caption{Sorting seven numbers bottom\hyp{}up by merging
+\label{fig:bottom_up_7}}
+\end{figure}
+shows an example where seven numbers are sorted. Notice how the
+rightmost leaf, that is, \erlcode{[4]}, is connected by an egde without
+an arrow to a node above containing \erlcode{[4]} as well because it
+is not merged. The list \erlcode{[4]} is only merged at the next level
+with \erlcode{[2,6]}, a list twice its length. The imbalance in length
+is propagated upward, as \erlcode{[1,3,5,7]} is merged with
+\erlcode{[2,4,6]}. Let us rely on the special case \(n=2^p\) to find
+an upper bound on \(\Bideal(n)\) for arbitrary \(n\), tight enough to
+yield an asymptotic equivalence with the help of the lower bound.
+
+The general situation can be guessed by abstracting away unnecessary
+details from the example of \fig~\vref{fig:bottom_up_7}. We can see
+that there are three special
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 633 149 721]{msort_abstract}
+\caption{Abstraction of \fig~\vref{fig:bottom_up_7}
+\label{fig:msort_abstract}}
+\end{figure}
+sub\-cases: the subtree rooted at \erlcode{[1,3,5,7]}, figured by a
+triangle and containing \(2^2\) numbers at its leaves; the subtree
+rooted at \erlcode{[2,6]}, also depicted by a triangle and containing
+\(2^1\) leaves, and the subtree whose root is \erlcode{[4]},
+containing \(2^0\) leaf. See \fig~\vref{fig:msort_abstract}, where
+only edges corresponding to merges, that is, ending with an arrow, are
+represented. In all generality, let \(n=2^{e_r} + \dots + 2^{e_1} +
+2^{e_0} > 0\), with \(e_r > \dots > e_1 > e_0 \geqslant 0\) and \(r
+\geqslant 0\). The natural numbers \(e_i\)~are the positions of the
+\(1\)\hyp{}bits in the binary representation of \(n\). In particular,
+this means that \(i \leqslant e_i\) and \(r+1\) is the number of
+\(1\)\hyp{}bits or, equivalently, the sum of the bits of \(n\). Also,
+\(2^{e_r}\) being the largest power in the decomposition of \(n\), it
+is identical to the largest power in the binary expansion of \(n\), so
+\(e_r+1\) is equal to the number of bits of \(n\). Let \(m\) be this
+number. Then the smallest integer expressible with \(m\) bits is \((10
+\ldots 0)_2 = 2^{m-1} = 2^{e_r}\). Dually, the greatest integer is
+\((1 \ldots 1)_2 = 2^{m-1}+\dots+2^1+2^0 = 2^{m}-1\). For \(n > 0\),
+\begin{equation}
+2^{m-1} \leqslant n \leqslant 2^m -  1 
+< 2^m \Rightarrow m - 1 \leqslant \lg n
+< m \Rightarrow e_r = \floor{\lg n}.\label{eq:e_r}
+\end{equation}
+Now let us consider in \fig~\vref{fig:msort_gen}
+\begin{figure}[!b]
+\centering
+\includegraphics[bb=71 631 202 721]{msort_gen}
+\caption{Sorting by merging \(n=2^{e_r}+ \dots + 2^{e_0}\) items
+\label{fig:msort_gen}}
+\end{figure}
+the tree of all the merges when we abstract away the details. The
+triangles are trees made of \emph{balanced merges}, that is, merges
+performed on lists of the same length, for which we already found the
+delays. The nodes from the root \(2^{e_r}+\dots+2^{e_0}\) down to
+\(2^{e_1}+2^{e_0}\) are the lengths of the results of \emph{unbalanced
+  merges}. The total delay is the sum of the balanced and unbalanced
+merges:
+\begin{equation}
+\Dideal(n)
+  = \sum_{i=0}^{r}{\Dideal(2^{e_i})}
+    +
+    \sum_{i=1}^{r}{\comp{merge}{2^{e_i},2^{e_{i-1}}+\dots+2^{e_0}}}.
+\label{eq:msort_gen}
+\end{equation}
+If \(r=0\), we found again the special case \(n=2^{e_0}\), as the
+second sum is zero. Let us bet that the general case is asymptotically
+the same as the special case \(n=2^p\) and strive for upper and lower
+bounds on the best, worst and average delays which converge to the
+same functions. This hope should not been considered as obvious, but
+really optimistic. For instance, even though \(2^{\floor{\lg n}} =
+n\), when \(n\)~is a power of \(2\), it is \emph{false} to state that
+\(2^{\floor{\lg n}} \mathrel{\sim} n\), as \(n \rightarrow \infty\).
+Consider the function \(x(p)=2^p-1\) ranging over the positive
+integers. First, let us notice that, for all \(p>0\),
+\begin{equation*}
+2^{p-1} \leqslant 2^p - 1 < 2^p \Rightarrow p-1 \leqslant \lg(2^p-1) <
+p \Rightarrow \floor{\lg(2^p-1)} = p-1.
+\end{equation*}
+Therefore, \(2^{\floor{\lg(x(p))}} = 2^{p-1} = (x(p)+1)/2
+\mathrel{\sim} x(p)/2 \mathrel{\nsim} x(p)\), which proves that
+\(2^{\floor{\lg(n)}} \nsim n\) when \(n=2^p-1 \rightarrow \infty\).
+
+\medskip
+
+\paragraph{Best delay.} 
+
+The best case of \erlcode{merge/2} is given by equation
+\eqref{eq:best_merge} \vpageref{eq:best_merge}, that is,
+\(\best{merge}{m,n} = 1 + \min\{m,n\}\), so
+\begin{equation*}
+\Bideal(n)
+  =   \sum_{i=0}^{r}{\Bideal(2^{e_i})}
+    + \sum_{i=1}^{r}{\left(1+\min\{2^{e_i},2^{e_{i-1}} + \dots +
+                                 2^{e_0}\}\right)}.
+\end{equation*}
+Let us commence by noting that the following inequality holds:
+\begin{equation*}
+\sum_{j=0}^{i}{2^{e_j}}
+\leqslant
+\sum_{j=0}^{e_i}{2^j} = 2 \cdot 2^{e_i} - 1.
+\end{equation*}
+This is the same as saying that a given binary number is always lower
+or equal than the number with the same number of bits all set to
+\(1\), for example, \((10110111)_2 \leqslant (11111111)_2\). By definition of
+\(e_i\): \(e_{i-1} + 1 \leqslant e_i\), hence
+\begin{equation}
+\sum_{j=0}^{i-1}{2^{e_j}} \leqslant 2^{e_{i-1}+1} - 1
+                       \leqslant 2^{e_i} - 1 < 2^{e_i},
+\label{ineq:up_bin}
+\end{equation}
+therefore, \(\min\{2^{e_i},2^{e_{i-1}} + \dots + 2^{e_0}\} =
+2^{e_{i-1}} + \dots + 2^{e_0}\). We can reformulate the original
+definition of the best delay now as
+\begin{equation}
+\Bideal(n)
+   =   \sum_{i=0}^{r}{\Bideal(2^{e_i})}
+     + r + \sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}.
+\label{eq:Bideal}
+\end{equation}
+Equation \eqref{eq:best_power} \vpageref{eq:best_power} states
+\(\Bideal(2^p) = p2^{p-1} + 2^p - 1\), hence
+\begin{gather}
+\sum_{i=0}^{r}{\Bideal(2^{e_i})} =
+\frac{1}{2}\sum_{i=0}^{r}{e_i2^{e_i}} + n - (r + 1),\notag\\
+\Bideal(n) =
+   \frac{1}{2}\sum_{i=0}^{r}{e_i2^{e_i}} + n - 1
+ + \sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}.\label{eq:B_n_tmp}
+\end{gather}
+By reusing inequations \eqref{ineq:up_bin}, let us work out a small
+upper bound:
+\begin{align}
+\sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}
+&\leqslant \sum_{i=1}^{r}\left(2^{e_{i-1}+1}-1\right)
+= 2 \sum_{i=0}^{r-1}{2^{e_i}} - r\notag\\
+&= 2 (n - 2^{e_r}) - r
+= 2n - 2^{\floor{\lg n} + 1} - \nu_{n} + 1.
+\label{ineq:double_upper}
+\end{align}
+The function \(\nu_{n} := r+1\) is the number of \(1\)\hyp{}bits in
+the binary expansion of \(n\), or, equivalently, the sum of its
+bits. This function of \(n\) is called \emph{population count},
+\emph{sideways sum}, \emph{bit sum} or \emph{Hamming weight}. It can
+be defined recursively as follows:
+\begin{equation}
+\nu_{0} := 0,\quad \nu_{2n} := \nu_{n},\quad
+\nu_{2n+1} := \nu_{n} + 1.\label{def:nu}
+\end{equation}
+We have the following intuitive tight bounds for any \(n>0\):
+\[
+1 \leqslant \nu_{n} \leqslant \floor{\lg n} + 1,
+\]
+because deduction \eqref{eq:e_r} \vpageref{eq:e_r} establishes that
+\(\floor{\lg n} + 1\) is the number of bits of \(n\). Notice that
+\(\nu\) is a deceptively simple function: first, it is periodic
+because \(\nu_{2^p} = 1\) and, second, \(\nu_{2^p-1}=p\). We can check
+that \(n=2^{e_0}\) leads to both sides to equal \(0\), as
+expected. The remaining sum \(\sum_{i=0}^{r}{e_i2^{e_i}}\) can be
+simply upper\hyp{}bounded as follows:
+\begin{equation}
+\sum_{i=0}^{r}{e_i2^{e_i}}
+ \leqslant \sum_{i=0}^{r}{e_r2^{e_i}} = e_r\sum_{i=0}^{r}{2^{e_i}}
+= n \floor{\lg n}.\label{ineq:upper_n_lg_n}
+\end{equation}
+This bound is tight only if \(n=2^{e_0}\). We can conclude now with
+the following bound, tight when \(n\) is a power of \(2\):
+\begin{equation*}
+\Bideal(n) 
+  \leqslant \tfrac{1}{2}n\floor{\lg n} + 3n
+             - 2^{\floor{\lg n} + 1} - \nu_{n}
+  \leqslant \tfrac{1}{2}n \floor{\lg n} + 3n - 2^{\floor{\lg n} + 1} - 1.
+\end{equation*}
+In order to ease finding the limit of the bound when \(n\) gets large,
+we need to get rid of the integer parts and the bit sum. We have
+\begin{equation}
+x - 1 <\! \floor{x} \leqslant x \Rightarrow 2^x < 2^{\floor{x}+1}
+\!\leqslant 2^{x+1} \Rightarrow n + 1 \leqslant 2^{\floor{\lg n}+1}
+\!\leqslant 2n.
+\label{ineq:upper_minus_2}
+\end{equation}
+The lower bound is tight only when \(n=2^p-1\) and the upper bound
+when \(n=2^p\). In other words, the expression \(2^{\floor{\lg n}+1}\)
+increases the most between consecutive integers of shape \(2^p-1\) and
+\(2^p\). Now we can weaken the upper bound of \(\Bideal(n)\), so it
+becomes simpler:
+\begin{equation}
+\Bideal(n) \leqslant \tfrac{1}{2}{n \lg n} + 3n - (n+1) - 1
+                   = \tfrac{1}{2}{n \lg n} + 2n - 2.
+\label{ineq:B_upper_simpl}
+\end{equation}
+The bound is tight if and only if \(n=1\) because it assumed that
+\(n\) is both of the form \(2^p\) and \(2^p-1\): this is worse than it
+could be but we are not looking for the smallest upper bound here,
+only one which helps us to derive the asymptotic behaviour. Let us
+endeavour now for a lower bound whose leading term is, hopefully,
+asymptotically equivalent to \(\frac{1}{2}n \lg n\). Let us resume
+from equation \eqref{eq:B_n_tmp} \vpageref{eq:B_n_tmp} and look for a
+lower bound of the first summation \(\sum_{i=0}^{r}{e_i2^{e_i}}\). Up
+to this point, we have expressed an arbitrary number \(n>0\) in two
+ways: first, as a sum of distinct powers of \(2\) and we wrote \(n
+:= \sum_{i=0}^{r}{2^{e_i}}\), where \(e_r > \ldots > e_1 > e_0
+\geqslant 0\) and \(r \geqslant 0\) (this point of view focuses on the
+\(1\)\hyp{}bits of the binary representation of \(n\)); second, as a
+binary string \(n := \sum_{i=0}^{m-1}{b_i2^i} = (b_{m-1}\ldots
+b_0)_2\), where \(b_i \in \{0,1\}\) and \(b_{m-1} = 1\). The sequence
+\((e_i)_i\) is an increasing subsequence of the positive integers, so
+\[
+\sum_{i=0}^{r}{e_i2^{e_i}} = \sum_{i=0}^{m-1}{ib_i2^i}.
+\]
+It is easy to derive a formula for \(b_i\). Let \(n=(b_{m-1} \dots b_1
+b_0)_2\). We have 
+%= \frac{1}{2^{i+1}}\sum_{k=0}^{i}{b_k2^k} + \sum_{k=i+1}^{m-1}{b_k2^{k-i-1}}\\
+\begin{equation*}
+\frac{n}{2^{i+1}}
+= \frac{1}{2^{i+1}}\sum_{k=0}^{m-1}{b_k2^{k}}
+= \frac{1}{2^{i+1}}\sum_{k=0}^{i}{b_k2^k} + (b_{m-1}\dots b_{i+1})_2.
+\end{equation*}
+We want to prove that \(\floor{n/2^{i+1}} = (b_{m-1}\dots
+b_{i+1})_2\), that is,
+\[
+\frac{1}{2^{i+1}}\sum_{k=0}^{i}{b_k2^k} < 1
+\;\Leftrightarrow\;
+\sum_{k=0}^{i}{b_k2^k} < 2^{i+1}
+\;\Leftarrow\;
+\sum_{k=0}^{i}{2^k} = 2^{i+1} - 1 < 2^{i+1},
+\]
+which obviously holds. So \(2\floor{n/2^{i+1}} = (b_{m-1}\dots
+b_{i+1}0)_2\). Similarly, \(\floor{n/2^i} = (b_{m-1}\dots
+b_{i+1}b_i)_2\), so, in general, we have
+\[
+b_i = \left\lfloor\frac{n}{2^i}\right\rfloor
+      - 2\left\lfloor\frac{n}{2^{i+1}}\right\rfloor.
+\]
+We can now use this latter equation to expand the former:
+% &= \sum_{i=0}^{m-1}{i\left\lfloor\frac{n}{2^i}\right\rfloor2^i}
+%   - \sum_{i=0}^{m-1}{i\left\lfloor\frac{n}{2^{i+1}}\right\rfloor2^{i+1}}\\
+ %% &= \sum_{i=0}^{m-1}{i\left\lfloor\frac{n}{2^i}\right\rfloor2^i}
+ %%   - \sum_{i=1}^{m}{i\left\lfloor\frac{n}{2^{i}}\right\rfloor2^{i}}
+ %%   + \sum_{i=1}^{m}{\left\lfloor\frac{n}{2^{i}}\right\rfloor2^{i}}\\
+\begin{align*}
+\sum_{i=0}^{r}{e_i2^{e_i}}
+ &= \sum_{i=0}^{m-1}{i\left(\left\lfloor\frac{n}{2^i}\right\rfloor - 2
+                   \left\lfloor\frac{n}{2^{i+1}}\right\rfloor\right)2^i}\\
+ &= \sum_{i=0}^{m-1}{i\left\lfloor\frac{n}{2^i}\right\rfloor2^i}
+   - \sum_{i=1}^{m}{(i-1)\left\lfloor\frac{n}{2^{i}}\right\rfloor2^{i}}\\
+ &= -m\left\lfloor\frac{n}{2^m}\right\rfloor 2^m
+   + \sum_{i=1}^{m}{\left\lfloor\frac{n}{2^{i}}\right\rfloor2^{i}}
+  = \sum_{i=1}^{m-1}{\left\lfloor\frac{n}{2^{i}}\right\rfloor2^{i},}
+\end{align*}
+because \(\floor{n/2^m} = 0\). Moreover, \(\floor{x} > x - 1\) implies
+\(\floor{n/2^i} 2^i > n - 2^i\), so we can proceed as follows:
+\begin{align}
+\sum_{i=0}^{r}{e_i2^{e_i}}
+&= \sum_{i=1}^{m-1}{\left\lfloor\frac{n}{2^{i}}\right\rfloor2^{i}}
+ \geqslant \sum_{i=1}^{m-1}{(n-2^i)}
+ = n(m-1) - \sum_{i=0}^{m-1}{2^i} + 2^0\notag\\
+&= n(m-1) - (2^m - 1) + 1
+ = n\floor{\lg n} - 2^{\floor{\lg n} + 1} + 2,
+\label{ineq:sum_ei_2ei_up}
+\end{align}
+by equation \eqref{eq:e_r} \vpageref{eq:e_r}: \(m-1=e_r=\floor{\lg
+  n}\). Notice that the bound is tight if and only if \(n=1\) (then
+\(m=1\) and the two sums are null). This allows us to deduce, from
+equation~\eqref{eq:B_n_tmp} \vpageref{eq:B_n_tmp}:
+\begin{equation*}
+\Bideal(n) \geqslant 
+(\tfrac{1}{2}n\floor{\lg n} - 2^{\floor{\lg n}} + 1)
++ n - 1 + \sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}.
+\end{equation*}
+We can easily obtain a lower bound of the remaining double summation
+by remarking that \(e_j \geqslant j\), therefore
+\begin{align}
+\sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}
+&=   \sum_{j=0}^{r-1}{2^{e_j}}
+   + \sum_{i=1}^{r-1}\sum_{j=0}^{i-1}{2^{e_j}}
+ = (n - 2^{e_r}) + \sum_{i=1}^{r-1}\sum_{j=0}^{i-1}{2^{e_j}}\notag\\
+&\geqslant n - 2^{\floor{\lg n}} + \sum_{i=1}^{r-1}\sum_{j=0}^{i-1}{2^j}
+= n - 2^{\floor{\lg n}} + \sum_{i=1}^{r-1}{(2^i-1)}\notag\\
+%&= n - 2^{\floor{\lg n}} + ((2^r-1)-2^0) - (r-1)\notag\\
+&= n - 2^{\floor{\lg n}} + 2^{\nu_n-1} - \nu_n.
+\label{ineq:double_sum}
+\end{align}
+because \(e_r=\floor{\lg n}\) and \(\nu_{n} := r + 1\). The
+bound is tight when \(r=0\), that is, \(n=2^{e_0}\). Let us resume:
+\begin{align*}
+\Bideal(n) 
+&\geqslant (\tfrac{1}{2}n\floor{\lg n} - 2^{\floor{\lg n}} +
+  1) + n - 1 + (n - 2^{\floor{\lg n}} + 2^{\nu_n-1} - \nu_n)\\
+&= \tfrac{1}{2}n\floor{\lg n} + 2n - 2^{\floor{\lg n}+1} + 2^{\nu_n-1} - \nu_n.
+\end{align*}
+Let \(f(x) := 2^{x-1} - x\) a function defined on real numbers
+\(x\). The derivative is \(f'(x) = 2^{x-1}\ln 2 - 1\), which is zero
+for \(x = -\lg(\ln 2) \simeq 1.53\) and positive afterwards. We also
+easily check that \(f(1) = f(2) = 0, f(3) = 1\) and \(f(4) = 4\), so
+we are now certain that \(2^{\nu_n-1} - \nu_n \geqslant 0\) for any
+integer \(n>0\), as shown in \fig~\vref{fig:exponential4}.
+\begin{figure}
+\centering
+\includegraphics{exponential4}
+\caption{\(f(x) := 2^{x-1} - x\)\label{fig:exponential4}}
+\end{figure}
+\begin{align}
+\Bideal(n)
+&\geqslant \tfrac{1}{2}n\floor{\lg n} + 2n - 2^{\floor{\lg n}+1}.
+\label{ineq:B_lower}
+\intertext{We can weaken the bound with the
+inequalities \eqref{ineq:upper_minus_2} \vpageref{ineq:upper_minus_2}:}
+\Bideal(n)
+&> \tfrac{1}{2}n(\lg n - 1) + 2n - 2n
+= \tfrac{1}{2}{n\lg n} - \tfrac{1}{2}{n}.\notag
+\end{align}
+Together with inequation \eqref{ineq:B_upper_simpl}
+\vpageref{ineq:B_upper_simpl}, we finally have proved
+\begin{align*}
+\tfrac{1}{2}{n\lg n} - \tfrac{1}{2}{n}
+&< \Bideal(n) \leqslant
+\tfrac{1}{2}{n \lg n} + 2n - 2.
+\end{align*}
+Now we can draw the asymptotic approximation
+\[
+\Bideal(n) \mathrel{\sim} \tfrac{1}{2}n\lg n,\;\, \text{as} \,\; n
+\rightarrow \infty.
+\]
+As a reminder, the case \(n=2^{e_0}\) in equation
+\eqref{eq:best_power} \vpageref{eq:best_power} was
+\[
+\Bideal(n) = \tfrac{1}{2}{n\lg n} + n - 1.
+\]
+
+\smallskip
+
+\paragraph{Worst delay.}
+
+Let us turn our attention now to the worst delay. We resume the
+mathematical definition at equation \eqref{eq:msort_gen}
+\vpageref{eq:msort_gen}:
+\begin{equation*}
+\Dideal(n)
+  = \sum_{i=0}^{r}{\Dideal(2^{e_i})}
+    +
+    \sum_{i=1}^{r}{\comp{merge}{2^{e_i},2^{e_{i-1}}+\dots+2^{e_0}}}.
+\end{equation*}
+The worst delay of \erlcode{merge/2} is given by equation
+\eqref{eq:worst_merge} \vpageref{eq:worst_merge}, that is,
+\(\worst{merge}{m,n} = m + n\), with \(m > 0\) and \(n > 0\),
+therefore, using equation \eqref{eq:worst_power} on page
+\pageref{eq:worst_power}, that is, \(\Wideal(2^p) = p2^p\), we draw
+\begin{equation}
+\Wideal(n)
+  = \sum_{i=0}^{r}{\Wideal(2^{e_i})}
+     + \sum_{i=1}^{r}\sum_{j=0}^{i}{2^{e_j}}
+  = \sum_{i=0}^{r}{e_i2^{e_i}} + \sum_{i=1}^{r}\sum_{j=0}^{i}{2^{e_j}}.
+\label{eq:Wideal}
+\end{equation}
+If \(r=0\), this equation degenerates into the correct \(\Wideal(n) =
+\Wideal(2^{e_0})\) because the double sum cancels out completely. Let
+us focus on it:
+\begin{align}
+  \sum_{i=1}^{r}\sum_{j=0}^{i}{2^{e_j}}
+&= \sum_{i=1}^{r}\biggl(\!2^{e_i} + \sum_{j=0}^{i-1}{2^{e_j}}\!\biggr)
+ = (n - 2^{e_0}) + \sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}\notag\\
+&\geqslant n - 2^{e_0} + (n - 2^{\floor{\lg n}}
+          + 2^{\nu_{n}-1} - \nu_{n})\notag\\
+&\geqslant 2n - 2^{\floor{\lg n}+1} + 2^{\nu_{n}-1} - \nu_{n}.
+\label{ineq:lower_r_i_tmp}
+\end{align}
+We made use of inequality \eqref{ineq:double_sum}
+\vpageref{ineq:double_sum}. We also have \(e_0 \leqslant \floor{\lg
+  n}\). The bound is tight only when \(n=2^{e_0}\). We can replace
+this inequality back into the definition of \(\Wideal(n)\):
+\begin{align*}
+\Wideal(n) &\geqslant \sum_{i=0}^{r}{e_i2^{e_i}}
+ + 2n - 2^{\floor{\lg n}+1} + 2^{\nu_{n}-1} - \nu_{n}.
+\intertext{We already bounded the remaining summation in inequation
+\eqref{ineq:sum_ei_2ei_up} \vpageref{ineq:sum_ei_2ei_up}, so we
+deduce}
+\Wideal(n) &\geqslant n\floor{\lg n} + 2n - 2^{\floor{\lg n}+2}
+   + 2^{\nu_{n}-1} - \nu_{n} + 2.
+\end{align*}
+The bound is tight if \(n=1\). Let us weaken it as we did before in
+order to obtain a more legible bound. We already know that
+\(2^{\nu_n-1} - \nu_n \geqslant 0\) for any integer \(n>0\), as shown
+in \fig~\vref{fig:exponential4}, so
+\begin{equation}
+\Wideal(n) \geqslant n\floor{\lg n} + 2n - 2^{\floor{\lg n}+2} + 2.
+\label{ineq:W_lower}
+\end{equation}
+We can weaken it further in the usual manner:
+\begin{equation}
+\Wideal(n) > n(\lg n - 1) + 2n - 2(2n) + 2 = n\lg n - 3n + 2.
+\label{ineq:W_lower_simpl}
+\end{equation}
+Let us turn now to finding a small upper bound for \(\Wideal(n)\).  We
+already know how to bound \(\sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}\)
+by means of inequation \eqref{ineq:double_upper}
+on page~\pageref{ineq:double_upper}, hence
+\begin{equation*}
+\sum_{i=1}^{r}\sum_{j=0}^{i}{2^{e_j}}
+\leqslant (n - 2^{e_0})
+           + (2n - 2^{\floor{\lg n} + 1} - \nu_{n} + 1)
+\leqslant 3n - 2^{\floor{\lg n}+1} - \nu_{n}.
+\end{equation*}
+The remaining sum was bounded in inequation \eqref{ineq:upper_n_lg_n}
+on page~\pageref{ineq:upper_n_lg_n}, that is,
+\(\sum_{i=0}^{r}{e_i2^{e_i}} \leqslant n \floor{\lg n}\), so we can
+draw an upper bound for \(\Wideal(n)\):
+\begin{equation*}
+\Wideal(n) \leqslant 
+n\floor{\lg n} + 3n - 2^{\floor{\lg n}+1} - \nu_{n}.
+\end{equation*}
+The bound is tight only when \(n=1\). As we did previously, we trade
+some weakeness for some legibility:
+\begin{equation}
+\Wideal(n) \leqslant n\floor{\lg n} + 3n - 2^{\floor{\lg n}+1} - 1.
+\label{ineq:W_upper}
+\end{equation}
+Inequations~\eqref{ineq:upper_minus_2} \vpageref{ineq:upper_minus_2}
+lead to \(-(n+1) \geqslant -2^{\floor{\lg n}+1}\), so
+\begin{equation}
+\Wideal(n) \leqslant n \lg n + 3n - (n+1) - 1
+= n \lg n + 2n - 2.
+\label{ineq:W_upper_simpl}
+\end{equation}
+Together with inequation \eqref{ineq:W_lower_simpl}, we thus proved
+\begin{equation*}
+n\lg n - 3n + 2 < \Wideal(n) \leqslant n \lg n + 2n - 2,
+\end{equation*}
+which imply the same asymptotic behaviour in the special case
+\(n=2^{e_0}\):
+\[
+\Wideal(n) \mathrel{\sim} n\lg n,\;\, \text{as} \,\; n \rightarrow
+\infty.
+\]
+As a reminder, the worst delay when \(n=2^{e_0}\) in
+\eqref{eq:worst_power} \vpageref{eq:worst_power} is
+\[
+\Wideal(n) = n\lg n.
+\]
+
+\medskip
+
+\paragraph{Average delay.}
+
+The remaining general case to investigate is the average delay
+\(\Aideal(n)\). We can restart with equation \eqref{eq:msort_gen} on
+page \pageref{eq:msort_gen}
+\begin{equation*}
+\Aideal(n)
+  = \sum_{i=0}^{r}{\Aideal(2^{e_i})}
+    +
+    \sum_{i=1}^{r}{\ave{merge}{2^{e_i},2^{e_{i-1}}+\dots+2^{e_0}}}.
+\end{equation*}
+The average delay of \erlcode{merge/2} is given by equation
+\eqref{eq:ave_merge} \vpageref{eq:ave_merge}:
+\[
+\ave{merge}{p,q} = \frac{pq}{p+1} + \frac{pq}{q+1} + 1.
+\]
+We draw
+\begin{equation}
+\Aideal(n)
+  = \sum_{i=0}^{r}{\Aideal(2^{e_i})}
+     + 
+     \sum_{i=1}^{r}{\left(\frac{2^{e_i}\sum_{j=0}^{i-1}{2^{e_j}}}{2^{e_i}+1}
+     +
+     \frac{2^{e_i}\sum_{j=0}^{i-1}{2^{e_j}}}{\sum_{j=0}^{i-1}{2^{e_j}}
+       + 1}
+     + 1\right)}.\label{eq:Aideal}
+\end{equation}
+From inequations \eqref{ineq:up_bin} \vpageref{ineq:up_bin},
+\(\sum_{j=0}^{i-1}{2^{e_j}} \leqslant 2^{e_{i}} - 1\), we deduce
+\begin{equation*}
+\frac{1}{\sum_{j=0}^{i-1}{2^{e_j}} + 1} \geqslant \frac{1}{2^{e_{i}}}
+\;\Longrightarrow\;
+\frac{1}{2^{e_{i}}+1} + \frac{1}{\sum_{j=0}^{i-1}{2^{e_j}} + 1}
+\geqslant
+\frac{2^{e_i+1}+1}{2^{e_i}(2^{e_i}+1)}.
+\end{equation*}
+The left\hyp{}hand side is \(\ave{merge}{p,q}/p/q\). Multiplying by
+\(pq\):
+\begin{gather*}
+2^{e_i}\sum_{j=0}^{i-1}2^{e_j}\left(\frac{1}{2^{e_{i}}+1} +
+\frac{1}{\sum_{j=0}^{i-1}{2^{e_j}} + 1}\right) 
+\geqslant \frac{2^{e_i+1}+1}{2^{e_{i}}+1}\sum_{j=0}^{i-1}{2^{e_j}}\\
+= \left(2 - \frac{1}{2^{e_i}+1}\right)\sum_{j=0}^{i-1}{2^{e_j}}
+> \left(2 - \frac{1}{2^{e_i}}\right)\sum_{j=0}^{i-1}{2^{e_j}}
+= 2\sum_{j=0}^{i-1}{2^{e_j}} - \sum_{j=0}^{i-1}{2^{e_j-e_i}}.
+\end{gather*}
+In the remaining sums, we have \(j < i\), and we know that the integer
+sequence \((e_i)_i\) is strictly increasing from \(e_0 \geqslant 0\),
+therefore \(e_j + 1 \leqslant e_i\) and \(2^{e_j-e_i} \leqslant 1/2\).
+We draw
+\begin{equation*}
+2^{e_i}\sum_{j=0}^{i-1}2^{e_j}\bigg(\frac{1}{2^{e_{i}}+1} +
+\frac{1}{\sum_{j=0}^{i-1}{2^{e_j}} + 1}\bigg) 
+> 2\sum_{j=0}^{i-1}{2^{e_j}} - \frac{i}{2}.
+\end{equation*}
+Furthermore
+\begin{gather}
+\sum_{i=1}^{r}{\ave{merge}{2^{e_i},2^{e_{i-1}}+\dots+2^{e_0}}}
+\geqslant
+\sum_{i=1}^{r}{\bigg(2\sum_{j=0}^{i-1}{2^{e_j}} - \frac{i}{2} + 1\bigg)}\notag\\
+= 2\sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}} - \frac{1}{4}{r(r+1)} + r
+= 2\sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}} -\frac{1}{4}{r(r-3)}.\notag
+\end{gather}
+The bound is tight only when \(r=0\), that is, \(n=2^{e_0}\). We can
+use this inequation on equation \eqref{eq:Aideal} \vpageref{eq:Aideal}:
+\begin{equation*}
+\Aideal(n) \geqslant \sum_{i=0}^{r}{\Aideal(2^{e_i})} +
+2\sum_{i=1}^{r}\sum_{j=0}^{i-1}{2^{e_j}}
+-\frac{1}{4}{(\nu_{n}-1)(\nu_{n}-4)},
+\end{equation*}
+by definition of \(\nu\). We already know how to bound the double sum
+in the right\hyp{}hand side by mean of inequation
+\eqref{ineq:double_sum} \vpageref{ineq:double_sum}, therefore
+\begin{align*}
+\Aideal(n)
+&\geqslant \sum_{i=0}^{r}{\Aideal(2^{e_i})}
+           + 2(n - 2^{\floor{\lg n}} + 2^{\nu_{n}-1} - \nu_{n})
+           - \frac{1}{4}{(\nu_{n}-1)(\nu_{n}-4)}\\
+&= \sum_{i=0}^{r}{\Aideal(2^{e_i})}
+   + 2n - 2^{\floor{\lg n}+1} + 2^{\nu_{n}}
+   - \frac{1}{4}(\nu_{n}^2 + 3\nu_{n} + 4).
+\end{align*}
+We can now make use of the lower bound of \(\Aideal(2^p)\) in
+inequation \eqref{ineq:A_power} \vpageref{ineq:A_power}, where
+\(\alpha := \sum_{k \geqslant 0}{1/(2^k+1)} \simeq
+1.2644997803484442092\):
+\begin{align*}
+\Aideal(n)
+&\geqslant \sum_{i=0}^{r}{(e_i2^{e_i}\!
+  -\!(\alpha\!-\!1)2^{e_i}\!-\!1)}
+   + 2n - 2^{\floor{\lg n}+1}\! + 2^{\nu_n}\!
+   - \frac{\nu_{n}^2+3\nu_{n}+4}{4}\\
+%% &= \sum_{i=0}^{r}{e_i2^{e_i}} - (\alpha-1)n 
+%%    - \nu_{n} + 2n - 2^{\floor{\lg n}+1}\!
+%%    + 2^{\nu_n}\! - \frac{\nu_{n}^2+3\nu_{n}+4}{4}\\
+&= \sum_{i=0}^{r}{e_i2^{e_i}} + (3-\alpha)n - 2^{\floor{\lg n}+1}
+   + 2^{\nu_n} - \frac{1}{4}{(\nu_{n}^{2} + 7\nu_{n} + 4)}.
+\end{align*}
+Note that \(3 - \alpha > 0\). We already found a lower bound for the
+remaining sum, in inequation \eqref{ineq:sum_ei_2ei_up}
+\vpageref{ineq:sum_ei_2ei_up}, therefore
+\begin{equation*}
+\Aideal(n) \geqslant n \floor{\lg n} + (3 - \alpha)n
+- 2^{\floor{\lg n}+2} + 2^{\nu_{n}}
+- (\nu_{n}^2 + 7\nu_{n} - 4)/4.
+\end{equation*}
+Let \(h(x) := 2^x - (x^2 + 7x - 4)/4\) be a function over the
+positive real numbers. It has no positive roots and its derivative is
+\(h'(x) = 2^x\ln 2 -(2x+7)/4\), whose unique positive root is
+approximately \(1.98399\). We have \(h(1) = 1, h(2) = 1/2\), and
+\(h(3) = 3/2\). See \fig~\vref{fig:exponential3},
+\begin{figure}
+\centering
+\includegraphics{exponential3}
+\caption{\(h(x) := 2^x - (x^2 + 7x - 4)/4\)
+\label{fig:exponential3}}
+\end{figure}
+where we should mind that the minimum is not exactly \(h(2)\). We
+deduce that, for any \(n>0\), we have \(2^{\nu_{n}} - (\nu_{n}^2 +
+7\nu_{n} - 4)/4 \geqslant 1/2\). We can weaken the lower bound
+accordingly:
+\begin{equation}
+\Aideal(n) \geqslant n \floor{\lg n} + (3 - \alpha)n
+             - 2^{\floor{\lg n}+2} + 1/2.
+\label{ineq:A_lower}
+\end{equation}
+We can further weaken it to get a rough, but more legible, bound as
+\begin{align*}
+\Aideal(n) &> n (\lg n - 1) + (3 - \alpha)n - 4n + 1/2
+            = n\lg n - (\alpha + 2)n + 1/2.
+\end{align*}
+Let us strive now to find a small upper bound of \(\Aideal(n)\) from
+equation \eqref{eq:Aideal} \vpageref{eq:Aideal}:
+\begin{align*}
+\Aideal(n)
+  &= \sum_{i=0}^{r}{\Aideal(2^{e_i})}
+     + 
+     \sum_{i=1}^{r}{\frac{2^{e_i}}{2^{e_i}+1}\sum_{j=0}^{i-1}{2^{e_j}}}
+     +
+     \sum_{i=1}^{r}{\frac{2^{e_i}\sum_{j=0}^{i-1}{2^{e_j}}}{\sum_{j=0}^{i-1}{2^{e_j}
+       + 1}}}
+     + r\\
+  &\leqslant \sum_{i=0}^{r}{\Aideal(2^{e_i})}
+     + 
+     \sum_{i=1}^{r}{\sum_{j=0}^{i-1}{2^{e_j}}}
+     +
+     \sum_{i=1}^{r}{2^{e_i}}
+     + r\\
+  &= \sum_{i=0}^{r}{\Aideal(2^{e_i})}
+     + 
+     \sum_{i=1}^{r}{\sum_{j=0}^{i-1}{2^{e_j}}}
+     + (n - 2^{e_0}) + (\nu_{n} - 1).     
+\intertext{We bounded the double sum in inequation
+  \eqref{ineq:double_upper} \vpageref{ineq:double_upper}, thus}
+\Aideal(n)
+ &\leqslant \sum_{i=0}^{r}{\Aideal(2^{e_i})}
+    + (2n - 2^{\floor{\lg n}+1} - \nu_{n} + 1)
++ n + \nu_{n} - 2^{e_0} - 1\\
+ &\leqslant \sum_{i=0}^{r}{\Aideal(2^{e_i})} + 3n - 2^{\floor{\lg n}+1}
+    - 1.
+\end{align*}
+The bound is tight only if \(n=1\). Using inequation
+\eqref{ineq:A_power} \vpageref{ineq:A_power}, that is, \(\Aideal(2^p)
+\leqslant p2^p\), and inequation \eqref{ineq:upper_n_lg_n}
+\vpageref{ineq:upper_n_lg_n}, that is, \(\sum_{i=0}^{r}{e_i2^{e_i}}
+\leqslant n\floor{\lg n}\), yields
+\begin{equation}
+\Aideal(n) \leqslant n\floor{\lg n} + 3n - 2^{\floor{\lg n}+1} - 1.
+\label{ineq:A_upper}
+\end{equation}
+Let us eliminate the integer parts and bit sums, so the asymptotic
+analysis becomes easier. Inequations \eqref{ineq:upper_minus_2}
+\vpageref{ineq:upper_minus_2} yield
+\[
+\Aideal(n) \leqslant n\lg n + 3n - (n + 1) - 1 = n\lg n + 2n - 2.
+\]
+In summary, we found the following bounds
+\begin{equation*}
+n \lg n - (\alpha+2)n + 1/2 < \Aideal(n) \leqslant n\lg n + 2n - 2,
+\end{equation*}
+which are tight enough to allow us to derive the asymptotic
+equivalences
+\[
+\Aideal(n) \mathrel{\sim} n \lg n \mathrel{\sim}
+\Wideal(n),\;\; \text{as} \,\; n \rightarrow \infty.
+\]
+Again, we find that this is the same as the special case
+\(n=2^{e_0}\).
+
+\medskip
+
+\paragraph{The program, finally.}
+
+It may come as a surprise that we have not written the program, except
+for the functions \erlcode{solo/1} and \erlcode{merge/2}, but we have
+deduced its delay nevertheless. In fact, the delays we found are not
+the delays of the program yet to be written, but the delays of an
+ideal version without \erlcode{solo/1} and without dealing with all
+the empty lists and singletons ending many recursive calls: only
+\erlcode{merge/2} was exactly defined and accounted for. Here are the
+definitions again:
+\begin{verbatim}
+merge(   [],      Q)            -> Q;
+merge(    P,     [])            -> P;
+merge([I|P],Q=[J|_]) when I < J -> [I|merge(P,Q)];
+merge(    P,  [J|Q])            -> [J|merge(P,Q)].
+
+solo(   []) -> [];
+solo([I|L]) -> [[I]|solo(L)].
+\end{verbatim}
+The extra delay incurred by \erlcode{solo/1} is known or obvious:
+\(\comp{solo}{n} = n + 1\). We need now to complete the program and
+sum the extra delays each new function entails. Let us call
+\erlcode{level/1} the function which computes the level in the tree
+just above the current one, which is the argument.
+\begin{verbatim}
+level([P,Q|S]) -> [merge(P,Q)|level(S)];
+level(      L) -> L.
+\end{verbatim}
+Note how we do not need to write a specific clause handling the case
+when the list is empty: the singleton list and the empty list are
+treated likewise, which is really neat. In our previous detailed
+analysis, we only counted the delays of the calls to
+\erlcode{merge/2}, therefore, we have now to find how many times in
+total \erlcode{level/1} is called to sort \(n\) items. The definition
+shows that, to one call \erlcode{level([P,Q|S])} corresponds one call
+\erlcode{merge(P,Q)}, so, if a level contains \(k\) lists, then the
+calls total \(\floor{k/2}+1\). First, let us assume that we sort
+\(n=2^p\) items. Previous study revealed that there are \(2^{p-1}\)
+merges on the leaves, then \(2^{p-2}\) on the level above etc. until
+\(2^0\). The extra delay due to \erlcode{level/1} is thus
+\(\sum_{k=0}^{p-1}{2^k} + p\), the additional \(p\) is the number of
+empty lists terminating each level, which trigger the second clause of
+\erlcode{level/1}. Hence, in total, the extra delay is \(2^p + p -
+1\).  Then, the function \erlcode{level/1} must be composed with
+itself until one list remains in the level, corresponding to the
+root. It follows:
+\begin{verbatim}
+all([P]) -> P;
+all(  L) -> all(level(L)).
+\end{verbatim}
+Notice that, just as with the definition of \erlcode{level/1}, the
+order of the clauses of \erlcode{all/1} is crucial. The extra delay
+incurred is the number of levels in the merge tree. Since we assume
+that the number of items is \(2^p\), we already know that there are
+\(p+1\) levels. Finally, the merge sort function, \erlcode{sort/1},
+starts by creating the singletons and then merging all of them and the
+resulting lists as well, etc. until one list remains.
+\begin{verbatim}
+sort([]) -> [];
+sort( L) -> all(solo(L)).
+\end{verbatim}
+Here, the extra delay due to \erlcode{sort/1} is simply \(1\). In sum,
+the total extra delay with respect to the ideal version of merge sort
+which only took into account the delay of \erlcode{merge/2} is
+\[
+(2^p + 1) + (2^p + p - 1) + (p+1) + 1 = 2^{p+1} + 2p + 2 
+= 2n + 2\lg n + 2.
+\]
+Let us recall the delays we found earlier in the case \(n=2^p\):
+\begin{gather*}
+\Bideal(n) = \tfrac{1}{2}{n\lg n} + n - 1;\;
+\Wideal(n) = n\lg n;\;\\
+n\lg n - (\alpha - 1)n - 1 < \Aideal(n) \leqslant n\lg n.
+\end{gather*}
+Let us add them the extra delay we just deduced:
+\begin{gather*}
+\best{sort}{n}  = \Bideal(n) + (2n + 2\lg n + 2)
+                = \tfrac{1}{2}{n\lg n} + 3n + 2\lg n + 1;\\
+\worst{sort}{n} = \Wideal(n) + (2n + 2\lg n + 2)
+                = n\lg n + 2n + 2\lg n + 2;\\
+n\lg n + (3-\alpha)n + 2\lg n + 1
+< \ave{sort}{n} \leqslant n\lg n + 2n + 2\lg n + 2.
+\end{gather*}
+It is important to check these involved calculations against some
+experiments. Let us thread an integer counter into all function calls
+and run a few tests. We do not need to transform the previous program
+into tail form. Consider the following method, consisting in handling
+each inner call separately and projecting their result in order to
+separate the value and the counter, then reconstructing the next call
+or the final value.  \verbatiminput{ms_c.erl} \Erlang permits
+simplifying the syntax of the \erlcode{case} constructs with only one
+clause: instead of
+\begin{center}
+\erlcode{case \emph{Exp}\(_1\) of \emph{Pattern} ->
+  \emph{Exp}\(_2\) end}
+\end{center}
+we can equivalently write
+\begin{center}
+\erlcode{\emph{Pattern} = \emph{Exp}\(_1\), \emph{Exp}\(_2\)}.
+\end{center}
+Now we can check the best case of \fig~\vref{fig:bottom_up_best1}:
+\begin{center}
+\erlcode{ms\_c:sort([1,2,3,4,5,6,7,8])} \(\twoheadrightarrow\) \erlcode{\{[1,2,3,4,5,6,7,8],43\}},
+\end{center}
+which means \erlcode{ms:sort([1,2,3,4,5,6,7,8])}
+\(\smashedrightarrow{43}\) \erlcode{[1,2,3,4,5,6,7,8]}, where
+\erlcode{ms} is the original module without the counter, so this is in
+accordance with the prediction \(\best{sort}{8} = 8 \cdot 3/2 + 3
+\cdot 8 + 2 \cdot 3 + 1 = 43\). Similarly, the worst case in
+\fig~\vref{fig:bottom_up_worst1} leads to the test
+\begin{center}
+\erlcode{ms\_c:sort([7,3,5,1,4,8,6,2])} \(\twoheadrightarrow\) \erlcode{\{[1,2,3,4,5,6,7,8],48\}},
+\end{center}
+which means \erlcode{ms:sort([7,3,5,1,4,8,6,2])}
+\(\smashedrightarrow{48}\) \erlcode{[1,2,3,4,5,6,7,8]}, in accordance
+with the instance \(\worst{sort}{8} = 8 \cdot 3 + 2 \cdot 8 + 2 \cdot
+3 + 2 = 48\). We could further use the program we designed in chapter
+\vpageref{permutations} to generate all permutations of
+\erlcode{[1,2,3,4,5,6,7,8]}, feed them to merge sort and take the
+arithmetic mean of the delays. We wrote \verbatiminput{perm.erl} Now
+we can write a module \erlcode{ms\_ave} which exports a function
+\erlcode{means/1} such that \erlcode{means(\(n\))} rewrites in the
+list of the mean values of \erlcode{ms:sort/1} from \(n\) down to
+\(1\).  \verbatiminput{ms_ave.erl} Module \erlcode{ms\_ave} depends
+upon independent modules \erlcode{ms\_c} and \erlcode{perm}, so these
+must be compiled first. Notive how we interleaved the computations of
+the sum and the length in one function, \erlcode{ms\_ave:sum\_len/1},
+performing only one traversal of the list of permutations and how,
+being in tail form, it uses a small, constant amount of the control
+stack. A possible session under the \Erlang shell:
+\begin{alltt}
+Erlang (BEAM) emulator version 5.6.3 [source] [smp:2]
+ [async-threads:0] [kernel-poll:false]
+
+Eshell V5.6.3  (abort with ^G)
+1> c(ms_c).
+\{ok,ms_c\}
+2> c(perm).
+\{ok,perm\}
+3> c(ms_ave).
+\{ok,ms_ave\}
+4> ms_ave:means(10).
+[62.84444444444444,56.62222222222222,46.733333333333334,
+ 40.733333333333334,34.93333333333333,29.466666666666665,
+ 21.666666666666668,16.666666666666668,10.0,4.0]
+5> \(\talloblong\)
+\end{alltt}
+Since we expect the resulting numbers to be rational, with the help of
+some \emph{computer algebra system}, we can find the exact expression
+of these numbers in \fig~\vref{fig:mean_table}.
+\begin{figure}
+\centering
+\includegraphics{mean_table}
+\caption{Values of \erlcode{mean(\(n\))} for
+         \(1 \leqslant n \leqslant 10\)
+         \label{fig:mean_table}}
+\end{figure}
+\Erlang has the peculiarity that integer arithmetic is implicitly
+performed with arbitrary precision, so we can compute integers as big
+as the computer memory can hold. Usually, programming languages
+require a dedicated library to do this and the integers are mapped by
+the run\hyp{}time system to the hardware integers, whose
+representation may lead to underflows and overflows. In this respect,
+\Erlang is quite a high\hyp{}level language. We have to compare now
+\erlcode{mean(\(n\))} with \(\ave{sort}{n}\). We can compute exactly
+the latter with help of equation \eqref{eq:ave_power}
+\vpageref{eq:ave_power}:
+\[
+\Aideal(2^p)
+  = p2^p + 2^p - 1 - 2^p \sum_{k=0}^{p-1}\frac{1}{2^k+1}.
+\]
+Therefore,
+\[
+\ave{sort}{2^p}
+  = \Aideal(2^p) + (2^{p+1}+2p+2)
+  = 2^p\left(p + 3 - \sum_{k=0}^{p-1}\frac{1}{2^k+1}\right) + 2p + 1.
+\]
+This yields the comfort to know that
+\begin{align*}
+\ave{sort}{2} &= 2\left(1 + 3 - \frac{1}{1+1}\right) + 2 \cdot 1 + 1 =
+10 = \erlcode{mean(\(2\))};\\
+\ave{sort}{4} &= 4\left(2 + 3 - \frac{1}{2} - \frac{1}{2+1}\right) +
+2 \cdot 2 + 1 = \frac{65}{3} = \erlcode{mean(\(4\))};\\
+\ave{sort}{8} &= 8\left(3 + 3 - \frac{1}{2} - \frac{1}{3} -
+\frac{1}{4+1}\right) + 2 \cdot 3 + 1 = \frac{701}{15} =
+\erlcode{mean(\(8\))}.
+\end{align*}
+Now, what if \(n\) is not a power of \(2\)? Let us assume that \(n
+\neq 2^p\) is expressed as a binary number with \(m\) bits as
+\((b_{m-1}b_{m-2}\dots{b_1}{b_0})_2\), that is, \(n :=
+\sum_{i=0}^{m-1}{b_i2^i}\). We have shown by equation \eqref{eq:e_r}
+\vpageref{eq:e_r} that \(m=\floor{\lg n} + 1\). Let \(L_n\) be the
+contribution of the arrows of function \erlcode{level/1}. As we
+pointed out earlier, if level \(k\) contains \(I(k)\) items, there are
+\(\floor{I(k)/2}+1\) calls to \erlcode{level/1}, so remains to
+determine \(I(k)\). A look back at the example in
+\fig~\vref{fig:bottom_up_7}, where \(n=7\), helps us to guess the
+answer:
+\[
+I(k+1) = \ceiling{I(k)/2}\,\; \text{and} \,\; I(0) = n,
+\]
+meaning that \(k=0\) represents the level of the leaves. This
+recurrent definition is equivalent to the closed form \(I(k) =
+\ceiling{n/2^k}\) because \(\ceiling{\ceiling{x}/q} = \ceiling{x/q}\).
+The proof is as follows. The equality is equivalent to the conjunction
+of the two complementary inequalities \(\ceiling{\ceiling{x}/q}
+\geqslant \ceiling{x/q}\) and \(\ceiling{\ceiling{x}/q} \leqslant
+\ceiling{x/q}\). The former is straightforward because it is a
+consequence of \(\ceiling{y} \geqslant y\), for any real number \(y\):
+\(\ceiling{x} \geqslant x \Rightarrow \ceiling{x}/q \geqslant x/q
+\Rightarrow \ceiling{\ceiling{x}/q} \geqslant \ceiling{x/q}\). Next,
+because both sides of the inequality are integers,
+\(\ceiling{\ceiling{x}/q} \leqslant \ceiling{x/q}\) is equivalent to
+state that \(p \leqslant \ceiling{\ceiling{x}/q} \Rightarrow p
+\leqslant \ceiling{x/q}\), for any integer \(p\). An obvious lemma is
+that if \(i\) is an integer and \(y\) a real number, \(i \leqslant
+\ceiling{y} \Leftrightarrow i \leqslant y\), so the original
+inequality is transitively equivalent to \(p \leqslant \ceiling{x}/q
+\Rightarrow p \leqslant x/q\), for any integer \(p\), which is
+trivially equivalent to \(pq \leqslant \ceiling{x} \Rightarrow pq
+\leqslant x\). This implication is true from the same lemma above,
+achieving the proof. In the end, \(L_n =
+\sum_{k=0}^{?}\left(\floor{\ceiling{n/2^k}/2} + 1\right)\). What is
+the greatest value of \(k\)? This is where the hypothesis \(n \neq
+2^p\) comes into play. If we compare \fig~\ref{fig:bottom_up_7} on
+page~\pageref{fig:bottom_up_7} with \fig~\vref{fig:bottom_up1}, where
+\(n=2^3\), we find that \(k=m\) for the former and \(k=m-1\) for the
+latter. Therefore, if \(n \neq 2^p\),
+\[
+L_n = \sum_{k=0}^{m}
+\left\lfloor\frac{1}{2}\left\lceil\frac{n}{2^k}\right\rceil\right\rfloor
++ (m + 1)
+= \sum_{k=0}^{m}
+\left\lfloor\frac{1}{2}\left\lceil\frac{n}{2^k}\right\rceil\right\rfloor
++ \floor{\lg n} + 2.
+\]
+For all integers \(q\), \(q = \floor{q/2} + \ceiling{q/2}\) holds,
+hence \(q=\ceiling{n/2^k}\) yields
+\begin{align*}
+L_n &= \sum_{k=0}^{m}\left(\left\lceil\frac{n}{2^k}\right\rceil -
+\left\lceil\frac{1}{2}\left\lceil\frac{n}{2^k}\right\rceil\right\rceil\right)
++ \floor{\lg n} + 2\\ 
+&= \sum_{k=0}^{m}{\!\left\lceil\frac{n}{2^k}\right\rceil} \! - \!
+\sum_{k=0}^{m}{\!\left\lceil\frac{n}{2^{k+1}}\right\rceil} + \floor{\lg n} + 2
+ = \left\lceil\frac{n}{2^0}\right\rceil \! - \!
+ \left\lceil\frac{n}{2^{m+1}}\right\rceil + \floor{\lg n} + 2\\
+&= n + \floor{\lg n} + 2.
+\end{align*}
+As far as \erlcode{all/1} is concerned, we determined previously that
+it contributes as much as the number of levels in the merge tree,
+which is here \(m+1=\floor{\lg n} + 2\). We have the extra \(1\)
+due to \erlcode{sort/1} and the \(n+1\) from \erlcode{solo/1}. In sum,
+the additional delay to reach the actual implementation delay is
+\[
+(n + \floor{\lg n} + 2) + (\floor{\lg n} + 2) + 1 + (n+1)
+= 2n + 2\floor{\lg n} + 6.
+\]
+Let us remind of the intervals for the delays of the ideal version of
+merge sort and add this extra time to get the actual intervals:
+\begin{align}%%BOUNDS
+\best{sort}{n} &\geqslant n\floor{\lg n}/2 + 4n - 2^{\floor{\lg n}+1} 
+    + 2\floor{\lg n} + 5,\notag\\
+\best{sort}{n} &\leqslant n\floor{\lg n}/2 + 5n
+    - 2^{\floor{\lg n}+1} + 2\floor{\lg n} + 5;\notag\\
+\worst{sort}{n} &\geqslant n\floor{\lg n} + 4n - 2^{\floor{\lg n}+2}
+   + 2\floor{\lg n} + 8,\notag\\
+\worst{sort}{n} &\leqslant n\floor{\lg n} + 5n
+                 - 2^{\floor{\lg n}+1} + 2\floor{\lg n} + 5;\notag\\
+\ave{sort}{n} &\geqslant n \floor{\lg n} + (5 - \alpha)n
+- 2^{\floor{\lg n}+2} + 2\floor{\lg n} + 13/2,\notag\\
+\ave{sort}{n} &\leqslant n\floor{\lg n} + 5n - 2^{\floor{\lg n}+1}
+               + 2\floor{\lg n} + 5.
+\label{ineq:Asort_upper}
+\end{align}
+The derivations ensure that these delays are valid for any integer
+\(n>0\). It is complicated to caracterise the best and worst cases but
+we can put to the test the average delay because we already have some
+exact values from instrumenting the actual code by adding a counter
+and a permutation generator. Let us use \Erlang to compute the bounds:
+\verbatiminput{mean.erl} Function \erlcode{trunc/1} is
+predefined. Module \erlcode{math} is also predefined and
+\erlcode{math:log/1} implements the Napierian logarithm. The
+approximate value of \(\alpha\) can be compute in \Erlang, but we
+preferred to use a computer algebra system. Note how we efficiently
+computed the binary exponentiation \(2^n\) by means of the recurrent
+equations
+\begin{equation}
+2^0 = 1,\quad 2^{2m} = (2^m)^2,\quad 2^{2m+1} =  2(2^m)^2.
+\label{def:exp2}
+\end{equation}
+The delay \(\comp{exp2}{n}\) thus satisfies the equations
+\[
+\comp{exp2}{0} = 1;\quad \comp{exp2}{n} = 1 +
+\comp{exp2}{\floor{n/2}},\;\, \text{if} \;\, n > 0.
+\]
+Therefore, if \(n>0\), it is \(1\) plus the number of bits of \(n\),
+that is, \(\comp{exp2}{n} = \floor{\lg n} + 2\), else \(\comp{exp2}{0} =
+1\). We can now complete the table of the bounds of \(\ave{sort}{n}\)
+and check them against the experimental results \erlcode{mean(\(n\))}
+in \fig~\vref{fig:mean_ms}.
+\begin{figure}
+\centering
+\includegraphics[bb=71 662 341 721]{mean_ms}
+\caption{Checking average delay of merge sort when \(n \neq
+  2^p\)\label{fig:mean_ms}}
+\end{figure}
+\medskip
+
+\paragraph{Stability.}
+
+This implementation of merge sort is unstable because
+\erlcode{merge/2} does not preserves the relative order of equal
+numbers. In order to obtain stability, we should write instead
+\begin{alltt}
+merge(   [],      Q)            -> Q;
+merge(    P,     [])            -> P;
+merge(P=[I|_],[J|Q]) when \textbf{I > J} -> [J|merge(P,Q)];\hfill% \emph{Here}
+merge(  [I|P],    Q)            -> [I|merge(P,Q)].
+\end{alltt}
+This works because the first list we pass to \erlcode{merge/2} always
+contains items which were located \emph{before} the items of the
+second list.
+
+\medskip
+
+\paragraph{Improvement.}
+
+It is easy to improve our implementation of merge sort by avoiding the
+construction of the initial list of singletons, that is, the leaves of
+the merge tree, and instead build directly the lists with two items,
+\emph{without using \erlcode{merge/2}}. Let us name the function in
+charge of this \erlcode{duo/1}. The program is as follows:
+\verbatiminput{ms_opt.erl} This simple modification saves
+\(\comp{solo}{n} = n+1\) function calls and the first call to
+\erlcode{all/1} and \erlcode{level/1}, that is, \(1\) for the call to
+\erlcode{all/1}, plus \(\floor{n/2}\) calls to \erlcode{merge/2} on
+pairs of singletons, plus \(1\) for the last singleton or the empty
+list in \erlcode{level/1}, that is, \(\floor{n/2}\comp{merge}{1,1} + 2
+= 2 \floor{n/2} + 2\). Instead, we have the delay of \erlcode{duo/2},
+that is, an additional delay of \(\floor{n/2} + 1\). The total delay
+is hence decreased by
+\[
+(n + 1 + 2\floor{n/2} + 2) - (\floor{n/2} + 1) = n + \floor{n/2} + 2.
+\]
+By modifying module \erlcode{ms\_opt} so that all functions thread a
+counter and by testing some cases we already know, we can reinforce
+our conviction that our deduction is correct.
+
+\medskip
+
+\paragraph{Higher\hyp{}order merge sort.}
+
+Just as we made insertion sort able to sort any kind of data as long
+as it is totally ordered by a supplied function, we can make merge
+sort by threading the comparison: \verbatiminput{ms_ho.erl} Now the
+following calls become possible:
+\begin{center}
+\erlcode{ms\_ho:sort(fun(I,J)->I>J end,[4,3,1,0,2])}
+\(\twoheadrightarrow\) \erlcode{[0,1,2,3,4]};\\
+\erlcode{ms\_ho:sort(fun(I,J)->I<J end,[4,3,1,0,2])}
+\(\twoheadrightarrow\) \erlcode{[4,3,2,1,0]}.
+\end{center}
+Stability is useless if the only type of data to be sorted is integer,
+so let us take an association list whose keys are integers but data is
+not:
+\begin{alltt}
+ms_ho:sort(fun(\{I,_\},\{J,_\}) -> I > J end,
+           [\{6,six\},\{1,one\},\{6,seis\},\{2,two\}]).
+\end{alltt}
+The result is \erlcode{[\{1,one\},\{2,two\},\{6,six\},\{6,seis\}]}
+because the relative order of \erlcode{\{6,six\}} and
+\erlcode{\{6,seis\}} is preserved.
+
+\medskip
+
+\paragraph{Comparison with insertion sort.}
+
+We introduce Landau's notation, which we define as
+\begin{equation}
+f(n) \in \landau{g(n)} \Leftrightarrow \lim_{n \rightarrow
+  \infty}{f(n)/g(n)} = 0.\label{eq:Landau}
+\end{equation}
+Equivalence~\eqref{ineq:ln} \vpageref{ineq:ln} imply \(\lim_{n
+  \rightarrow \infty}(\lg n)/n = 0\), which we can equivalently
+express with Landau's notation as \(\lg n \in \landau{n}\). Thus,
+\(n\lg n \in \landau{n^2}\). Moreover, a consequence of inequations
+\eqref{ineq:i2wb} \vpageref{ineq:i2wb} is that the average delay
+\(\ave{i2wb}{n}\) of the two\hyp{}way insertion sort is
+lower\hyp{}bounded as follows:
+\begin{equation*}
+\tfrac{1}{8}(n^2 - 13n + \ln n - 10 + \ln 2) < \ave{i2wb}{n}.
+\end{equation*}
+In this chapter, we established inequation \eqref{ineq:Asort_upper}
+\vpageref{ineq:Asort_upper} about the upper bound of merge sort, which
+we can weaken a little bit to make it more wieldy:
+\begin{align*}
+\ave{sort}{n} 
+&\leqslant n\floor{\lg n} + 5n - 2^{\floor{\lg n}+1}
++ 2\floor{\lg n} + 5\\
+&\leqslant n\lg n + 4n + 2\lg n + 4.
+\end{align*}
+Therefore, we expect the existence of \(n_0 > 0\), such that, for all
+\(n \geqslant n_0\),
+\[
+\ave{sort}{n} < \ave{i2wb}{n}.
+\]
+The problem is to determine \(n_0\), that is, we want to solve the
+inequation
+\[
+n\lg n + 4n + 2\lg n + 4
+< \tfrac{1}{8}(n^2 - 13n + \ln n - 10 + \ln 2).
+\]
+This is where a computer algebra system comes handy to deduce that it
+is equivalent to \(n \geqslant 100\), that is, \(n_0 = 100\). Since we
+worked on bounds of the delays, this result does not mean that the
+crossing of the averages happens at \(n=100\), only that we are
+certain that it happened whenever \(n \geqslant 100\). In order to get
+a lower bound, let us consider the dual situation: we want the upper
+bound of \(\ave{i2wb}{n}\) to be lower than the lower bound of
+\(\ave{sort}{n}\). To make the point clearer, we still consider the
+fastest version of insertion sort and the slowest version of merge
+sort we found. Another implication of \eqref{ineq:i2wb}
+\vpageref{ineq:i2wb} is
+\begin{equation*}
+\ave{i2wb}{n} < \tfrac{1}{8}(n^2 - 13n + \ln n - 10 + \ln 2 + 7).
+\end{equation*}
+Furthermore, we found \vpageref{ineq:Asort_upper} a lower bound we can
+now weaken as usual:
+\begin{align*}
+\ave{sort}{n} 
+&> n\floor{\lg n} + (5-\alpha)n - 2^{\floor{\lg n}+2}
++ 2\floor{\lg n} + 13/2\\
+&> n\lg n - \alpha n + 2\lg n + 5/2.
+\end{align*}
+With a computer algebra system, we obtain
+\[
+1 \leqslant n \leqslant 50 \Rightarrow \ave{i2wb}{n} < \ave{sort}{n}.
+\]
+In other words, insertion sort is certainly faster in average than
+merge sort for less than \(50\)~items and it is certainly slower in
+average for more than \(100\)~items. We do not have enough precision
+to decide in\hyp{}between. Anyhow, this shows that, when comparing the
+asymptotic delays of two sorting algorithms, we should not conclude of
+the superiority of one over the other for small inputs. Also, this
+result entices us to drop the function \erlcode{solo/2} (even
+\erlcode{duo/2}) in favour of a function which constructs chunks of
+\(50\)~items from the original list, then sort them using balanced
+two\hyp{}way insertions and, finally, if there are more than
+\(50\)~items, start merging these sorted lists. In reference to the
+example in \fig~\vref{fig:bottom_up_7}, this improvement amounts to
+not constructing the first \(50\)~levels in the tree, starting from
+the leaves, and instead use two\hyp{}way insertion sort to directly
+build the \(50\)th level.
+
+\medskip
+
+\paragraph{Minimum\hyp{}comparison sorting.}
+
+In several instances, we claimed that a good sorting algorithm has a
+worst delay asymptotically equivalent to \(n\lg n\), without any
+justification. In order to substantiate this statement, we need to
+investigate \emph{minimum\hyp{}comparison sorting}. First, it is
+important to realise that there are sorting algorithms which do not
+rely on comparisons, although they are not suited for being
+implemented in purely functional languages. Second, for the sake of
+simpli\-city, we shall restrict the present theoretical discussion to
+\emph{distinct items}. We model the outcome of sorting \(n\) distinct
+objects \(a_1\), \(a_2\), \ldots, \(a_n\), as a permutation of
+\((a_1,\dots,a_n)\). There are \(n!\) possible sorts, as we found out
+in chapter \vref{permutations}. For instance, let us represent in the
+tree of \fig~\vref{fig:comparison_tree} all the comparisons for
+sorting three numbers.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=72 626 335 721]{comparison_tree}
+\caption{A comparison tree for sorting three items
+\label{fig:comparison_tree}}
+\end{figure}
+The \emph{external nodes} are all the permutations of
+\((a_1,a_2,a_3)\). The \emph{internal nodes} are comparisons between
+two items, say, in general, \(a_i\) is compared to \(a_j\) and noted
+\(a_i\)?\(a_j\). If \(a_i<a_j\), then this property holds everywhere
+in the left subtree, otherwise \(a_i>a_j\) holds in the right
+subtree. Note that this tree is one possible amongst many: it
+corresponds to an algorithm which starts by comparing \(a_1\) and
+\(a_2\) and there are, of course, many other strategies. It does not
+perform redundant comparisons, though. \Fig~\vref{fig:redudant_comp}
+shows an excerpt of a comparison tree with such a useless comparison.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=72 638 238 721]{redundant_comp}
+\caption{Comparison of \(a_1\) to \(a_3\) is useless
+\label{fig:redudant_comp}}
+\end{figure}
+The special external node \(\bot\) corresponds to no permutation
+because the comparison \(a_1<a_3\) cannot fail as it is implied by
+transitivity of the previous comparisons on the path from the
+root. \emph{A comparison tree for \(n\) items without redundancy has
+  \(n!\) external nodes.} Because we are investigating
+minimum\hyp{}comparison sorting, we shall consider henceforth
+comparison trees with \(n!\) external nodes. Furthermore, amongst
+them, we want to determine the trees such that the maximum number of
+comparisons is minimum.
+
+The maximality constraint means that we must consider the longest
+paths from the root to a leaf (a leaf is an internal node whose two
+children are external nodes, see definitions \vpageref{def:tree})
+because the number of comparison nodes along those paths is an upper
+bound for sorting all the permutations. For example, in
+\fig~\vref{fig:comparison_tree}, there are four paths satisfying this
+maximality constraint and they contain \(3\) comparisons each, for example,
+\((a_1<a_2)\rightarrow(a_2<a_3)\rightarrow(a_1<a_3)\). Let us note
+\(S(n)\) the number of nodes on a maximum path, which is usually
+called the \emph{height} of the tree, for example, \(S(3)=3\) in
+\fig~\vref{fig:comparison_tree}. The minimality constraint in the
+problem statement above then means that \emph{we want a lower bound on
+  the height of a comparison tree with \(n!\) external nodes.}
+
+A \emph{complete binary tree} is a binary tree whose internal nodes
+have children which are either two internal nodes or two external
+nodes. If such a tree has height \(h\), then it has \(2^h\) external
+nodes. For instance, \fig~\vref{fig:complete_tree} shows the case
+where the height \(h\) is 3 and there are indeed \(2^h=8\) external
+nodes, figured as \(\Box\).
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 635 294 721]{complete_tree}
+\caption{Complete binary trees of height \(h\) have \(2^h\) external
+  nodes.\label{fig:complete_tree}}
+\end{figure}
+Since we know that the minimum\hyp{}comparison trees have \(n!\)
+external nodes and height \(S(n)\), they must contain less external
+nodes than a complete binary tree of identical height, that is, the
+following holds:
+\begin{equation*}
+n! \leqslant 2^{S(n)}.
+\end{equation*}
+This inequality implies the following (perhaps best read leftward):
+\begin{equation*}
+\sum_{k=1}^{n}{(\floor{\lg k} + 1)} - n
+= \sum_{k=1}^{n}{\floor{\lg k}}
+\leqslant \sum_{k=1}^{n}{\lg k}
+= \lg n! \leqslant \lg\left(2^{S(n)}\right) = S(n).
+\end{equation*}
+The reason for manifesting the term \(\floor{\lg k} + 1\) is that its
+value is the number of bits of \(k\), so the remaining sum is the
+total number of bits of the integers from~\(1\) to~\(n\). The table in
+\fig~\vref{fig:bit_table} 
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 463 146 721]{bit_table}
+\caption{Binary numbers from \(1\) to \(n\)\label{fig:bit_table}}
+\end{figure}
+shows the enumeration of the first integers in binary. The greatest
+power of \(2\) smaller than \(n\) is \(2^{\floor{\lg n}}\) because it
+is the number \((10\dots0)_2\) with the same number of bits as \(n\)
+(so it appears in the same section of the table as \(n\)). The trick
+consists in counting the bits in columns, from top to bottom, and
+leftward. In the rightmost column, we find \(n\) bits. In the second
+column, from the right, we find \(n-2^1+1\) bits. The third from the
+right contains \(n-2^2+1\) bits etc. until the leftmost column
+containing \(n-2^{\floor{\lg n}}+1\) bits. The total number of bits in
+the table is
+\begin{align*}
+\sum_{k=1}^{n}{\!(\floor{\lg k}+1)}
+  &= \sum_{k=0}^{\floor{\lg n}}{\!(n-2^k+1)}
+   = (n+ 1)(\floor{\lg n} + 1) - 2^{\floor{\lg n}+1} + 1\\
+  &\geqslant (n\!+\!1)(\floor{\lg n}\! +\! 1) - 2n + 1
+  = n\floor{\lg n} - n + \!\floor{\lg n} + 3.
+\end{align*}
+We can finally weaken a little bit the lower bound of \(S(n)\) as
+follows:
+\[
+n\lg n - 3n + \lg n + 2 < n\floor{\lg n} - 2n + \floor{\lg n} + 3
+                        \leqslant S(n),
+\]
+\noindent 
+because \(x - 1 < \floor{x}\). This proves that any optimal sorting
+algorithm, solely based on comparisons, requires at least
+\(n\floor{\lg n} - 2n\) comparisons to sort any list of \(n\)
+items. Since we found in inequation~\eqref{ineq:W_upper_simpl} on
+page~\pageref{ineq:W_upper_simpl} that the worst delay of merge sort,
+\(\Wideal(n)\), satisfies
+\[
+\Wideal(n) \leqslant n\lg n + 2n - 2
+\]
+and, since \(S(n) \leqslant \Wideal(n)\), we now have converging
+bounds for the so\hyp{}called \emph{minimax} delay:
+\[
+n\lg n - 3n + \lg n + 2 < S(n) \leqslant n\lg n + 2n - 2
+\]
+and thus \(S(n) \mathrel{\sim} n \lg n \mathrel{\sim} \Wideal(n)
+\mathrel{\sim} \Aideal(n)\). This means that merge sort is, in the
+worst case and asymptotically, as good as any optimal sorting
+algorithm. However, this does not mean that it cannot be beaten by
+another algorithm for small values of~\(n\) or in average.
+
+\medskip
+
+\paragraph{Exercises.}
+\label{ex:merge_sort}
+
+\noindent [See answers page~\pageref{ans:merge_sort}.]
+\begin{enumerate}
+
+  \item \label{ex:merge_sort:1} A theoretical way to compare sorting
+    algorithms based on comparisons is to compare only the number of
+    comparisons they perform. Determine \(\Bcomp(n)\), \(\Wcomp(n)\)
+    and \(\Acomp(n)\), which are, respectively, the best, worst and
+    average number of comparisons in the ideal merge sort
+    algorithm. Deduce a better upper bound for \(S(n)\).
+
+  \item \label{ex:merge_sort:2} Find better approximations of
+    \(\Bideal(n)\) and \(\Wideal(n)\) when \(n=2^p-1\). Compare
+    \(\Bcomp(2^p-1)\) with \(\Bcomp(2^p)\) and \(\Wcomp(2^p-1)\) with
+    \(\Wcomp(2^p)\).
+
+  \item \label{ex:merge_sort:3} When looking for a lower bound of
+    \(S(n)\), we used the inequality \(\sum_{k=1}^{n}{\floor{\lg k}} <
+    \sum_{k=1}^{n}{\lg k}\), which is quite rough. If we allow
+    ourselves to work temporarily on real numbers, we can harvest the
+    fruits of real analysis as follows. Let two integers \(a \leqslant
+    b\) and \(f:[a,b] \rightarrow \mathbb{R}\) a real\hyp{}valued,
+    increasing and Riemann\hyp{}integrable function. Then
+    \[
+      \sum_{k=a}^{b-1}f(k) \leqslant \int_{a}^{b}{\!\!f(x)} \,dx
+                         \leqslant \sum_{k=a+1}^{b}{\!\!\!f(k)}.
+    \]
+    Assume this theorem and derive a better lower bound for \(S(n)\).
+
+  \item \label{ex:merge_sort:4} The derivation of simple bounds is not
+    as accurate as we would like because we made over\hyp{}pessimistic
+    assumptions. For instance, the inequalities
+    \[
+    \Wideal(n) \geqslant n\floor{\lg n} + 2n - 2^{\floor{\lg n}+2} + 2
+                       > n(\lg n - 1) + 2n - 4n + 2
+    \]
+    rely on \(\floor{\lg n} > \lg n - 1\) and \(n \geqslant
+    2^{\floor{\lg n}}\). The latter is tight if \(n\) is a power of
+    \(2\). But if it is so, we could have used an equality in stead of
+    the former inequality: \(\floor{\lg n} = \lg n\). Prove the finer
+    \[
+    \begin{array}{r@{\,}c@{\,}c@{\,}c@{\,}l}
+    \frac{1}{2}{n\lg n} & \leqslant & \Bideal(n)
+       & \leqslant & \tfrac{1}{2}{n \lg n} + \tfrac{3}{2}{n} - 1,\\
+    n\lg n - 2n + 2 & \leqslant & \Wideal(n)
+                    & \leqslant & n\lg n + \tfrac{3}{2}{n} - 1,\\[1pt]
+    n\lg n - (\alpha + 1)n + \tfrac{1}{2} & \leqslant & \Aideal(n)
+                               & \leqslant & n\lg n + \tfrac{3}{2}n - 1.
+    \end{array}
+    \]
+    Using Question~\ref{ex:merge_sort:1}, find a smaller upper bound
+    for \(S(n)\).
+
+    \noindent \emph{Hint.} In general, we want a lower bound such that
+    \(n\lg n + \lambda n \leqslant n\floor{\lg n} + \psi n - \omega
+    2^{\floor{\lg n}}\), with \(\psi > 0\), \(\omega > 0\) and
+    \(\lambda\) is maximum. In the example above, \(\psi = 2\) and
+    \(\omega = 4\) (the constant term can be cancelled on both sides)
+    and \(\lambda = -2\). The dual case for upper bounds is obtained
+    by reversing the comparison and minimising \(\lambda\). Let us
+    allow \(n\) to range over the real numbers and represent it in the
+    mantissa\hyp{}exponent notation in base \(2\), that is, we set
+    \(n=q2^p\), where \(p \in \mathbb{N}, q \in \mathbb{R}\) and \(1
+    \leqslant q < 2\). Therefore \(\lg n = p + \lg q\), with \(0
+    \leqslant \lg q < 1\), and thus \(\floor{\lg n} = p\). Use this
+    representation in the inequality, study the resulting
+    real\hyp{}valued function of \(q\) and maximise \(\lambda\) on the
+    real interval \([1,2]\), depending on conditions upon \(\psi\) and
+    \(\omega\).
+
+  \item \label{ex:merge_sort:5} Implement in two \Erlang clauses the
+    function \(\nu\) (bit sum).
+
+  \item \label{ex:merge_sort:6} Let \(\rho_n\) the largest power of
+    \(2\) dividing \(n\). In other words, \(\rho_n = 2^{e_0}\) if we
+    let \(n=2^{e_r} + \dots + 2^{e_1} + 2^{e_0} > 0\), with \(e_r >
+    \dots > e_1 > e_0 \geqslant 0\) and \(r \geqslant 0\). This
+    function is called the \emph{ruler function} and can also be
+    understood as computing the number of trailing zeros in the binary
+    representation of \(n\). Define recursively \(\rho_n\) and prove
+    \[
+    \rho_n = 1 + \nu_{n-1} - \nu_{n},
+    \]
+    where \(\nu_n\) is the sum of the bits of \(n\). Finally conclude that
+    \[
+      \sum_{k=1}^{n}{\rho_k} = n - \nu_n \sim n,\; \text{as} \; n
+      \rightarrow \infty.
+    \]
+    %% Prove independently that
+    %% \[
+    %% \sum_{k>0}{\left\lfloor\frac{n}{2^k}\right\rfloor} = n - \nu_n.
+    %% \]
+
+  \item \label{ex:merge_sort:7} Let \(\Bcomp(n)\) be the number of
+    comparisons in the best case of the ideal merge sort. Prove what
+    Question~\ref{ex:merge_sort:2} suggested:
+    \[
+    \Bcomp(n+1) = \Bcomp(n) + \nu_{n}.
+    \]
+    Examine vertically \fig~\vref{fig:bit_table} and deduce simple
+    bounds on \(\sum_{k=0}^{n-1}{\nu_k}\). (Note that the row \(k=0\)
+    is missing in the table but it matters even though \(\nu_0 = 0\).)
+    Deduce bounds on \(\Bcomp(n)\) and compare them with the ones in
+    Question~\ref{ex:merge_sort:1} and \ref{ex:merge_sort:4}.
+
+    \noindent \emph{Hint.} Let us consider \(n\) expressed as a sum of
+    powers of \(2\): \(n := \sum_{i=0}^{r}{2^{e_{i}}}\). When
+    \(n\) is even, \(e_0>0\) and all the merge trees in their best
+    cases are isomorphic to the tree displayed in
+    \fig~\vref{fig:bcomp_2p_merge}, 
+\begin{figure}[t]
+\centering
+\subfloat[Nodes with list lengths\label{fig:bcomp_2p_merge}]{%
+  \includegraphics[bb=71 640 165 721]{bcomp_2p_merge}
+}
+\quad
+\subfloat[Nodes with best delays\label{fig:bcomp_2p}]{%
+  \includegraphics[bb=71 632 175 721]{bcomp_2p}
+}
+\caption{Best delay mergings for \(n\) even\label{fig:Bcomp_2p}}
+\end{figure}
+whose nodes contain the lengths of the lists in the corresponding
+merge tree. They are also isomorphic to the tree in
+\fig~\vref{fig:bcomp_2p}, whose nodes contain the best delays of the
+corresponding merges in the merge tree. The total best delay
+\(\Bcomp(n)\) is the sum of the delays of all the nodes. The
+complementary situation, \(n\) odd, means that \(n\) can be written in
+binary as \(\sigma 01^q\), where \(\sigma\) is some bit sequence and
+\(q\) some positive integer. In terms of the decomposition into powers
+of \(2\), this is equivalent to say that there exists a positive \(q\)
+such that \(e_q>q\) and, for all \(i < q\), \(e_i=i\). This leads to
+the trees in \fig~\ref{fig:Bcomp_2p_1} on
+page~\pageref{fig:Bcomp_2p_1}. Make the trees for \(n+1\) from the
+cases ``\(n\) even'' and ``\(n\) odd.''  Conclude that \(\Bcomp(n+1) =
+\Bcomp(n) + \nu_{n}\), whatever the parity of \(n\) is. Does the same
+recurrent equation hold for \(\Wcomp\), as
+Question~\ref{ex:merge_sort:2} suggested?
+\begin{figure}
+\centering
+\subfloat[Nodes with list lengths\label{fig:bcomp_2p_1_merge}]{%
+\includegraphics[bb=71 610 193 721]{bcomp_2p_1_merge}
+}
+\quad
+\subfloat[Nodes with best delays\label{fig:bcomp_2p_1}]{%
+\includegraphics[bb=71 607 198 721]{bcomp_2p_1}
+}
+\caption{Best delay mergings for \(n\) odd\label{fig:Bcomp_2p_1}}
+\end{figure}
+
+  \item \label{ex:merge_sort:8} We mentionned that the beauty of our
+    implementation of merge sort is the fact that no provision is made
+    for handling the unbalanced merges: the merge tree is built
+    bottom\hyp{}up in a uniform manner. \Fig~\vref{fig:msort_gen}
+    shows the sequence in which the unbalanced merges are
+    performed. Abstractly, we could order them as we wish, so the
+    question naturally arises: does this scheme lead to the fastest
+    algorithm in the worst or average case? \Fig~\ref{fig:msort_gen}
+    can be considered as an extreme case, because the unbalanced
+    merges are computed from right to left. Another extreme case is
+    the exact reverse order: from left to right, as shown in
+    \fig~\vref{fig:msort_var}. Would you expect the worst delay to be
+    worse than merging leftward? Same question about the best delay.
+  \item \label{ex:merge_sort:9} Prove \(n\floor{\lg n} + 2n -
+    2^{\floor{\lg n}+1} = n\ceiling{\lg n} + n - 2^{\ceiling{\lg
+        n}}\).
+
+  \item \label{ex:merge_sort:10} Use theorem of
+    Question~\ref{ex:merge_sort:4} to derive a better lower bound for
+    \(\ave{sort}{n}\) and then \(1 \leqslant n \leqslant 26
+    \Rightarrow \ave{i2wb}{n} < \ave{sort}{n}\).
+
+\end{enumerate}
+\begin{figure}[!b]
+\centering
+\includegraphics[bb=71 640 164 721]{msort_var}
+\caption{Unbalanced merges from left to right\label{fig:msort_var}}
+\end{figure}
+

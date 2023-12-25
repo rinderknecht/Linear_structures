@@ -1,0 +1,1330 @@
+%%-*-latex-*-
+
+\chapter{Joining and reversing}
+
+Consider writing a function \erlcode{join/2} with two lists as
+parameters and which computes a list containing all the items of the
+first list followed by all the items of the second one. In other
+words, all function calls \erlcode{join(\(P\),\(Q\))} are rewritten
+into a list containing all the items of \(P\) followed by all the
+items of \(Q\). For instance, the function call
+\erlcode{join([3|[5|[]]],[2|[]])} has value
+\erlcode{[3|[5|[2|[]]]]}. Since the above requirement is a bit vague,
+it is important to try out several extreme cases in order to
+understand more precisely what is expected from this function. These
+extreme cases are special configurations of the arguments. Both of
+them being lists, a hint comes naturally to mind because it is well
+known that lists must either be empty or non\hyp{}empty. This simple
+observation leads to consider four distinct cases: both lists are
+empty; the first is empty and the second is not; the first is not
+empty and the second is; both are not empty:
+\begin{verbatim}
+join(   [],   [])
+join(   [],[J|Q])
+join([I|P],   [])
+join([I|P],[J|Q])
+\end{verbatim}
+It is important not to rush to write the bodies. Are some cases left
+out? No, because there are exactly two arguments which can each be
+either empty or not, leading to exactly \(2 \cdot 2 = 4\) cases. Then,
+we write the corresponding \Erlang canvas:
+\begin{alltt}
+join(   [],   []) -> \fbcode{[I|join(P,[J|Q])]};
+join(   [],[J|Q]) -> \fbcode{[I|join(P,[J|Q])]};
+join([I|P],   []) -> \fbcode{[I|join(P,[J|Q])]};
+join([I|P],[J|Q]) -> \fbcode{[I|join(P,[J|Q])]}.
+\end{alltt}
+Let us ponder which clause looks easier, because there is no reason to
+complete them in order if do not want to. When reading the patterns, a
+clear mental representation of the situation should arise. Here, it
+seems that the first clause is the easiest: what is the list made of
+all the items of the (first) empty list followed by all the items of
+the (second) empty list? Since the empty list, by definition, contains
+no item, the answer is the empty list:
+\begin{alltt}
+join(   [],   []) -> \textbf{[]};
+join(   [],[J|Q]) -> \fbcode{[I|join(P,[J|Q])]};
+join([I|P],   []) -> \fbcode{[I|join(P,[J|Q])]};
+join([I|P],[J|Q]) -> \fbcode{[I|join(P,[J|Q])]}.
+\end{alltt}
+Perhaps we might wonder whether this case should be dropped. In other
+words, is it a meaningful case? Yes, because the vague English
+description of the behaviour of \erlcode{join/2} mandates the result
+be always a list made of items of other lists (the arguments), so, in
+the absence of any items to ``put'' in the result, the resulting list
+``remains'' empty.
+
+It should be evident enough that the second and third clauses should
+lead to the same result, because when appending a non\hyp{}empty list
+to the right of an empty list is the same as appending it to the left:
+the result is always the non\hyp{}empty list in question.
+\begin{alltt}
+join(   [],   []) -> [];
+join(   [],[J|Q]) -> \textbf{[J|Q]};\hfill% \emph{Clause symmetrical...}
+join([I|P],   []) -> \textbf{[I|P]};\hfill% \emph{...to this one.}
+join([I|P],[J|Q]) -> \fbcode{[I|join(P,[J|Q])]}.
+\end{alltt}
+The last clause is the trickiest. What does the pattern in the clause
+head reveal about the situation? That both lists are not empty, more
+precisely, the head of the first list is denoted by the
+variable~\erlcode{I}, the corresponding tail (which can either be
+empty or not) is~\erlcode{P}, and similarly for the second list and
+\erlcode{J}~and~\erlcode{Q}. Are these bricks enough for building the
+body, that is, the next step towards the result? We understand that
+appending two lists \(P\)~and~\(Q\) preserves in the result the total
+order of the items in \(P\)~and~\(Q\) but also the relative order of
+the items of~\(P\) with respect to the items of~\(Q\). In other words,
+the items of~\(P\) must be present in the result before the items of
+\(Q\) and the items from~\(P\) must be in the same order as in~\(P\)
+(same for~\(Q\)). With this ordering in mind, it is worth sketching
+the following
+\begin{alltt}
+join([I|P],[J|Q]) -> \fbcode{II} I \fbcode{II} P \fbcode{II} J \fbcode{II} Q \fbcode{II}.
+\end{alltt}
+In one rewrite step, can the item~\erlcode{I} be placed in its final
+position, that is, in a position from where it does not need to be
+moved again?  The answer is yes: it must be the head of the
+result. 
+\begin{alltt}
+join([I|P],[J|Q]) -> [I | \fbcode{II} P \fbcode{II} J \fbcode{II} Q \fbcode{II}].
+\end{alltt}
+What about the other head, variable~\erlcode{J}? It should remain the
+head of~\erlcode{Q}:
+\begin{alltt}
+join([I|P],[J|Q]) -> [I | \fbcode{II} P \fbcode{II} [J | Q]].
+\end{alltt}
+What is the relationship between \erlcode{P}~and~\erlcode{[J|Q]}? We
+can be tempted by
+\begin{alltt}
+join([I|P],[J|Q]) -> [I | [P | [J | Q]]].\hfill% ?
+\end{alltt}
+which, despite being correct \Erlang, is flawed. The reason is that,
+while \Erlang allows lists to be used as items for other lists (in
+other words, lists can be arbitrarily embedded in other lists),
+\erlcode{P}~should not be used as an item here, as it is when it is
+used as a head for \erlcode{[J|Q]}. Consider the running example
+\erlcode{join([3|[5|[]]],[2|[]])}: here, the head of the clause in
+question bounds \erlcode{I}~to~\erlcode{3},
+\erlcode{P}~to~\erlcode{[5|[]]}, \erlcode{J}~to~\erlcode{2} and
+\erlcode{Q}~to~\erlcode{[]}, therefore the corresponding putative body
+\erlcode{[I|[P|[J|Q]]]} is actually
+\erlcode{[3|[\textbf{[5|[]]}|[2|[]]]]}, which is different from the
+expected result \erlcode{[3|[\textbf{5}|[2|[]]]]} in that
+\erlcode{[5|[]]} is not~\erlcode{5}.
+
+How can \erlcode{P}~and~\erlcode{[J|Q]} be joined? Well, is this
+question not familiar yet? There is a list, here named~\erlcode{P},
+which has to be appended to the left of another list, whose shape is
+described by the pattern~\erlcode{[J|Q]}. Of course, this is exactly
+the purpose of the function \erlcode{join/2} being defined. Therefore,
+what we need here is a recursive call:
+\begin{alltt}
+join(   [],   []) -> [];
+join(   [],[J|Q]) -> [J|Q];
+join([I|P],   []) -> [I|P];
+join([I|P],[J|Q]) -> \textbf{[I|join(P,[J|Q])]}.
+\end{alltt}
+\noindent Even before proofing this idea against some examples, we
+should consider on the spot whether this kind of recursive definition
+is likely to terminate for all valid inputs. Indeed, while \Erlang
+allows any kind of recursive definition, this does not mean that all
+lead to terminating programs. Let us consider
+\begin{verbatim}
+loop(N) -> loop(N).
+\end{verbatim}
+which is a valid program but which does not end for any input and uses
+a constant amount of memory. (Some other ill\hyp{}conceived programs
+run until they exhaust the memory of its corresponding process.) Hence
+we must discriminate between terminating and non\hyp{}terminating
+recursive calls. There is no general automatic method which can always
+answer that question and that is why the \Erlang compiler does not
+check the termination property. In practice, however, some heuristics
+work quite well, as we shall see. First, the pattern and the call must
+be compared for a match, and a measure of the arguments, for instance,
+the size in the case of a list, must be decided upon and kept in
+mind. In the case of \erlcode{loop/1}, there is only one argument,
+which is an integer and the head of the clause is exactly the same as
+the body: \erlcode{loop(N)}. It is not surprising that such definition
+never ends. But then what about the following?
+\begin{verbatim}
+loop(N) -> loop(N+1).
+\end{verbatim}
+In this situation, the clause head is different from the recursive
+call. A rather ``natural'' measure on an integer is induced by the
+total ordering on the mathematical integers, that is, we rely upon
+\erlcode{N~<~N~+~1}. This implies that the recursive call is going to
+be performed on increasingly larger numbers without an end. Let us
+consider a slight variation:
+\begin{verbatim}
+loop(N) -> loop(N-1).
+\end{verbatim}
+Here \erlcode{N - 1 < N}, but that does not seem to make any
+difference as far as termination is concerned. But a clause can be
+added to \emph{filter}, that is, catch, the terminating value of the
+argument. For instance
+\begin{verbatim}
+loop(0) -> 7;
+loop(N) -> loop(N-1).
+\end{verbatim}
+This is a program which always terminate with the value \erlcode{7},
+for example,
+\[
+\erlcode{loop(3)} \rightarrow \erlcode{loop(2)} \rightarrow
+\erlcode{loop(1)} \rightarrow \erlcode{loop(0)} \rightarrow
+\erlcode{7}.
+\]
+Two conditions are sufficient to have a terminating recursive
+definition: the recursive calls must have smaller arguments than their
+heads and some clauses must provide pattern heads for the smallest
+arguments. But we may object that the variant definition
+\begin{verbatim}
+loop(0) -> 7;
+loop(N) -> loop(N+1).
+\end{verbatim}
+also terminates on \erlcode{7} for all \erlcode{N < 0}. This remark
+reveals by the way that
+\begin{verbatim}
+loop(0) -> 7;
+loop(N) -> loop(N-1).
+\end{verbatim}
+fails to terminate if \erlcode{N~<~0}, so it should have been written
+instead
+\begin{verbatim}
+loop(0)            -> 7;
+loop(N) when N > 0 -> loop(N-1).
+\end{verbatim}
+Returning to the other loop, the following terminates for all
+\erlcode{N~<~1}:
+\begin{verbatim}
+loop(0)            -> 7;
+loop(N) when N < 0 -> loop(N+1).
+\end{verbatim}
+These observations allow us to formulate more precisely the previous
+criteria: a recursive definition always terminates if the size of the
+arguments of the recursive calls change so that the series of calls
+gets strictly closer, that is, converges, to some cases which
+terminate in one step, called \emph{base cases}. In the above
+definitions, the base case is \erlcode{loop(0)} and the recursive
+calls bring one step closer to it.
+
+If we apply this criterion to \erlcode{join/2}, we can see that the
+first argument ``becomes'' a shorter list in one rewrite:
+\erlcode{P}~is shorter by one item in comparison with \erlcode{[I|P]},
+whilst the second argument does not change. Since the direction of
+change is towards a smaller first argument, base cases are needed to
+filter the minimum value of the first argument. The initial reasoning
+about the requirements revealed that the first argument can be the
+empty list and two complementary base cases are already written:
+\erlcode{join([],[])} and \erlcode{join([],[J|Q])}. Therefore, the
+function \erlcode{join/2} terminates on all input lists.
+
+By the way, an assumption was made earlier about the loop
+\begin{verbatim}
+loop(N) -> loop(N).
+\end{verbatim}
+which was too strong. It was indeed implicitly taken for granted that
+\erlcode{N}~was an integer, but this statement does not arise from the
+examination of the code. Actually, \erlcode{N}~could perfectly well be
+a list, since nothing is done with it. The moral of this story is that
+we should not trust naming conventions when inferring the type of a
+variable, especially when inspecting the code of another
+programmer. It is not because a variable is spelled~\erlcode{N} that
+it is an integer, it is its uses in the program that make it an
+integer or not. Of course, this remark does not entail that no naming
+convention should be followed. In
+\begin{verbatim}
+loop(0)            -> 7;
+loop(N) when N < 0 -> loop(N+1).
+\end{verbatim}
+there are two constraints which entail that \erlcode{N}~must be an
+integer: the guard \erlcode{N~<~0} and the arithmetic operation
+\erlcode{N+1}. Continuing on this track, the definition of
+\erlcode{join/2} could be examined in terms of the nature, or types,
+of the items in the lists. Let us consider again the definition
+\verbatiminput{join_4.def} Do \erlcode{I}~and~\erlcode{J} have to be
+integers? By looking at the bodies, it appears that none of these
+variables are involved in any kind of computation or guard that would
+force them to denote numbers; they are passed around until they reach
+their respective position in the final result. Spurred on by
+curiosity, we should try a test with embedded lists, so let us label
+the arrows of the previous definition:
+\begin{alltt}
+join(   [],   []) \(\smashedrightarrow{\alpha}\) [];
+join(   [],[J|Q]) \(\smashedrightarrow{\beta}\) [J|Q];
+join([I|P],   []) \(\smashedrightarrow{\gamma}\) [I|P];
+join([I|P],[J|Q]) \(\smashedrightarrow{\delta}\) [I|join(P,[J|Q])].
+\end{alltt}
+and try for instance
+\begin{alltt}
+\erlcode{join([3|[[4|[]]|[]]],[[]|[]])}
+                           \(\smashedrightarrow{\delta}\) \erlcode{[3|join([[4|[]]|[]],[[]|[]])]}
+                           \(\smashedrightarrow{\delta}\) \erlcode{[3|[[4|[]]|join([],[[]|[]])]]}
+                           \(\smashedrightarrow{\beta}\) \erlcode{[3|[[4|[]]|[[]|[]]]]}\textrm{.}
+\end{alltt}
+It may be unclear what the arguments in this example are. The first
+list contains two items: the first one is the number~\erlcode{3} and
+the last one is the \emph{list} containing the single
+number~\erlcode{4}. The second argument is the list containing a
+single item, the empty list. Fortunately, \Erlang proposes an
+alternative syntax which is more legible and the previous example is
+preferably written
+\begin{alltt}
+\erlcode{join([3,[4]],[[]])} \(\smashedrightarrow{\delta}\) \erlcode{[3|join([[4]],[[]])]}
+                   \(\smashedrightarrow{\delta}\) \erlcode{[3,[4]|join([],[[]])]}
+                   \(\smashedrightarrow{\beta}\) \erlcode{[3,[4],[]]}\textrm{.}
+\end{alltt}
+There are two simplifying conventions:
+\begin{itemize}
+
+  \item for all expression \(e\), we have \(\erlcode{[\(e\)|[]]}
+    \mathrel{\equiv} \erlcode{[\(e\)]}\);
+
+  \item for all expressions \(e_0\) and \(e_1\), and all lists \(L\),
+    we have \[\erlcode{[\(e_0\)|[\(e_1\)|\(L\)]]} \mathrel{\equiv}
+    \erlcode{[\(e_0\),\(e_1\)|\(L\)]}.\]
+
+\end{itemize}
+In particular, a list whose items are all known can be specified by
+enumerating all these items separated by commas, for example, the list
+\erlcode{[3|[1|[0|[]]]]}~is the same as~\erlcode{[3,1,0]} and
+\erlcode{[5|[]]}~is the same as~\erlcode{[5]}. About the second
+simplification, note that \erlcode{[3|[1|L]]}~is the same as
+\erlcode{[3,1|L]}, but \erlcode{[3|[1|L]]}~\emph{is not}
+\erlcode{[3,1,L]}, because \erlcode{L}~is not an item of the whole
+list: it is the rest of the whole list following the two first items.
+
+As a final note, it is easy to convince oneself that the function
+\erlcode{join/2} is \emph{associative}, that is, for all lists
+\(L_1\), \(L_2\) and \(L_3\), the following holds:
+\[
+  \erlcode{join(\(L_1\),join(\(L_2\),\(L_3\)))} \mathrel{\equiv}
+  \erlcode{join(join(\(L_1\),\(L_2\)),\(L_3\))}.
+\]
+
+\medskip
+
+\paragraph{Correctness and completeness.}
+\label{correctness}
+
+It is extremely common that, in the course of designing a function, we
+focus on some aspect, some clause, and then on some other part of the
+code, and we may miss the forest for the trees. When we settle for a
+function definition, the next step is to check whether it is correct
+and complete with respect to the conception we had of its expected
+behaviour.
+
+We say that a definition is \emph{correct} if all function calls we
+can make with it are rewritten by the clauses into the expected result
+\emph{and} every call failing was expected to fail. By failure, we
+mean that a \emph{stuck expression} is reached, that is, an expression
+which can not be further rewritten into a value. We came across such an
+expression \vpageref{broken_arrow} and represented this situation with
+a broken arrow \((\nrightarrow)\).
+
+We say that a definition is \emph{complete} if all function calls that
+we expect to be computable are indeed computable. In other words, we
+must also check that the definition enables rewriting into values all
+the inputs we deem acceptable.
+
+How do we check that the last definition of \erlcode{join/2} is
+correct and complete? If the concept of ``expected result'' is not
+formally defined, typically by means of mathematics, we resort to
+\emph{code review} and \emph{testing}. One important aspect of the
+reviewing process consists in verifying again the heads of the
+definition and see if all possible inputs are accepted or not. In case
+some inputs are not matched by the heads, we must justify that fact
+and record the reason in a comment. The heads of \erlcode{join/2}
+match all the combinations of two lists, whether they are empty or
+not, and this is exactly what was expected: no more, no less. The next
+step is to inspect the bodies and wonder twofold: (1)~Are the bodies
+rewritten into the expected type of value, for all function calls?
+(2)~Are the function calls being provided the expected type of
+arguments?  These checks stem from the fact that \Erlang does not
+include \emph{type inference} at compile\hyp{}time. Other functional
+languages, like \OCaml and \Haskell, would have their compilers
+automatically establish these properties. The examination of the
+bodies in the definition of \erlcode{join/2} confirms that
+\begin{itemize}
+
+  \item the bodies of the clauses \clause{\alpha}, \clause{\beta} and
+    \clause{\gamma} are lists containing the same kind of items as the
+    arguments;
+
+  \item the arguments of the unique recursive call in clause
+    \clause{\delta} are lists made of items from the parameters;
+
+  \item assuming that the recursive call has the expected type, we
+    deduce that the body of the last clause is a list made of items
+    from the arguments.
+
+\end{itemize}
+As a conclusion, the two questions above have been positively
+answered. Notice how we had to assume that the recursive call already
+had the type we were trying to establish for the current
+definition. There is nothing wrong with this reasoning, called
+\emph{inductive}, and it is rife in mathematics. We shall revisit it in
+different contexts.
+
+The following stage consists in testing the definition. This means to
+define a set of inputs which lead to a set of outputs and failures
+that are all expected. For example, it is expected that
+\erlcode{join([],[])} be rewritten into~\erlcode{[]}, so we could
+assess the validity of this statement by running the code. And the
+function call indeed passes the test. How should we choose the inputs
+meaningfully? There are no general rules, but some guidelines are
+useful. One is to consider the empty case or the smaller case,
+whatever that means in the context of the function. For example, if
+some argument is a list, then let us try the empty list. If some
+argument is a nonnegative integer, then let us try zero. Another
+advice is to have at least \emph{test cases}, that is, some function
+calls whose values are known, which exert each clause. In the case of
+\erlcode{join/2}, there are four clauses to be covered by the test
+cases.
+
+\medskip
+
+\paragraph{Improving joins.}
+
+When we are convinced that the function we just defined is correct and
+complete, it is often worth considering again the code for
+improvement. There are several directions in which improvements, often
+called \emph{optimisations} although the result is not optimal, can be
+achieved:
+\begin{itemize}
+
+  \item Can we rewrite the definition so that in all or some cases it
+    is faster? 
+
+  \item Is there an equivalent definition which uses less memory in
+    all or some cases?
+
+  \item Can we shorten the definition by using less clauses (perhaps
+    some are useless or redundant) or shorter bodies?
+
+  \item Can we use less parameters in the definition? (This is related
+    to memory usage.)
+
+  \item Do we need a tail form version of the same function?
+    (Again, this is related to memory, more precisely, the call
+    stack.)
+
+\end{itemize}
+Let us reconsider \erlcode{join/2}:
+\verbatiminput{join_4.def}
+and focus our attention on the two first clauses, whose common point
+is to have the first list being empty. It is clear now that the
+bodies, which are values, are, in both clauses, the second list,
+whether it is empty (first clause) or not (second clause). Therefore,
+there is no need to discriminate on the structure of the second list
+when the first one is empty and we can equivalently write
+\begin{alltt}
+\textbf{join(   [],    Q) -> Q;}\hfill% Q \emph{is a list}
+join([I|P],   []) -> [I|P];
+join([I|P],[J|Q]) -> [I|join(P,[J|Q])].
+\end{alltt}
+Note how the new definition does not ascertain that \erlcode{Q} is a
+list---hence the comment---so it is not strictly equivalent to the
+original definition: now \erlcode{join([],5)}
+\(\rightarrow\)~\erlcode{5}. Let us compromise by favouring the
+conciseness of the latter definition.
+
+Let us consider next the two last clauses and look for common
+patterns. It turns out that, in the penultimate clause, the first list
+is matched as \erlcode{[I|P]} but nothing is done with \erlcode{I} and
+\erlcode{P} except \emph{rebuilding} \erlcode{[I|P]} in the body. This
+suggests that we could simplify the clause as follows:
+\begin{alltt}
+join(   [],    Q) -> Q;
+join(    \textbf{P},   []) -> \textbf{P};\hfill% P \emph{is a non-empty list}
+join([I|P],[J|Q]) -> [I|join(P,[J|Q])].
+\end{alltt}
+It is important to check that changing \erlcode{[I|P]}
+into~\erlcode{P} does not affect the matching, that is to say, exactly
+the same inputs which used to match the head are still matching
+it. Indeed, it is possible in theory that the new~\erlcode{P} matches
+an empty list. Can we prove that \erlcode{P}~is always non\hyp{}empty?
+The head of the penultimate clause matches only if the previous clause
+did not match, since \Erlang tries the heads in the order of the
+writing, that is, top\hyp{}down. Therefore, we know that
+\erlcode{P}~can not be the empty list, because \erlcode{[]}~is used in
+the previous clause \emph{and} the second parameter can be any
+list. Nevertheless, as happened before, \erlcode{P}~is not necessarily
+a list anymore, for instance, \erlcode{join(5,[])}
+\(\rightarrow\)~\erlcode{5}. Again, we will ignore this
+side\hyp{}effect and choose the conciseness of the latter definition.
+
+In the last clause, we observe that the second argument, matched as
+\erlcode{[J|Q]}, is simply passed over to the recursive call, thus it
+is useless to distinguish \erlcode{J}~and~\erlcode{Q} and we can try
+\begin{alltt}
+join(   [], Q) -> Q;
+join(    P,[]) -> P;
+join([I|P], \textbf{Q}) -> [I|join(P,\textbf{Q})].\hfill% \emph{Can} Q \emph{be} []\emph{?}
+\end{alltt}
+Again, we must make sure that \erlcode{Q}~can not match an empty list:
+it can not be empty because, otherwise, the previous head would have
+matched the call. As it is, the penultimate head is included in the
+last, that is, all input matching the last could match the
+penultimate, if we let aside the order used by \Erlang, which leads us
+to consider whether the function would still be correct if
+\erlcode{Q}~could be empty after all. If so, then the penultimate
+clause would be useless. Let us label the clauses as follows:
+\begin{alltt}
+join(   [], Q) \(\smashedrightarrow{\alpha}\) Q;
+join(    P,[]) \(\smashedrightarrow{\beta}\) P;
+join([I|P], Q) \(\smashedrightarrow{\gamma}\) [I|join(P,Q)].
+\end{alltt}
+Let \(L\)~be some list containing \(n\)~items, which we write
+informally as \(L = [I_0, I_1, \dots, I_{n-1}]\). The subscript~\(i\)
+in~\(I_i\) is the \emph{position} of the item in the list, the head of
+the list being at position~\(0\). Then \Erlang would rewrite in one
+step
+\begin{alltt}
+join(\(L\),[]) \(\smashedrightarrow{\beta}\) \(L\).
+\end{alltt}
+Had clause~\clause{\beta} been erased, we would have had instead the
+series
+\begin{tabbing}
+\erlcode{join(\(L\),[])} \= \(\smashedrightarrow{\gamma}\) \= \erlcode{[\(I\sb{0}\)|join([\(I\sb{1}\),\(\ldots\),\(I\sb{n-1}\)],[])]}\\
+           \> \(\smashedrightarrow{\gamma}\) \> \erlcode{[\(I\sb{0}\)|[\(I\sb{1}\)|join([\(I\sb{2}\),\(\ldots\),\(I\sb{n-1}\)],[])]]}\\
+           \> \(=\) \> \erlcode{[\(I\sb{0}\),\(I\sb{1}\)|join([\(I\sb{2}\),\(\ldots\),\(I\sb{n-1}\)],[])]}\\
+           \> \(\smashedrightarrow{\gamma}\) \> \erlcode{[\(I\sb{0}\),\(I\sb{1}\)|[\(I\sb{2}\)|join([\(I\sb{3}\),\(\ldots\),\(I\sb{n-1}\)],[])]]}\\
+           \> \(=\) \> \erlcode{[\(I\sb{0}\),\(I\sb{1}\),\(I\sb{2}\)|join([\(I\sb{3}\),\(\ldots\),\(I\sb{n-1}\)],[])]}\\
+           \> \ \(\vdots\)\\
+           \> \(\smashedrightarrow{\gamma}\) \> \erlcode{[\(I\sb{0}\),\(I\sb{1}\),\(\ldots\),\(I\sb{n-1}\)|join([],[])]}\\
+           \> \(\smashedrightarrow{\alpha}\) \> \erlcode{[\(I\sb{0}\),\(I\sb{1}\),\(\ldots\),\(I\sb{n-1}\)|[]]}\\
+           \> \(=\) \>
+           \erlcode{[\(I\sb{0}\),\(I\sb{1}\),\(\ldots\),\(I\sb{n-1}\)]}\\
+           \> \(:=\) \> \(L\)\textrm{.}
+\end{tabbing}
+(The notation \((:=)\) means ``equal by definition,''
+sometimes called an \emph{assignment}. It must be distinghished from
+\((=)\), which is an equality \emph{deduced} from some other property.)
+In short, we found
+\[
+\erlcode{join(\(L\),[])} \twoheadrightarrow L.
+\]
+This means that clause~\clause{\beta} is useless, since its removal
+allows us to reach the same result~\(L\), although more slowly:
+\(n\)~steps by clause~\clause{\gamma} plus~\(1\) by
+clause~\clause{\alpha}, instead of one step by
+clause~\clause{\beta}. We are hence in a situation where we discover
+that the original definition was already specialised for speed when
+the second list is empty. If we remove clause~\clause{\beta}, the
+program is shorter but becomes slower in that special case. This kind
+of dilemma is quite common in programming and there is sometimes no
+clear\hyp{}cut answer as to what is the best design. Perhaps another
+argument can here tip the scale slightly in favour of the
+removal. Indeed, whilst the removal slows down some calls, it makes
+the number of rewrites easy to remember: it is the number of items of
+the first list plus~\(1\); in particular, the length of the second
+argument is irrelevant. So let us settle for\label{code:join}
+
+\verbatiminput{join_2.def}
+
+\noindent Let us note that \erlcode{join(5,[])} fails again, as it
+does in the original version.
+
+When programming medium or large applications, it is recommended to
+use evocative variables, like~\erlcode{ListOfProc}, instead of
+enigmatic ones, like~\erlcode{L}. But in this presentation we are
+mostly concerned with short programs, not software engineering, so
+short variables will do. Nevertheless, we need to opt for a naming
+convention so we can easily recognise the type of the variables across
+function definitions. Let us decide that \erlcode{L}, \erlcode{P},
+\erlcode{Q}~and~\erlcode{R} are lists, while
+\erlcode{I}~and~\erlcode{J} denote elements, also called items, of
+those lists (which can be lists themselves).
+
+\medskip
+
+\paragraph{Tail form.}
+
+As the rewrite of \erlcode{join(\(L\),[])} shows, the definition of
+\erlcode{join/2} is not in tail form. Indeed, a function call is
+embedded in the second clause and it has the control context
+\erlcode{[I|\textvisiblespace]}, the mark \erlcode{\textvisiblespace}
+standing for the location of the call. We may wonder whether a tail
+form variant is necessary or not. This decision lies entirely on
+practical grounds, typically, the maximum size of the call stack in
+comparison to the call stack usage as a function of the expected size
+of the input. In the case under consideration, the call stack usage
+can be considered as proportional to the size of the first list, as
+the list grows. More precisely, we ended up with a definition of
+\erlcode{join/2} for which the number of computational steps
+is~\(n+1\) if the length of the first argument is~\(n\). Therefore, if
+we expect some calls to \erlcode{join/2} to have a first argument
+longer than the maximum size of the call stack allocated by the
+process running the program, it is wise to write a tail form version
+of \erlcode{join/2}, otherwise a crash is likely. But it is never
+necessary in theory, hence experience is paramount here. For the sake
+of the argument, let us imagine that we need such a tail form
+variant. Perhaps it is also useful here to state unambiguously that it
+is always possible to rewrite a function definition into an equivalent
+tail form definition.
+
+For the moment, instead of presenting an automatic transformation, let
+us envisage an empirical approach. We previously considered the
+transformations of \erlcode{sum/1} into \erlcode{sum\_tf/1},
+\vpageref{code:sum_tf}, and of \erlcode{mult/1} into
+\erlcode{mult\_tf/1}, \vpageref{code:mult_tf}. The idea consisted in
+adding an \emph{accumulator} (or \emph{accumulative parameter}) which
+would hold a partial result. This partial result was computed by
+applying the control context to the previous value of the accumulator,
+thus, for instance, the clause
+\begin{alltt}
+sum([N|L]) -> \textbf{N +} sum(L).
+\end{alltt}
+became
+\begin{alltt}
+sum_tf([N|L],A) -> sum_tf(L,A\textbf{+N}).
+\end{alltt}
+But we noted that this works only because the addition operation is
+associative, that is, \(x + (y + z) = (x + y) + z\). In the case of
+\erlcode{join/2}, as stated above, the control context is
+\erlcode{[I|\textvisiblespace]} and the operator~(\erlcode{|}) is not
+associative: \(\erlcode{[X|[Y|Z]]} \not\equiv
+\erlcode{[[X|Y]|Z]}\). Let us try nevertheless and see exactly what
+happens. We want a new function \erlcode{join/3} whose shape
+is\label{trans_join}
+\begin{alltt}
+join(   [],Q,\textbf{A}) -> \fbcode{join([],[I|Q],A)};
+join([I|P],Q,\textbf{A}) -> \fbcode{join([],[I|Q],A)}.
+\end{alltt}
+The new parameter~\erlcode{A} is the accumulator in question. Since we
+want to push~\erlcode{I} on it, it must be a list. Furthermore, its
+initial value should be the empty list, otherwise extraneous items
+would be found in the result. Therefore, the definition in tail form,
+equivalent to \erlcode{join/2} and named \erlcode{join\_tf/2}, calls
+\erlcode{join/3} with the extra argument~\erlcode{[]}:
+\begin{verbatim}
+join_tf(P,Q) -> join(P,Q,[]).
+\end{verbatim}
+Let us go back to \erlcode{join/3} and push \erlcode{I} on
+\erlcode{A}:
+\begin{alltt}
+join(   [],Q,A) \(\smashedrightarrow{\alpha}\) \fbcode{join([],[I|Q],A)};
+join([I|P],Q,A) \(\smashedrightarrow{\beta}\) \textbf{join(P,Q,[I|A])}.
+\end{alltt}
+What is the accumulator with respect to the expected result? We
+already know that it can not be a partial result, because
+(\erlcode{|})~is not associative. So some more work has to be done
+with \erlcode{A}~\emph{and}~\erlcode{Q}, but, first, we should
+understand what \erlcode{A}~contains at this point and unfolding a
+call, with a piece of paper and a pencil, is quite enlightening. Let
+\(L\) be a list of \(n\)~items \([I_0,I_1,\dots,I_{n-1}]\). We have
+the following:
+\begin{tabbing}
+\erlcode{join(\(L\),\(Q\),[])} \= \(\smashedrightarrow{\beta}\) \= \erlcode{join([\(I\sb{1}\),\(\ldots\),\(I\sb{n-1}\)],\(Q\),[\(I\sb{0}\)])}\\
+              \> \(\smashedrightarrow{\beta}\) \> \erlcode{join([\(I\sb{2}\),\(\ldots\),\(I\sb{n-1}\)],\(Q\),[\(I\sb{1}\),\(I\sb{0}\)])}\\
+              \> \ \(\vdots\)\\
+              \> \(\smashedrightarrow{\beta}\) \> \erlcode{join([],\(Q\),[\(I\sb{n-1}\),\(I\sb{n-2}\),\(\ldots\),\(I\sb{0}\)])}\\
+              \> \(\smashedrightarrow{\alpha}\) \> \fbcode{join([],[I|Q],A)}\textrm{.}
+\end{tabbing}
+Therefore \erlcode{A} in the head of clause~\clause{\alpha} is bound
+to a list which contains the same items as the original first
+argument~\(L\), but in \emph{reverse order}. In other words, given the
+call \erlcode{join(P,Q,[])}, the parameter~\erlcode{A} in the first
+head of \erlcode{join/3} holds~\erlcode{P} reversed. What can we do
+with \erlcode{A}~and~\erlcode{Q} in order to reach the result?  The
+key is to realise that the answer depends on the contents
+of~\erlcode{A}, which, therefore, needs to be matched more accurately:
+is~\erlcode{A} empty or not? This leads to split
+clause~\clause{\alpha} into \(\alpha_0\) and \(\alpha_1\):
+\newlength\Split\settowidth\Split{\(_{\alpha_0}\)}
+\begin{alltt}
+join(   [],Q,   \textbf{[]}) \(\MyArrow{\Split}{\alpha\sb{0}}\) \fbcode{join([],[I|Q],A)};
+join(   [],Q,\textbf{[I|A]}) \(\MyArrow{\Split}{\alpha\sb{1}}\) \fbcode{join([],[I|Q],A)};
+join([I|P],Q,    A) \(\MyArrow{\Split}{\beta}\) join(P,Q,[I|A]).
+\end{alltt}
+Notice that clauses \clause{\alpha_0}~and~\clause{\alpha_1} could be
+swapped, as they filter completely distinct cases. The body of
+clause~\clause{\alpha_0} is easy to guess: it must be~\erlcode{Q},
+since it corresponds to the case when we want to append~\erlcode{Q} to
+the empty list:
+\begin{alltt}
+join(   [],Q,   []) \(\MyArrow{\Split}{\alpha\sb{0}}\) \textbf{Q};
+join(   [],Q,[I|A]) \(\MyArrow{\Split}{\alpha\sb{1}}\) \fbcode{join([],[I|Q],A)};
+join([I|P],Q,    A) \(\MyArrow{\Split}{\beta}\) join(P,Q,[I|A]).
+\end{alltt}
+How do we relate \erlcode{Q}, \erlcode{I}~and~\erlcode{A} in clause
+\clause{\alpha_1} with the result we are looking for? Given the call
+\erlcode{join(P,Q,[])}, we know that \erlcode{[I|A]}~is~\erlcode{P}
+reversed, so item \erlcode{I}~is last in~\erlcode{P} and it should be
+on top of~\erlcode{Q} in the result. Now, we found above that
+\erlcode{[I|Q]} is the end of the result. But what should we do with
+\erlcode{A}? The key is to realise that we need to start the same
+process again, that is, we need another recursive call:
+\begin{alltt}
+join(   [],Q,   []) \(\MyArrow{\Split}{\alpha\sb{0}}\) Q;
+join(   [],Q,[I|A]) \(\MyArrow{\Split}{\alpha\sb{1}}\) \textbf{join([],[I|Q],A)};
+join([I|P],Q,    A) \(\MyArrow{\Split}{\beta}\) join(P,Q,[I|A])\textrm{.}
+\end{alltt}
+To test the correctness of this definition, we can try a small
+example:
+\begin{alltt}
+join([1,2,3],[4,5],[]) \(\MyArrow{\Split}{\beta}\) join([2,3],      [4,5],    [1])
+                       \(\MyArrow{\Split}{\beta}\) join(  [3],      [4,5],  [2,1])
+                       \(\MyArrow{\Split}{\beta}\) join(   [],      [4,5],[3,2,1])
+                       \(\MyArrow{\Split}{\alpha\sb{1}}\) join(   [],    [3,4,5],  [2,1])
+                       \(\MyArrow{\Split}{\alpha\sb{1}}\) join(   [],  [2,3,4,5],    [1])
+                       \(\MyArrow{\Split}{\alpha\sb{1}}\) join(   [],[1,2,3,4,5],     [])
+                       \(\MyArrow{\Split}{\alpha\sb{0}}\) [1,2,3,4,5]\textrm{.}
+\end{alltt}
+As a conclusion, the tail form version of \erlcode{join/2}, called
+\erlcode{join\_tf/2}, requires an auxiliary function \erlcode{join/3}
+with an accumulator whose purpose is to reverse the first
+argument:\label{code:join_tf} \input{join_tf_alpha.def} We also know
+what to do when the control context is not made of a call to some
+associative operator: push the variables it contains and when the
+input list is empty, pop them and apply the context.
+
+\medskip
+
+\paragraph{Efficiency.}
+
+The number of steps to rewrite \erlcode{join\_tf(\(P\),\(Q\))} into a
+value is greater than with \erlcode{join(\(P\),\(Q\))}, as we guessed
+while writing the previous example. Indeed, assuming that
+\erlcode{P}~contains \(n\)~items, we have
+\begin{itemize} 
+
+  \item one step to obtain \erlcode{join(\(P\),\(Q\),[])}, by clause
+    \clause{\alpha};
+
+  \item \(n\) steps to reverse \(P\) in the accumulator, by clause
+    \clause{\delta};
+
+  \item \(n\) steps to reverse the accumulator on top of \(Q\), by
+    clause \clause{\gamma};
+
+  \item one step when the accumulator is finally empty, by clause
+    \clause{\beta}.
+
+\end{itemize}
+Thus, the total number of steps is \(2n+2\), which is twice the delay
+of the previous version. When we wrote two different versions of the
+factorial function, \erlcode{fact\_tf/1} in tail form and
+\erlcode{fact/1}, the number of rewrites was, respectively,
+\(n+1\)~versus~\(n\). So why is the difference much greater between
+\erlcode{join/2} and \erlcode{join\_tf/2}?  The explanation is found
+in the heterogeneous natures of the accumulators. In the case of the
+factorial, the operation applied to the accumulator is a
+multiplication and the accumulator is, at all times, a partial
+result. In the case of appending a list to another, the operation
+applied to the accumulator consists in pushing an item onto a list and
+has to be undone later: the accumulator is not a partial result but a
+\emph{temporary list} used to hold the items of the first list in
+reverse order. We shall find many occurrences of this
+situation. Meanwhile, it is important to remember that a tail form
+variant of a function operating on lists may lead to a slower program,
+even though the call stack remains of constant size. Also, the derived
+definition in tail form may be longer, as illustrated by
+\erlcode{join\_tf/2}: four clauses instead of two.
+
+It may be argued that any instance of a control context has to be
+stored in the call stack and later removed to be combined with the
+result of said call, therefore, since we only measure the number of
+user\hyp{}defined rewrites, these removals from the call stack are not
+accounted for, despite incurring a delay. This is a valid point, but
+this delay is arguably much shorter than the allocation time because,
+for reasons we will expand in a later chapter, deallocation of data in
+the heap takes significantly more time than in the call stack.
+
+As a final note on efficiency, we can summarise the \emph{execution
+  trace} above as a product (composition) of clauses: \(\alpha \cdot
+\delta^n \cdot \gamma^n \cdot \beta\), or, simply,
+\(\alpha\delta^n\gamma^n\beta\). The number of clauses
+\(\comp{sum\_tf}{n}\) of \erlcode{sum\_tf(\(L\))}, when the list~\(L\)
+contains \(n\)~integers, is then the length of the trace, given that
+the length of a clause~\(c\), noted~\(\abs{c}\), is~\(1\):
+\begin{align*}
+\comp{sum\_tf}{n} 
+  &:= \abs{\alpha\delta^n\gamma^n\beta}
+   = \abs{\alpha} + \abs{\delta^n} + \abs{\gamma^n} + \abs{\beta}
+   = 1 + \abs{\delta} \cdot n + \abs{\gamma} \cdot n + 1\\
+   &= 2n + 2.
+\end{align*}
+
+\medskip
+
+\paragraph{Polymorphism.}
+\label{polymorphism}
+
+The function \erlcode{join/2} presents a characteristic which makes it
+different from \erlcode{fact/1}, \erlcode{sum/1} and \erlcode{mult/1}
+because the nature, usually called \emph{type}, of the items in the
+lists to be joined is irrelevant. For example, we showed previously
+that \erlcode{join([3,[]],[[]])} can be computed, in spite the lists
+to be joined containing integers and/or lists. In the case of the
+other mentioned functions, the argument must either be an integer or a
+list containing integers, otherwise the computation fails because the
+involved arithmetic operators can not be applied to something else
+other than an integer. When the evaluation of a function call never
+depends on the type of (some part of) its arguments, the function is
+said to be \emph{polymorphic}. This does not mean that any type would
+fit a polymorphic function: \erlcode{join/2} does require its first
+argument to be a list, what does not matter is the type of the items
+it contains.
+
+\medskip
+
+\paragraph{Function definitions as metadata.}
+
+The previous discussions on obtaining equivalent definitions which are
+in tail form suppose to consider programs as data. At this point, it
+is a methodological standpoint only and we do not mean that functions
+can be processed as lists (we shall come back on this later), but,
+more informally, we mean that definitions can be transformed into
+other definitions and that this is often an excellent method, as
+opposed to trying to figure out from scratch the final definition. It
+would have been probably more difficult to write the tail form variant
+of \erlcode{join/2} without having first designed the version not in
+tail form. It is in general not a good idea to start head\hyp{}on by
+defining a function in tail form because it may either be unnecessary,
+the maximum allowed size for the call stack being large enough, or
+lead to a mistake since these kinds of definitions are usually more
+involved.
+
+Sometimes the result is correct but overly involved. Let us consider a
+simple case by defining a function \erlcode{last/1} such that
+\erlcode{last(\(L\))}~computes the last item of the non\hyp{}empty
+list~\(L\). The correct approach is to forget about tail forms and aim
+straight at the heart of the problem. We know that \(L\)~can not be
+empty, so let us start with the following head:
+\begin{alltt}
+last([I|L]) -> \fbcode{last([J|L])}.
+\end{alltt}
+Can we reach the result in one step? No, because we do not know
+whether \erlcode{I}~is the sought item: we need to know more
+about~\erlcode{L}. This additional information about the structure of
+\erlcode{L} is given by more precise heads: \erlcode{L}~can be empty
+or not. This is
+\begin{alltt}
+last([I|   \textbf{[]}]) -> \fbcode{last([J|L])};
+last([I|\textbf{[J|L]}]) -> \fbcode{last([J|L])}.
+\end{alltt}
+The first head can be simplified as follows:
+\begin{alltt}
+last(      [I]) -> \fbcode{last([J|L])};
+last([I|[J|L]]) -> \fbcode{last([J|L])}.
+\end{alltt}
+The first body is easy to guess:
+\begin{alltt}
+last(      [I]) -> \textbf{I};
+last([I|[J|L]]) -> \fbcode{last([J|L])}.
+\end{alltt}
+In the last clause, how do \erlcode{I}, \erlcode{J}~and~\erlcode{L}
+relate to the result? Can we reach it in one step? No, despite we know
+that \erlcode{I}~is \emph{not} the result, we still don't know whether
+\erlcode{J}~is, so we have to start over again, which means a
+recursive call is required:
+\begin{alltt}
+last(      [I]) -> I;
+last([I|[J|L]]) -> \textbf{last(}\fbcode{[J|L]}\textbf{)}.\hfill% I \emph{is useless}
+\end{alltt}
+Note how knowing that some specific part of the input is not useful to
+build the output is useful knowledge. By the way, \Erlang allows us to
+silence these useless parts by writing instead an underscore as in
+\begin{alltt}
+last(      [I]) -> I;
+last([\textbf{\_}|[J|L]]) -> last(\fbcode{[J|L]}).\hfill% \emph{Anonymous list head}
+\end{alltt}
+We can not call recursively \erlcode{last(L)} because \erlcode{L}~may
+be empty and the call fail, which would mean that the answer
+was~\erlcode{J}. Therefore, we must call with \erlcode{[J|L]} to give
+\erlcode{J} the opportunity to be the last:
+\begin{alltt}
+last(      [I]) -> I;
+last([_|[J|L]]) -> last(\textbf{[J|L]}).
+\end{alltt}
+As we advocated previously, the next phase consists in testing this
+definition for correctness and completeness, using meaningful
+examples. Let us assume that we are convinced that this definition is
+correct and complete. What's next? Let us try to improve upon it. Let
+us look for common patterns that can be simplified. For instance, we
+observe that \erlcode{[J|L]}~is used as a whole, in other words,
+\erlcode{J}~and~\erlcode{L} are not used separately in the second
+body. Therefore, it is worth trying to replace the pattern by a more
+general one, in this case, a variable:
+\begin{alltt}
+last(  [I]) -> I;
+last([_|\textbf{L}]) -> last(\textbf{L}).\hfill% L \emph{is non-empty}
+\end{alltt}
+This transformation is correct because the case where \erlcode{L}~is
+empty has already been matched by the first head. Notice also that we
+considered a definition as some data (We should write more accurately
+\emph{metadata} since definitions are not data processed by the
+program, but by the programmer.) which we transformed, step by step,
+making sure that each step starts at a correct and complete definition
+and leads to an equivalent one, so a series of transformations
+compulsorily yields an equivalent function. In passing, it is now
+obvious that the definition we found for \erlcode{last/1} is in tail
+form.
+
+What if we had tried to find directly a definition in tail form? We
+might have recalled that such definitions need an accumulator and we
+would have tried perhaps something along these lines:
+\begin{verbatim}
+last(L)         -> last__(L,0).
+last__(   [],A) -> A;
+last__([I|L],A) -> last__(L,I).
+\end{verbatim}
+The first observation may be about the function name
+\erlcode{last\_\_}. Why not write the following, in accordance with
+the style up to now?
+\begin{alltt}
+last(L)       -> \textbf{last}(L,0).
+\textbf{last}(   [],A) -> A;
+\textbf{last}([I|L],A) -> \textbf{last}(L,I).
+\end{alltt}
+There would be no confusion between \erlcode{last/1} and
+\erlcode{last/2} because, each taking a different number of arguments,
+they are logically considered different in \Erlang. The reason why we
+recommend to distinguish the names and, in general, to use one name
+for only one function (inside a module), is that this discipline
+enables the compiler to catch the error consisting in forgetting one
+argument. For instance, the program
+\begin{alltt}
+last(L)       -> last(L,0).
+last(   [],A) -> A;
+last([I|L],A) -> \textbf{last(L)}.\hfill% \emph{Argument silently missing}
+\end{alltt}
+contains an error that goes unreported, while
+\begin{alltt}
+last(L)         -> last__(L,0).
+last__(   [],A) -> A;
+last__([I|L],A) -> \textbf{last\_\_(L)}.\hfill% \emph{Error reported}
+\end{alltt}
+raises an error in the compiler, which allows us to realise an error
+was made and helps in fixing it. However, for didactic purposes in
+this book, we will not always follow this recommendation of having
+unique function names. The possibility to use the same name for
+different functions which can be otherwise distinguished by the number
+of their arguments is called \emph{overloading}. Overloading of
+methods in the programming languages \Java and \Cpp is allowed, but
+the rules used to distinguish amongst the different methods sharing
+the same name is different than in \Erlang, as it makes use of the
+number of parameters but also their static types.
+
+Computing the call \erlcode{last([1,2,3])} with the original
+definition, we find that the three clauses are covered until the
+correct result is found, that is, \erlcode{3}. Because we recommended
+previously to make some litmus test and the argument is a list, we try
+the empty list and find that \(\erlcode{last([])} \rightarrow
+\erlcode{last\_\_([],0)} \rightarrow \erlcode{0}\), which is
+unexpected, since this test ought to fail (\erlcode{last/1} is not
+defined for the empty list). Can we fix this case? Yes, this can be
+done in a simple way: let us change the head of \erlcode{last/1} so
+that only non\hyp{}empty lists are matched. We find here a case where
+more information on the structure of the input is needed and a
+variable is too general a pattern. We need instead
+\begin{alltt}
+last(\textbf{[I|L]})     -> last__(\textbf{[I|L]},0).\hfill% \emph{Fixed}
+last__(   [],A) -> A;
+last__([I|L],A) -> last__(L,I).
+\end{alltt}
+This emendation seems to go against an improvement we made earlier,
+when we replaced \erlcode{[J|L]} by \erlcode{L}, but it does not: here
+we want to exclude some input, that is, we do not seek an equivalent
+function, whilst before the purpose was to simplify and obtain an
+equivalent function.
+
+This last definition of \erlcode{last/1} is correct and complete but a
+careful review should raise some doubts about its actual
+simplicity. For example, the initial value of the accumulator, given
+in the unique body of \erlcode{last/1} is \erlcode{0}, but this value
+is never used, because it is discarded immediately after in the second
+body of \erlcode{last\_\_/2}, as it is conspicuous if we write instead
+the equivalent
+\begin{alltt}
+last([I|L])     -> last__([I|L],\textbf{0}).\hfill% \emph{Why zero?}
+last__(   [],A) -> A;
+last__([I|L],\textbf{\_}) -> last__(L,I).\hfill% A \emph{was useless}
+\end{alltt}
+Indeed, we could write the equivalent definition:
+\begin{alltt}
+last([I|L])     -> last__([I|L],\textbf{7}).\hfill% \emph{Why not 7?}
+last__(   [],A) -> A;
+last__([I|L],_) -> last__(L,I).
+\end{alltt}
+The initial value of the accumulator here does not even need to be an
+integer, it could be of whatever type, like \erlcode{[4,[]]}. We
+should better give up this overly complicated definition, which is the
+result of a methodology that does not consider programs as data and is
+founded on the wrong assumption that definitions in tail form always
+require an accumulator: they do not, in general. Take for example the
+polymorphic identity: \erlcode{id(X) -> X.} It is trivially in tail
+form. In passing, being in tail form has nothing to do, in general,
+with recursion, despite the widespread and unfortunate locution
+``tail\hyp{}recursive function.'' A recursive definition may be in tail
+form, but a definition in tail form may not be recursive, as
+\erlcode{id/1}.
+
+\medskip
+
+\paragraph{List reversal.}
+
+How do we reverse a given list? Let us explore two approaches: the
+first one tries to analyse the problem in terms of a previous problem,
+the second reuses, more abstractly, some insight gained in solving a
+previous larger or similar problem. Let \erlcode{srev/1} be the
+function such that \erlcode{srev(\(L\))} is rewritten in a list which
+contains the items of list \(L\) in reverse order. It is easy to write
+the heads:
+\begin{alltt}
+srev(   []) -> \fbcode{HH srev(L) HH I HH};
+srev([I|L]) -> \fbcode{HH srev(L) HH I HH}.
+\end{alltt}
+We must ponder whether \erlcode{srev/1} is defined for the empty list,
+since the original question left that point out. It was said that the
+result is a list containing all the items of the input and, since the
+input contains no item, it implies that the result is a list that
+contains no items. This makes sense as this is the very definition of
+the empty list:
+\begin{alltt}
+srev(   []) -> \textbf{[]};
+srev([I|L]) -> \fbcode{HH srev(L) HH I HH}.
+\end{alltt}
+We must wonder now if we can reach the result in one step in the
+remaining body. Clearly no, because we have to reverse \erlcode{L},
+that is, a recursive call \erlcode{srev(L)} must be placed
+somewhere. Where is the item \erlcode{I} located in the final result?
+Since the purpose is to reverse \erlcode{[I|L]}, we deduce that
+\erlcode{I} must be located at the end of the resulting list. So the
+situation so far is as follows:
+\begin{alltt}
+srev(   []) -> [];
+srev([I|L]) -> \fbcode{HH} \textbf{srev(L)} \fbcode{HH} \textbf{I} \fbcode{HH}.
+\end{alltt}
+As usual, the empty boxes are a reminder of some relationship to be
+found between the pieces already in place. For instance, we know that
+the body must be a list, so should we try the following?
+\begin{alltt}
+srev(   []) -> [];
+srev([I|L]) -> [srev(L) | I].\hfill% \emph{Hmm...}
+\end{alltt}
+For this to work we need to check the types of the expressions
+involved at this point. We know that \erlcode{srev(L)} is a list made
+of items from \erlcode{L}, because it is a recursive call; item
+\erlcode{I} is an item from \erlcode{[I|L]}. But the position of
+\erlcode{srev(L)} in our proposal is that of the head of a list and
+\erlcode{I} is the tail of the same, which is wrong: they should be
+reversed to be homogeneous. But the relative order of
+\erlcode{srev(L)} and \erlcode{I} above is correct, so we must think
+of some other relationship. What we want is to join \erlcode{srev(L)}
+and \erlcode{I}, which reminds us of the function \erlcode{join/2}:
+\begin{alltt}
+srev(   []) -> [];
+srev([I|L]) -> \textbf{join(}srev(L)\textbf{,}I\textbf{)}.\hfill% \emph{Still...}
+\end{alltt}
+Again, let us check the types. We know that in
+\erlcode{join(\(P\),\(Q\))}, both \(P\) and \(Q\) must be lists. But
+\erlcode{I} is an item, so it does not fit in as it is. The solution
+consists in making a singleton from \erlcode{I}:\label{code:srev}
+
+\verbatiminput{srev.def}
+
+\noindent Before we test this definition, a keen observer may have
+raised an objection to the last argument: it is possible that
+\erlcode{I} be a list. Indeed, but what was exactly meant was that
+\erlcode{I} is considered as an item \emph{with respect to
+  \erlcode{srev(L)}}, not in an absolute sense. This is best
+understood by looking at the abstract syntax tree of the input
+list. Let us take for instance \erlcode{[3,[1,[]],[]]}. This value is
+a short\hyp{}hand for \erlcode{[3|[[1|[[]|[]]]|[[]|[]]]]}, whose tree
+is given in \fig~\vref{fig:list_example}.
+\begin{figure}
+\centering
+\includegraphics[bb=71 631 171 721]{list_example}%
+\caption{Abstract Syntax Tree of \erlcode{[3,[1,[]],[]]}
+\label{fig:list_example}}
+\end{figure}
+Following the rightmost edges from the root to the rightmost
+\erlcode{[]} (the dashed line), the left subtrees (the solid
+lines) are the items of the embedding list \erlcode{[3,[1,[]],[]]}:
+\erlcode{3}, \erlcode{[1,[]]} and \erlcode{[]}. It does not matter
+that one item is an integer while the other two are lists, what does
+matter is their relative positions in the abstract syntax tree because
+it defines their interpretation as items of the whole list. Perhaps we
+can also remark that the definition of \erlcode{srev/1} we came upon
+contains a call inside a call. We found \vpageref{fibonacci} a similar
+situation with a \emph{na\"{\i}ve} definition of the Fibonacci
+function:
+\begin{verbatim}
+fib(0)            -> 1;
+fib(1)            -> 1;
+fib(N) when N > 1 -> fib(N-1) + fib(N-2).
+\end{verbatim}
+Remember that (\erlcode{+}) is an operator, that is, a predefined
+function, so its arguments are function calls themselves:
+\erlcode{fib(N-1)} and \erlcode{fib(N-2)}. When multiple calls are
+present in a body, there could be several ways to rewrite it, but we
+saw that the strategy used by \Erlang consists in rewriting first the
+most embedded calls and then their immediately embedding calls
+etc. until the outermost call is evaluated. But the order in which two
+calls which are arguments to the same function or arithmetic operator
+are evaluated is not specified in \Erlang. In the case of
+\erlcode{srev/1}, there is no choice and the first call to be computed
+is \erlcode{srev(\(L\))}, because it is the most deeply embedded, and
+then the immediately embedding
+\erlcode{join(\(\overline{L}\),[\(I\)])}, where \(\overline{L}\)
+stands for the value of \erlcode{srev(\(L\))} previously computed. In
+the case of \erlcode{fib/1}, it is purposefully left unspecified which
+call of \erlcode{fib(N-1)} or \erlcode{fib(N-2)} is rewritten first.
+
+Another observation is that our definition of \erlcode{srev/1} is not
+in tail form: there is a control context
+\erlcode{join(\textvisiblespace,[\(I\)])} around the recursive call
+\erlcode{srev(\(L\))}. (Let us keep in mind that the fact that the
+call is recursive does not matter here.) Therefore, we should expect
+the maximum size of the call stack to grow as the input size
+grows. Let us take as an example \erlcode{srev([3,2,1])}, whose
+expected outcome must be \erlcode{[1,2,3]}, and let us follow the
+rewrites on the abstract syntax trees by drawing the node to be
+rewritten at each step in a box. Let us label the clauses defining
+\erlcode{srev/1} with the Greek letters \(\alpha\) and \(\beta\):
+\begin{alltt}
+srev(   []) \(\smashedrightarrow{\alpha}\) [];
+srev([I|L]) \(\smashedrightarrow{\beta}\) join(srev(L),[I]).
+\end{alltt}
+\Fig~\vref{fig:srev_321} shows the first rewrites until there are no
+more calls to \erlcode{srev/1}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 620 324 721]{srev_321_0}
+\includegraphics[bb=66 626 311 721]{srev_321_1}
+\caption{\erlcode{srev([3,2,1])} \(\twoheadrightarrow\)
+\erlcode{join(join(join([],[1]),[2]),[3])}
+\label{fig:srev_321}}
+\end{figure}
+Let us label the clauses defining \erlcode{join/2} as follows
+\begin{alltt}
+join(   [],Q) \(\smashedrightarrow{\gamma}\) Q;
+join([I|P],Q) \(\smashedrightarrow{\delta}\) [I|join(P,Q)].
+\end{alltt}
+and resume the rewrites in \fig~\vref{fig:rev_321ast}.  This
+computation can also be followed in a flat representation as
+well:\label{rev_321bis}
+\begin{tabbing}
+\erlcode{srev([3,2,1])} \= \(\smashedrightarrow{\beta}\) \= \erlcode{join(srev([2,1]),[3])}\\
+  \> \(\smashedrightarrow{\beta}\) \> \erlcode{join(join(srev([1]),[2]),[3])}\\
+  \> \(\smashedrightarrow{\beta}\) \>
+                \erlcode{join(join(join(srev([]),[1]),[2]),[3])}\\
+  \> \(\smashedrightarrow{\alpha}\) \>
+                \erlcode{join(join(join([],[1]),[2]),[3])}\\
+  \> \(\smashedrightarrow{\gamma}\) \> \erlcode{join(join([1],[2]),[3])}\\
+  \> \(\smashedrightarrow{\delta}\) \> \erlcode{join([1|join([],[2])],[3])}\\
+  \> \(\smashedrightarrow{\gamma}\) \> \erlcode{join([1|[2]],[3])}\\
+  \> \(=\)               \> \erlcode{join([1,2],[3])}\\
+  \> \(\smashedrightarrow{\delta}\) \> \erlcode{[1|join([2],[3])]}\\
+  \> \(\smashedrightarrow{\delta}\) \> \erlcode{[1|[2|join([],[3])]]}\\
+  \> \(=\)               \> \erlcode{[1,2|join([],[3])]}\\
+  \> \(\smashedrightarrow{\gamma}\) \> \erlcode{[1,2|[3]]}\\
+  \> \(=\)               \> \erlcode{[1,2,3]}\textrm{.}
+\end{tabbing}
+There are~\(10\) steps: \(4\)~with clauses
+\clause{\alpha}~and~\clause{\beta} (\erlcode{srev/1}), plus \(6\)~with
+the clauses \clause{\gamma}~and~\clause{\delta}
+(\erlcode{join/2}). The contents of the call stack, at any time, is
+the branch from the root to the boxed node, which is the call to be
+rewritten next, as shown in \fig~\vref{fig:rev_steps} (the final
+downward arrow is a reference to the result in the heap). We see that
+the longest extant of the call stack was reached after the third step,
+when \fbox{\erlcode{srev}} is the deeper in the abstract syntax
+tree. As we shall understand, the occurrence of the number~\(3\) here
+is no mere coincidence.
+\begin{figure}[H]
+\centering
+\includegraphics[bb=71 627 366 721]{join_join_123_0}
+\includegraphics[bb=71 627 364 721]{join_join_123_1}
+\caption{\erlcode{join(join([1],[2]),[3])} \(\twoheadrightarrow\)
+  \erlcode{[1,2,3]}
+\label{fig:rev_321ast}}
+\end{figure}
+
+What would have happened, had we chosen \erlcode{join\_tf/2} (tail
+form) instead of \erlcode{join/2}? Let us recall the definition of
+\erlcode{join\_tf/2}:
+\input{join_tf_alpha.def}
+and define an alternative definition \erlcode{srev\_alt/1} as follows:
+\begin{alltt}
+srev_alt(   []) \(\smashedrightarrow{\epsilon}\) [];
+srev_alt([I|L]) \(\smashedrightarrow{\zeta}\) join_tf(srev_alt(L),[I]).
+\end{alltt}
+Then, our example unfolds as follows.\label{rev_321}
+\begin{alltt}
+\erlcode{srev\_alt([3,2,1])}
+    \(\smashedrightarrow{\zeta}\) \erlcode{\textbf{join\_tf}(srev\_alt([2,1]),[3])}
+    \(\smashedrightarrow{\zeta}\) \erlcode{join\_tf(join\_tf(srev\_alt([1]),[2]),[3])}
+    \(\smashedrightarrow{\zeta}\) \erlcode{join\_tf(join\_tf(join\_tf(srev\_alt([]),[1]),[2]),[3])}
+    \(\smashedrightarrow{\epsilon}\) \erlcode{join\_tf(join\_tf(join\_tf([],[1]),[2]),[3])}
+    \(\smashedrightarrow{\alpha}\) \erlcode{join\_tf(join\_tf(join([],[1],[]),[2]),[3])}
+    \(\smashedrightarrow{\beta}\) \erlcode{join\_tf(join\_tf([1],[2]),[3])}
+    \(\smashedrightarrow{\alpha}\) \erlcode{join\_tf(join([1],[2],[]),[3])}
+    \(\smashedrightarrow{\delta}\) \erlcode{join\_tf(join([],[2],[1]),[3])}
+    \(\smashedrightarrow{\gamma}\) \erlcode{join\_tf(join([],[1,2],[]),[3])}
+    \(\smashedrightarrow{\beta}\) \erlcode{join\_tf([1,2],[3])}
+    \(\smashedrightarrow{\alpha}\) \erlcode{join([1,2],[3],[])}
+    \(\smashedrightarrow{\theta}\) \erlcode{join([2],[3],[1])}
+    \(\smashedrightarrow{\delta}\) \erlcode{join([],[3],[2,1])}
+    \(\smashedrightarrow{\delta}\) \erlcode{join([],[2,3],[1])}
+    \(\smashedrightarrow{\gamma}\) \erlcode{join([],[1,2,3],[])}
+    \(\smashedrightarrow{\beta}\) \erlcode{[1,2,3]}\textrm{.}
+\end{alltt}
+\begin{figure}[h]
+\centering
+\includegraphics[bb=71 633 371 721]{srev_call_stack_0}
+\includegraphics[bb=71 653 376 720]{srev_call_stack_1}
+\caption{Call stack of \protect\figs~\protect\vrefrange{fig:srev_321}{fig:rev_321ast}\label{fig:rev_steps}}
+\end{figure}
+These rewrites can also be viewed two\hyp{}dimensionally as abstract
+syntax trees in \fig~\vref{fig:join_tf_123}, 
+\begin{figure}
+\centering
+\vspace{-4pt}
+\includegraphics[bb=71 628 339 721]{join_tf_0}
+\includegraphics[bb=71 646 335 721]{join_tf_1}
+\includegraphics[bb=71 626 317 720]{join_tf_2}
+\hspace{-6pt}
+\includegraphics[bb=71 646 255 720]{join_tf_3}
+\hspace{12pt}
+\includegraphics[bb=71 646 301 720]{join_tf_4}
+\includegraphics[bb=71 626 325 720]{join_tf_5}
+\caption{\erlcode{join\_tf(join\_tf(join\_tf([],[1]),[2]),[3])}
+\(\!\!\!\twoheadrightarrow\!\!\!\) \erlcode{[1,2,3]}
+\label{fig:join_tf_123}}
+\end{figure}
+where the last step \((\smashedrightarrow{\epsilon})\) of
+\erlcode{srev\_alt/1} is shown first. There are \(16\) steps: \(4\)
+with the definition of \erlcode{srev\_alt/1}, plus \(12\) with the
+definition of \erlcode{join/2}. The contents of the call stack, at any
+time, is the branch from the root to the boxed node in
+\fig~\vref{fig:join_tf_123_stack} (steps 1--4 are omitted as they are
+already displayed in \fig~\vref{fig:rev_steps}).
+\begin{figure}
+\centering
+\includegraphics[bb=71 643 365 720]{join_tf_call_stack_0}
+\bigskip
+\includegraphics[bb=71 674 310 720]{join_tf_call_stack_1}
+\bigskip
+\includegraphics[bb=71 693 313 720]{join_tf_call_stack_2}
+\bigskip
+\includegraphics[bb=71 693 365 720]{join_tf_call_stack_3}
+\caption{Call stack of \protect\fig~\protect\vref{fig:join_tf_123}
+\label{fig:join_tf_123_stack}}
+\end{figure}
+
+What can we conclude from using \erlcode{join/2} to define
+\erlcode{srev/1} and \erlcode{join\_tf/1} to define
+\erlcode{srev\_alt/1}?
+
+On the example \erlcode{srev\_alt([3,2,1])}, using
+\erlcode{join\_tf/2} (tail form) leads to longer rewrites (\(16\)
+against \(10\)) and the maximum call stack capacity is the same (since
+it is reached after the same third step in both cases). We may not be
+surprised to find a greater delay by using a tail form definition, but
+it may come as a surprise that there is no gain in the call stack
+allocation.
+
+Is perhaps the reason that the test was carried out on a list too
+short to show otherwise? When considering such a question, instead of
+trying a longer input by hand, it is worth revisiting the previous
+test and try to generalise the process for a list of \(n\) items:
+\erlcode{[\(I_0\),\(\dots\),\(I_{n-1}\)]}. The third rewrite,
+involving only the definition of \erlcode{srev/1}, leads to the
+abstract syntax tree in \fig~\vref{fig:srev_iota}, where the dotted
+edge stands for the repetition of the same schema: a node
+\erlcode{join} with a right subtree \erlcode{[\(I_i\)]}. The number of
+nodes in the call stack is thus \(n+1\) and this holds whichever
+version for joining two lists, \erlcode{join/2} or
+\erlcode{join\_tf/2}, is chosen. Therefore, a lesson to remember from
+this short analysis is that the usage of a definition in tail form
+does not automatically lead to gains in terms of call stack allocation
+or speed---indeed, a slowdown is likely. One way to recover the
+benefit of definitions in tail form is to make sure that \emph{all}
+the functions that are composed are either in tail form or do not use
+call stack space at least in proportion of the input size.
+
+Therefore, let us turn our attention back to the design of
+\erlcode{srev/1}. We would like to find a definition equivalent to
+\erlcode{srev/1} but in tail form. There are at least two options left
+open: either start from scratch or try to modify the program which is
+correct and complete but not in tail form. Another way to analyse the
+problem consists in realising that \emph{the definition of
+  \erlcode{join\_tf/2} already includes the concept of list reversal.}
+In other words, instead of calling \erlcode{join/2} in the definition
+of \erlcode{srev/1}, let us realise that the design of
+\erlcode{srev/1} is already embedded in the definition
+\erlcode{join\_tf/2} and write accordingly another version of
+\erlcode{srev/1}, called \erlcode{rev/1} in tail form. It is important
+to realise that \erlcode{rev/1} is not derived mechanically from
+\erlcode{srev/1}: it implements another design. The definition
+\vpageref{code:join_tf} shows that clause \clause{\delta} has the
+effect of reversing the first argument into the accumulator (the third
+argument). Moreover, clause \clause{\gamma} reverses the accumulator
+on the second argument. Thus, we already know how to reverse a list:
+simply use an extra argument to accumulate the items of the list to be
+reversed, since the accumulation consists in pushing the items one by
+one on top of the initially empty list, the resulting value of the
+accumulator is the input list reversed. In \Erlang, this is
+implemented as follows:\label{code:rev_join}\label{code:rev}
+\verbatiminput{rev.def} All the clauses are in tail form, hence is the
+whole definition. The accumulator is named \erlcode{Q}. We must bear
+in mind that the reason why this definition is efficient is not due to
+it being in tail form, but because the algorithm, that is, the underlying
+idea, is better.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 650 179 721]{srev_iota}%
+\caption{\erlcode{srev([\(I_0\),\(\ldots\),\(I_{n-1}\)])} after \(n\)
+  rewrites\label{fig:srev_iota}}
+\end{figure}
+
+\medskip
+
+\medskip
+
+\paragraph{Exercises.}
+\label{ex:joining_and_reversing}
+
+\noindent [Answers \vpageref{ans:joining_and_reversing}.]
+\begin{enumerate}
+
+  \item Define a function \erlcode{len\_tf/1} in tail form such that
+    \erlcode{len\_tf(\(L\))} is rewritten to the number of items in
+    the list \(L\). Do you need an auxiliary function? How many
+    rewrites are needed to reach the result when \(L\) contains \(n\)
+    items?
+
+  \item Define a function \erlcode{penul/1} such that
+    \erlcode{penul(\(L\))} is rewritten to the penultimate item in
+    list \(L\). Make sure to avoid any confusion in the syntax of
+    lists between the comma (\erlcode{,}) and the vertical bar
+    (\erlcode{|}). Test for correctness and completeness. If \(L\)
+    contains \(n\) items, how many rewrites are needed to reach the
+    result? Is your definition in tail form?
+
+  \item Define a function \erlcode{rep\_fst/1} such that the call
+    \erlcode{rep\_fst(\(L\))}, where \(L\) is a list, is rewritten
+    into a list of same length as \(L\) but containing only the first
+    item of \(L\) repeated.
+
+  \item Same with \erlcode{rep\_lst/1}, but repeating the last item
+    instead of the first.
+
+  \item Consider the following alternative definition for reversing a list.
+\begin{verbatim}
+rev_bis(   []) -> [];
+rev_bis([I|L]) -> join(rev_bis(L),[I],[]).
+
+join(   [],Q,   []) -> Q;
+join(   [],Q,[I|A]) -> join([],[I|Q],A);
+join([I|P],Q,    A) -> join(P,Q,[I|A]).
+\end{verbatim}
+    Lay out the rewrites of \erlcode{rev\_bis([3,2,1])} with this
+    definition, both with the abstract syntax trees and the flat
+    representation. Compare with the definition of \erlcode{srev/1}:
+    \verbatiminput{srev.def} \verbatiminput{join_2.def}
+
+\end{enumerate}

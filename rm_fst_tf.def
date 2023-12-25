@@ -1,0 +1,5 @@
+rm_fst_tf(I,L)    -> rm_fst(I,L,[]).
+rm_fst(_,   [],A) -> rev(A);
+rm_fst(I,[I|L],A) -> rev_join(A,L);
+rm_fst(I,[J|L],A) -> rm_fst(I,L,[J|A]).
+

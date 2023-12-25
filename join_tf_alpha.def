@@ -1,0 +1,6 @@
+\begin{alltt}
+join_tf(P,Q)        \(\smashedrightarrow{\alpha}\) join(P,Q,[]).
+join(   [],Q,   []) \(\smashedrightarrow{\beta}\) Q;
+join(   [],Q,[I|A]) \(\smashedrightarrow{\gamma}\) join([],[I|Q],A);
+join([I|P],Q,    A) \(\smashedrightarrow{\delta}\) join(P,Q,[I|A]).
+\end{alltt}

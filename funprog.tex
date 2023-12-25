@@ -1,0 +1,118 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{book}
+
+% CSLI Pubs format; use [FINAL] for final copy (else [DRAFT]).
+\usepackage[FINAL]{cslipubs}    
+
+% Title and author
+%
+%\title{Design and Analysis \protect\linebreak of \protect\linebreak Purely Functional Programs}
+\title{Functional Programs on Linear Structures}
+\author{Christian Rinderknecht}
+\date{}
+
+%\raggedbottom   % Uncomment this line if large diagrams cause vertical gaps.
+
+\hfuzz = 2pt     % No warnings about margin overhangs less than this amount.
+
+%\crop[]         % Uncomment for centered pages while using [FINAL] option.
+\crop[cam]      % Uncomment for crosshairs that show corners of each page.
+%\crop[frame]    % Uncomment for rectangle that shows edges of each page.
+
+
+\usepackage[comma]{natbib}           % CSLI Pubs favored bibliography package.
+%\bibliographystyle{cslipubs-natbib}  % CSLI Pubs bibliography format.
+
+
+%\usepackage{makeidx}               % Necessary if this book has an Index.
+%\makeindex                         % Comment out this line when Index is final.
+
+%\usepackage{cslipubs-extra}
+
+% Some more bells and whistles.
+%\usepackage{avm}
+%\usepackage{lingmacros}
+
+% Language
+%
+\usepackage[british]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{hyphenat}
+\usepackage[scaled=0.8]{beramono}
+
+% Graphics
+%
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{picins}
+\usepackage{float}
+
+% Maths
+%
+\usepackage{amssymb,amsmath,stmaryrd}
+
+% Verbatim and tty
+%
+\usepackage{verbatim}
+\usepackage{alltt}
+
+% Tables
+%
+%\usepackage{booktabs}
+
+% Miscellanea
+%
+\usepackage{xspace}
+\usepackage{varioref}
+
+% Input files
+%
+%\input{erlc}
+
+% New commands
+%
+\input{commands}
+
+% ---------------------------------------------------------------------
+%
+\begin{document}
+
+\frontmatter
+
+\maketitle
+
+%% Uncomment when final:
+%%
+ \cleardoublepage
+ \thispagestyle{empty}
+ \ 
+ \cleardoublepage
+
+\setcounter{page}{1}
+\setcounter{tocdepth}{1}  % 0 = chapters only in Contents, 1 = sections also.
+\tableofcontents
+
+% Start on an odd page
+\addtocounter{page}{2} % Comment out when final
+
+\mainmatter       %%%%%% Chapter numbers and Arabic page numbers begin with 1.
+
+\allowdisplaybreaks
+
+\thispagestyle{empty}
+\ 
+\clearpage
+\include{foreword}
+\include{introduction}
+\input{lists}
+\include{answers}
+
+\backmatter
+
+ \cleardoublepage
+ \thispagestyle{empty}
+ \ 
+ \cleardoublepage
+
+\end{document}

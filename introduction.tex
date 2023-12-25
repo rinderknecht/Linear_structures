@@ -1,0 +1,1376 @@
+%%-*-latex-*-
+
+\chapter{Introduction}
+%\addcontentsline{toc}{chapter}{Introduction}
+
+Consider the factorial function, defined by the following equations:
+\begin{align*}
+  1! &= 1,\\
+  n! &= n \cdot (n-1)!,\quad \text{if \(n > 1\)}.
+\end{align*}
+The expression `\(n!\)' reads as `the factorial of the positive
+integer~\(n\),' where the factorial is a mathematical function
+symbolised by~`!'. The equations mean that the \emph{function
+  call}~\(n!\) is the product of the consecutive positive integers up
+to~\(n\), which can be written informally as
+\begin{equation*}
+n! = n \cdot (n-1) \cdot \ldots \cdot 1.
+\end{equation*}
+Let us use the equational definition to compute \(3!\) as an example:
+\begin{equation*}
+3! = 3 \cdot (3-1)! = 3 \cdot 2! = 3 \cdot (2 \cdot (2-1)!) = 3
+\cdot (2 \cdot 1!) = 3 \cdot (2 \cdot (1)) = 6.
+\end{equation*}
+Let us be more precise about how this simple computation is carried
+out by tagging the equations with Greek letters:
+\begin{align*}
+  1! &\eqn{\alpha} 1,\\
+  n! &\eqn{\beta} n \cdot (n-1)!, \quad \text{if \(n > 1\)}.
+\end{align*}
+The previous computation is rewritten from left to right as follows:
+\begin{equation*}
+3! \eqn{\beta} 3 \cdot (3-1)! = 3 \cdot 2! \eqn{\beta} 3 \cdot (2 \cdot
+(2-1)!) = 3 \cdot (2 \cdot 1!) \eqn{\alpha} 3 \cdot (2 \cdot (1)) = 6.
+\end{equation*}
+Two things are worth noticing. Firstly, not all equality
+symbols~(\(=\)) are annotated. The unadorned ones correspond to
+arithmetic operations, like computing \(3-1 = 2\), and thus are not
+part of the definition of the factorial function per se. Secondly,
+when a function call is to be replaced by the right\hyp{}hand side of
+an equation, it is sometimes first surrounded by parentheses, like
+\(2!\)~being replaced by \(\textbf{(}2 \cdot (2-1)!\textbf{)}\)
+instead of simply \(2 \cdot (2-1)!\). The purpose is to avoid any
+interference with the \emph{control context} of the call, that is, the
+part of the formula in which the call is embedded. In the current
+example, there is no ambiguity because the control context is always
+`\(n \cdot \erlcode{\textvisiblespace}\)', where the underscore
+(\erlcode{\textvisiblespace}) is a place\hyp{}holder for the call in
+question, but let us recall why parentheses are necessary in \(x \cdot
+(y + z)\). The first step, that is, \(3!  \eqn{\beta} 3 \cdot
+(3-1)!\), does not require extra parentheses because there was no
+control context around~\(3!\) since it is the original call.
+
+\bigskip
+
+\paragraph{Follow the arrows.}
+
+The way the previous equations were used suggests another notation,
+which provides further hints about their usage:
+\begin{alltt}
+fact(\(1\)) \(\xrightarrow{\smash[t]{\alpha}}\) 1;
+fact(\(n\)) \(\xrightarrow{\smash[t]{\beta}}\) \(n\) *
+fact(\(n-1\)), \textrm{if \(n>1\).}
+\end{alltt}
+We replaced the factorial function \emph{symbol} (\(!\)) by the
+function \emph{name} \erlcode{fact}. Function names are placed before
+the value they apply to, for example, \erlcode{fact(\(n\))} instead
+of~\(n!\) which is usual in mathematics. Equality symbols have been
+replaced by arrows (\(\rightarrow\)) oriented from left to right. It
+is a fundamental property that equations are not oriented: every time
+\(x = y\) is true, \(y = x\) is as well and vice versa. In practice,
+when using equations to define a function, they are often implicitly
+oriented from left to right in order to hint at how they should be
+used to compute. But, in theory, nothing impedes writing
+\begin{align*}
+  1! &= 1,\\
+  n \cdot (n-1)! &= n!, \quad \text{if} \; n > 1.
+\end{align*}
+By replacing~(\(=\)) with~(\(\rightarrow\)), an orientation is imposed
+on the equations, which become \emph{rewrite rules}. By restricting
+the way an equation is used, that is, either only from left to right
+or only from right to left, some generality may be lost, that is, some
+formulas might not be computed anymore, but it is a necessary
+compromise to automate computations. It is sometimes possible to
+complete rewrite rules with more rules in order to regain the lost
+expressivity when orienting the initial equations, but this is far
+off\hyp{}topic here and we shall focus on designing rewrite rules from
+the start, instead of deriving them from a set of equations.
+
+When considering rewrite rules, we must distinguish the left\hyp{}hand
+side from the right\hyp{}hand side of~(\(\rightarrow\)). For example,
+the expressions used as input to a function in the right\hyp{}hand
+side are called \emph{arguments}, for instance, \(n-1\)~is an argument
+of~\erlcode{fact}. The left\hyp{}hand sides are restricted to be
+function calls and their arguments are either constants, like~\(1\),
+or \emph{variables}, which are names denoting \emph{values}. Values
+are expressions which cannot be computed further, like an
+integer. These variables on the left\hyp{}hand side are called
+\emph{parameters}. So the \(n\)~in \erlcode{fact(\(n\))} is a
+parameter of \erlcode{fact} and \(n\) in
+`\erlcode{\(n\)~*~\textvisiblespace}' is simply called a
+variable. Parameters refer potentially to an infinite number of
+values, for example, the parameter~\(n\) in \erlcode{fact(\(n\))} can
+be bound to any integer. The previous computation is now written as
+follows:
+\begin{alltt}
+fact(3) \(\xrightarrow{\beta}\) 3 * fact(3-1)       \(=\) 3 * fact(2)
+        \(\xrightarrow{\smash[t]{\beta}}\) 3 * (2 * fact(2-1)) \(=\) 3 * (2 * fact(1))
+        \(\xrightarrow{\smash[t]{\alpha}}\) 3 * (2 * (1))       \(=\) 6\textrm{.}
+\end{alltt}
+The final integer is the value of the initial function call. A value
+contains neither function calls nor arithmetic operators, because such
+calls would need themselves to be thoroughly rewritten. For the
+moment, values can only be integers. It is often clearer to implicitly
+compose intermediary arithmetic operations~(\(=\)) with the current
+rewrite and write in short
+\begin{alltt}
+fact(3) \(\xrightarrow{\beta}\) 3*fact(2) \(\xrightarrow{\smash[t]{\beta}}\) 3*(2*fact(1)) \(\xrightarrow{\smash[t]{\alpha}}\) 3*(2*(1)) \(=\) 6\textrm{.}
+\end{alltt}
+Note how the last rewrite (\(\xrightarrow{\smash[t]{\alpha}}\)) must be
+followed by a series of multiplications~\erlcode{3*(2*1)} because each
+individual multiplication had to be delayed until \erlcode{fact(1)} be
+computed. This could have been anticipated because the call to
+\erlcode{fact} in the right\hyp{}hand side of the rewrite rule
+(\(\xrightarrow{\smash[t]{\beta}}\)), that is, the underlined text in
+\begin{alltt}
+fact(\(n\)) \(\xrightarrow{\smash[t]{\beta}}\) \(n\) * \underline{\erlcode{fact(\(n\)-1)}}
+\end{alltt}
+has the non\hyp{}empty control context
+`\erlcode{\(n\)~*~\textvisiblespace}'. To understand why this is
+important, let us consider a slightly longer series of
+rewrites:\label{trace:fact_5} \input{fact_5} It is clear that each
+rewrite by (\(\xrightarrow{\smash[t]{\beta}}\)) yields a longer
+expression. An expression can contain function calls, arithmetic
+operations, numerical constants and variables. Therefore, \emph{values
+  are expressions but the converse does not always hold.}  Let us
+focus now only on the shapes of the previous computation:
+\begin{alltt}
+fact(5) \(\xrightarrow{\smash[t]{\beta}}\) \fbcode{5 * fact(4)}
+        \(\xrightarrow{\smash[t]{\beta}}\) \fbcode{5 * (4 * fact(3))}
+        \(\xrightarrow{\smash[t]{\beta}}\) \fbcode{5 * (4 * (3 * fact(2)))}
+        \(\xrightarrow{\smash[t]{\beta}}\) \fbcode{5 * (4 * (3 * (2 * fact(1))))}
+\end{alltt}
+This phenomenon suggests that a great deal of space, that is, computer
+\emph{memory}, is needed to keep the expressions before the final,
+long arithmetic computations. The example leads to induce that the
+larger term occurring in the computing of \erlcode{fact(\(n\))} is the
+one just before (\(\xrightarrow{\smash[t]{\alpha}}\)) is applied and its
+size is likely to be proportional to~\(n\), since all the integers
+from \(n\)~to~\(1\) had to be kept until the end.
+
+The dual concept of space is time. By orienting the original
+equations, the definition becomes more operational, it conveys the
+notions of `before' a rewrite, `after' a rewrite and, transitively, of
+a `series' of rewrites as a historical record. Therefore, the number
+of rewrites could be used as a measure of the time needed to compute
+the value of a function call. For instance, \erlcode{fact(\(n\))}
+requires \(n\)~rewrites by (\(\xrightarrow{\smash[t]{\beta}}\)) plus
+one by (\(\xrightarrow{\smash[t]{\alpha}}\)), hence a total
+of~\(n+1\).
+
+\bigskip
+
+\paragraph{Introducing \Erlang.}
+
+\Erlang is a \emph{functional programming language}, which means that
+it supports a programming style mainly based on the design and
+processing of mathematical functions. In \Erlang, the previous rewrite
+system is written
+\begin{verbatim}
+fact(1)            -> 1;
+fact(N) when N > 1 -> N * fact(N-1).
+\end{verbatim}
+Notice how the syntax is similar to mathematics. A difference is that,
+in \Erlang, the first letter of a variable must be set in upper case,
+like~\erlcode{N}, \erlcode{Number} or \erlcode{Var}, to distinguish it
+from a function name, whose first letter must be set in lower case,
+like~\erlcode{plusOne}. Let us remark that, mimicking a usage in
+English prose, each rewrite rule is either followed by a semicolon or
+a period, the entire definition being conceived as a complete
+sentence. Also, \erlcode{when} is a~\emph{keyword}, that is to say, it
+looks like a function name but it is in practice reserved only for
+expressing conditions on a rewrite rule, like \erlcode{N~>~1}. In
+\Erlang, a rewrite rule is called a~\emph{clause}. Its left\hyp{}hand
+side is called the~\emph{head} and the right\hyp{}hand side
+the~\emph{body}. A condition on a clause is called a~\emph{guard}. (As
+a side note, the lexical conventions, syntax and vocabulary of \Erlang
+have been drawn indirectly from the \Prolog programming language.)
+The structure of a clause in \Erlang is summed up in
+\fig~\vref{fig:clause}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=214 602 397 646]{clause}
+\caption{Structure of a clause in \Erlang\label{fig:clause}}
+\end{figure}
+A head has always the shape of a function call. A body is an
+expression. The guard in the definition of~\erlcode{fact} implies that
+there is no overlap between the two clauses. By overlap, we mean that,
+for a given function call, either no clause apply, thus no rewrite is
+entailed, or only one does. It is thus impossible for two clauses to
+carry on the next calculation. This becomes clearer if the clauses are
+rewritten in the following way:
+\begin{alltt}
+fact(N) \textbf{when N = 1} -> N;
+fact(N) when N > 1 -> N * fact(N-1).
+\end{alltt}
+Obviously, the two guards are mutually exclusive, that is, when one is
+true the other one is false, thus enabling exactly one clause or none
+if~\erlcode{N~<~1}. As a consequence, the previous definition could
+have been written instead as follows:
+\begin{verbatim}
+fact(N) when N > 1 -> N * fact(N-1);
+fact(1)            -> 1.
+\end{verbatim}
+The pieces of source code up to now are not complete \Erlang programs
+for an \Erlang program to be self\hyp{}contained needs to be a
+\emph{module}. A module is a unit of compilation containing a
+collection of function definitions. The module name must be the
+basename of the file containing the program. For example, if the
+definition above is found in a file named~\erlcode{math1.erl}, the
+corresponding module name must be~\erlcode{math1}:
+\begin{alltt}
+\textbf{-module(math1).}\hfill% \emph{Drop the file extension} .erl
+\textbf{-export([fact/1]).}
+fact(1)            -> 1;
+fact(N) when N > 1 -> N * fact(N-1).
+\end{alltt}
+The \erlcode{-export} line lists the function names which can be
+called from outside the module, that is, either from another module or
+from the \Erlang \emph{shell}. A shell is an application which reads
+commands entered by some user, interprets them, prints a result or an
+error message and waits for further commands. The `\erlcode{/1}'
+part of `\erlcode{fact/1}' means that the function
+named~\erlcode{fact} which has exactly one parameter is exported. The
+reason for specifying the number of parameters is that \Erlang
+functions can be overloaded, that is, it is possible to define two
+functions with the same name as long as they differ in the number of
+their parameters.
+
+In order to test some examples with \erlcode{fact/1}, we first have to
+launch the \Erlang shell. Depending on your operating system, your
+programming environment may vary greatly. Here, we shall assume a
+command\hyp{}line interface, like the ones available in a terminal for
+the \Unix operating systems. The \Erlang shell is an application which
+allows us to interactively compile and call functions from modules and
+its name is likely to be~\erlcode{erl}. Here is the start of a session
+with the shell:
+\begin{alltt}
+\$ erl
+Erlang (BEAM) emulator version 5.6.3 [source] [smp:2]
+[async-threads:0] [kernel-poll:false]
+
+Eshell V5.6.3  (abort with ^G)
+1> \(\talloblong\)
+\end{alltt}
+The first line is the command to run the shell. The last line is the
+prompt of the \Erlang shell, the number meaning that the shell is
+waiting for the first command. Note that the operating system prompt
+is denoted by a dollar sign (\erlcode{\$}). The character
+\(\talloblong\) denotes the blinking prompt of the \Erlang shell where
+typing will occur. If we want to close the shell and return to the
+operating system shell, just type~`\erlcode{q().}' (standing
+for~`quit'). Each command must be terminated by a
+period~(\erlcode{.})  and followed by a pressure on the return key.
+\begin{alltt}
+1> q().
+ok
+2> \$ \textvisiblespace
+\end{alltt}
+The character \erlcode{\textvisiblespace} represents where text is to
+be typed in the operating system shell. But before quitting the
+\Erlang shell, the first action usually consists in calling the
+\Erlang compiler to process some module we want to use. This is done
+by the command~`\erlcode{c}', whose argument is the module name. In
+our example, the filename is \texttt{math1.erl}:
+\begin{alltt}
+1> c(math1).
+\{ok,math1\}
+2> \(\talloblong\)
+\end{alltt}
+The compilation was successful, as the \erlcode{ok} suggests. Let us
+compute some factorials now:
+\begin{alltt}
+2> math1:fact(4).
+24
+3> math1:fact(-3).
+** exception error: no function clause matching
+math1:fact(-3)
+4> \(\talloblong\)
+\end{alltt}
+The error message is very legible. In this book, we will rarely copy
+and paste the input to and the output from the \Erlang shell. We will
+not write complete modules as well because we want to focus on the
+programming itself and delegate the practical aspects to a user manual
+or a textbook oriented towards practice.
+
+\bigskip
+
+\paragraph{A classic variation.}
+
+Consider another way of writing the factorial:
+\begin{verbatim}
+-module(math2).
+-export([fact_tf/1]).
+fact_tf(N) when N >= 1 -> fact_tf(N,1).
+fact_tf(1,A)           -> A;
+fact_tf(N,A)           -> fact_tf(N-1,A*N).
+\end{verbatim}
+\noindent The \Erlang comparison (\erlcode{>=}) stands for `greater
+or equal,' which is usually written (\erlcode{=>}) in other
+programming languages. This is because the sequence of
+symbols~(\erlcode{=>}) reminded too much of the logical
+implication~(\(\Rightarrow\)). Notice how there are actually two
+definitions, each one concluded by a period. Both functions are named
+\erlcode{fact\_tf} but the first one takes only one parameter (the
+first clause), whilst the second one takes two parameters (the two
+last clauses). In other words, the former is completely qualified by
+\erlcode{fact\_tf/1} and the latter by \erlcode{fact\_tf/2}. We can
+remark also that \Erlang allows us to write the definition of a
+function, such as \erlcode{fact\_tf/2}, \emph{after} another
+definition making use of it, such as \erlcode{fact\_tf/1}. The
+function~\erlcode{fact\_tf/2} is not meant to be called from outside
+the module, the rationale being that, instead of delaying the
+multiplications, exactly one multiplication is going to be computed at
+each rewrite, thus, in the end, nothing remains to be done---there is
+no instance of the control context to resume. The reason for this new
+version is hence to minimise the total memory needed to calculate the
+factorial. In order to follow an example with this new
+module~\erlcode{math2}, let us revert for a moment to the mathematical
+notation, so the clauses can be labelled with Greek letters and easily
+distinguished, but let us keep the \Erlang variables:
+\begin{alltt}
+fact_tf(N)   \(\xrightarrow{\smash[t]{\alpha}}\) fact_tf(N,1),      \textrm{if} N > 0.
+fact_tf(1,A) \(\xrightarrow{\smash[t]{\beta}}\) A;
+fact_tf(N,A) \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(N-1,A*N).
+\end{alltt}
+The previously considered function call \erlcode{fact\_tf(5)} is
+rewritten as
+\begin{alltt}
+fact_tf(5) \(\xrightarrow{\smash[t]{\alpha}}\) fact_tf(5,1)\textrm{,}        \textrm{since} 5 > 1\textrm{,}
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(5-1,1*5)  \(=\) fact_tf(4,5)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(4-1,5*4)  \(=\) fact_tf(3,20)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(3-1,20*3) \(=\) fact_tf(2,60)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(2-1,60*2) \(=\) fact_tf(1,120)
+           \(\xrightarrow{\smash[t]{\beta}}\) 120\textrm{.}
+\end{alltt}
+The reason why \erlcode{fact\_tf(5)} = \erlcode{fact(5)} is that
+\begin{equation}
+  (((1 \cdot 5) \cdot 4) \cdot 3) \cdot 2
+= 5 \cdot (4 \cdot (3 \cdot (2 \cdot 1))).\label{eq:fact5}
+\end{equation}
+This equality holds because, in general, for all numbers~\(x\),
+\(y\)~and~\(z\),
+\begin{enumerate}
+
+  \item \label{mult_assoc} the multiplication is associative: \(x \cdot (y
+    \cdot z) = (x \cdot y) \cdot z\);
+
+  \item \label{mult_one} the number \(1\) is neutral with respect to
+    (\(\cdot\)): \(x \cdot 1 = 1 \cdot x = x\).
+
+\end{enumerate}
+To show exactly why, let us write~(\(\eqn{\ref{mult_assoc}}\))
+and~(\(\eqn{\ref{mult_one}}\)) to denote, respectively, the use of
+associativity and neutrality, then lay out the following equalities
+leading from the left\hyp{}hand side to the right\hyp{}hand side of
+the purported equality~\eqref{eq:fact5}:
+\begin{align*}
+  (((1 \cdot 5) \cdot 4) \cdot 3) \cdot 2
+  &\eqn{\ref{mult_one}}   ((((1 \cdot 5) \cdot 4) \cdot 3) \cdot 2)
+  \cdot 1\\
+  &\eqn{\ref{mult_assoc}}   (((1 \cdot 5) \cdot 4) \cdot 3) \cdot (2
+    \cdot 1)\\ 
+  &\eqn{\ref{mult_assoc}} ((1 \cdot 5) \cdot 4) \cdot (3 \cdot (2
+    \cdot 1))\\
+  &\eqn{\ref{mult_assoc}} (1 \cdot 5) \cdot (4 \cdot (3 \cdot (2 \cdot
+    1))\\
+  &\eqn{\ref{mult_assoc}} 1 \cdot (5 \cdot (4 \cdot (3 \cdot (2 \cdot
+    1))))\\
+  &\eqn{\ref{mult_one}} 5 \cdot (4 \cdot (3 \cdot (2 \cdot 1))).\quad
+    \text{\textsc{qed}.}
+\end{align*}
+Furthermore, if we do not want to rely upon the neutrality of~\(1\),
+we could set the initial call to \erlcode{fact\_tf(N-1,N)} and stop
+when the number is~\(0\), instead of~\(1\) (change in
+bold):\label{code:fact_tf_alpha}
+\begin{alltt}
+fact_tf(N) when N > 0 \(\xrightarrow{\smash[t]{\alpha}}\) fact_tf(N\textbf{-1},\textbf{N}).
+fact_tf(\textbf{0},A)          \(\xrightarrow{\smash[t]{\beta}}\) A;
+fact_tf(N,A)          \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(N-1,A*N).
+\end{alltt}
+The same example now runs as
+\begin{alltt}
+fact\_tf(5) \(\xrightarrow{\smash[t]{\alpha}}\) fact\_tf(5-1,5)     \(=\) fact\_tf(4,\ \ 5)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact\_tf(4-1,5*4)   \(=\) fact\_tf(3, 20)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact\_tf(3-1,20*3)  \(=\) fact\_tf(2, 60)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact\_tf(2-1,60*2)  \(=\) fact\_tf(1,120)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact\_tf(1-1,120*1) \(=\) fact\_tf(0,120)
+           \(\xrightarrow{\smash[t]{\beta}}\) 120\textrm{.}
+\end{alltt}
+This new version relies on the following equality which can be proved
+only by means of associativity:
+\begin{equation*}
+  (((5 \cdot 4) \cdot 3) \cdot 2) \cdot 1
+= 5 \cdot (4 \cdot (3 \cdot (2 \cdot 1))).
+\end{equation*}
+The number of rewrites seems greater than with the factorial defined
+in module~\erlcode{math1}, precisely one more step due to the
+clause~\clause{\alpha}. But this version presents an advantage in
+terms of memory usage, as long as it is understood that all integers
+within a certain range imposed by the hardware architecture occupy the
+same space at run\hyp{}time. This means that we assume, for instance,
+that the memory needed to store the number~\erlcode{120} is the same
+as for the number~\erlcode{5}. Then the shape of the previous rewrites
+is
+\begin{alltt}
+fact_tf(5) \(\xrightarrow{\smash[t]{\alpha}}\) \fbcode{fact_tf(0,10)}
+           \(\xrightarrow{\smash[t]{\gamma}}\) \fbcode{fact_tf(0,10)}
+           \(\xrightarrow{\smash[t]{\gamma}}\) \fbcode{fact_tf(0,10)}
+           \(\xrightarrow{\smash[t]{\gamma}}\) \fbcode{fact_tf(0,10)}
+           \(\xrightarrow{\smash[t]{\gamma}}\) \fbcode{fact_tf(0,10)}
+           \(\xrightarrow{\smash[t]{\beta}}\) \fbcode{120}\textrm{.}
+\end{alltt}
+It is safe to induce that this version uses a constant chunk of
+memory, while the version in module~\erlcode{math1} uses an increasing
+amount of memory, more precisely a space proportional to~\erlcode{N}
+when computing \erlcode{fact\_tf(N)}. This phenomenon has been
+anticipated by the keen reader who noticed that there is no control
+context for the calls in the clauses of module \erlcode{math2}, so
+there are no delayed computations that accumulate until the last
+step. As a conclusion, module~\texttt{math2} is always preferable to
+\texttt{math1}.
+
+Let us dwell a bit longer on the former. The relative order of the
+clauses \clause{\beta}~and~\clause{\gamma} is significant because the
+two corresponding heads can overlap, that is, there exists a
+\emph{substitution} for the parameters which leads to identical
+heads. In this case, by substituting~\erlcode{0} for~\erlcode{N}, the
+heads of clauses \clause{\beta}~and~\clause{\gamma} become
+identical. Which one should be used when computing
+\erlcode{fact\_tf(0,A)}? The intention is to use clause
+\clause{\beta}, but how can this preference be expressed?  The problem
+could be remedied by adding a condition to clause \clause{\gamma}:
+\begin{alltt}
+fact_tf(0,A) \(\xrightarrow{\smash[t]{\beta}}\) A;
+fact_tf(N,A) \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(N-1,A*N), \textrm{if} N \(\neq\) 0.
+\end{alltt}
+In \Erlang, this is expressed as a guard:
+\begin{verbatim}
+fact_tf(0,A)              -> A;
+fact_tf(N,A) when N =/= 0 -> fact_tf(N-1,A*N).
+\end{verbatim}
+Clearly, the two clauses now can be considered irrespectively of their
+relative order, so the following is just fine:
+\begin{verbatim}
+fact_tf(N,A) when N =/= 0 -> fact_tf(N-1,A*N);
+fact_tf(0,A)              -> A.
+\end{verbatim}
+With the aim to avoid writing too many guards, \Erlang assumes an
+implicit order on the clauses as they are written. As a result, when
+looking for a match between a function call and a head in a clause,
+the firstly written clause is considered first, then, in case of match
+failure, the secondly written clause is examined etc. That is why
+\begin{verbatim}
+fact_tf(0,A) -> A;
+fact_tf(N,A) -> fact_tf(N-1,A*N).
+\end{verbatim}
+is valid because it is implicit that, in the second clause,
+\erlcode{N} cannot be~\erlcode{0}, since the first clause would have
+been selected otherwise. Also, this means that the following
+definition is wrong.
+\begin{alltt}
+fact_tf(N,A) \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(N-1,A*N);
+fact_tf(0,A) \(\xrightarrow{\smash[t]{\beta}}\) A.
+\end{alltt}
+Indeed, the second clause would never be chosen: \erlcode{N}
+in the first head can always be replaced by any number,
+including~\erlcode{0}. As a consequence, the computation never
+ends. For example:
+\begin{alltt}
+fact_tf(3) \(\xrightarrow{\smash[t]{\alpha}}\) fact_tf( 3,1) \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf( 2,3)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf( 1,6) \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf( 0,0)
+           \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(-1,0) \(\xrightarrow{\smash[t]{\gamma}}\) fact_tf(-2,0) \(\rightarrow \ldots\)
+\end{alltt}
+In other words, the \Erlang definition `loops' forever and the
+process running it has to be interrupted. The memory of the computer
+will not be exhausted because we already know that this version of
+factorial, albeit incorrect, uses a constant amount of space.
+
+Still, would not it be better to guard~\erlcode{fact\_tf(N,A)} from
+a negative~\erlcode{N}? For instance, by writing
+\begin{verbatim}
+fact_tf(N)   when N >= 1 -> fact_tf(N-1,N).
+fact_tf(0,A)             -> A;
+fact_tf(N,A) when N > 0  -> fact_tf(N-1,A*N).
+\end{verbatim}
+Indeed, this is a more robust function \erlcode{fact\_tf/2}, since it
+now fails on incorrect input, that is, on negative or
+zero~\erlcode{N}, instead of entering an infinite loop. But note how
+the guard~\erlcode{N~>~0} is evaluated each time the head
+of~\erlcode{fact\_tf(N,A)} is successfully matched, which incurs a
+time penalty---even though we only take into account the number of
+rewrites to approximate the real time. Therefore, the only scenario
+where the guard is useful is when calling directly
+\erlcode{fact\_tf/2} without passing through the body
+of~\erlcode{fact\_tf/1}. Since the only aim of~\erlcode{fact\_tf/2} is
+to serve as an auxiliary to~\erlcode{fact\_tf/1}, it could be
+envisaged that the guard be left off, while making sure that no direct
+calls to~\erlcode{fact\_tf/2} are made in the rest of the
+module. Typically, a comment would remind the programmer of this
+requisite:
+\begin{alltt}
+fact_tf(N) when N > 1 -> fact_tf(N-1,N).
+
+% fact_tf(N,A) \emph{assumes} N > 0.
+fact_tf(0,A) -> A;
+fact_tf(N,A) -> fact_tf(N-1,A*N).
+\end{alltt}
+
+\medskip
+
+\paragraph{Fibonacci.}
+\label{fibonacci}
+
+Consider the Fibonacci function defined as follows:
+\begin{alltt}
+fib(0)            \(\xrightarrow{\smash[t]{\alpha}}\) 1;
+fib(1)            \(\xrightarrow{\smash[t]{\beta}}\) 1;
+fib(N) when N > 1 \(\xrightarrow{\smash[t]{\gamma}}\) fib(N-1) + fib(N-2).
+\end{alltt}
+Beware that some authors define \erlcode{fib(0) -> 0}, leading to the
+sequence to be shifted by one: \(0\),\(1\),\(1\),\(2\),\(3\),\(5\)
+etc. instead of our \(1\),\(1\),\(2\),\(3\),\(5\) etc. The peculiarity
+here is that the right\hyp{}hand side of clause~\clause{\gamma}
+contains two function calls instead of one, as in the factorial
+function definition. This yields a cascade of choices as to which call
+is computed next. For instance, we underline the call to be rewritten
+in the rewrites of~\erlcode{fib(3)}:
+\begin{alltt}
+\underline{fib(3)} \(\xrightarrow{\smash[t]{\gamma}}\)            \underline{fib(2)} + fib(1)
+       \(\xrightarrow{\smash[t]{\gamma}}\) \obp{}fib(1) + \underline{fib(0)}\cbp{} + fib(1)
+       \(\xrightarrow{\smash[t]{\alpha}}\) (fib(1) +    \obp{}1\cbp) + \underline{fib(1)}
+       \(\xrightarrow{\smash[t]{\beta}}\) (\underline{fib(1)} +    (1)) +    \obp{1}\cbp
+       \(\xrightarrow{\smash[t]{\beta}}\) (   \obp{1}\cbp +    (1)) +    (1) = (2) + (1) = 3\textrm{,}
+\end{alltt}
+but the following rewrites are also admissible:
+\begin{alltt}
+\underline{fib(3)} \(\xrightarrow{\smash[t]{\gamma}}\)            fib(2) + \underline{fib(1)}
+       \(\xrightarrow{\smash[t]{\beta}}\)            \underline{fib(2)} +    (1)
+       \(\xrightarrow{\smash[t]{\gamma}}\) (\underline{fib(1)} + fib(0)) +    (1)
+       \(\xrightarrow{\smash[t]{\beta}}\) (   (1) + \underline{fib(0)}) +    (1)
+       \(\xrightarrow{\smash[t]{\alpha}}\) (   (1) +    (1)) +    (1) = (2) + (1) = 3\textrm{.}
+\end{alltt}
+The strategy of \Erlang does not specify which call is rewritten
+first. The only constraint is that, for a call to be rewritten, its
+arguments must be values, that is, they do not contain calls
+(including arithmetic operations) themselves. We shall encounter later
+the case where function calls are arguments to other function calls
+and see what \Erlang does in this case. In the previous example, the
+two original calls~\erlcode{fib(2)} and~\erlcode{fib(1)} fulfill this
+requirement. Even if the order of rewriting is not revealed to the
+programmer, it is guaranteed to be irrelevant. Moreover, the order is
+always the same for each execution of the program and only one call is
+computed at each step: these are the \emph{deterministic} and
+\emph{sequential} paradigms, respectively. Indeed, it may be
+imaginable that two or more calls are computed at the same time,
+giving birth to the (implicit) \emph{concurrent} paradigm of
+computation. Something similar to the fictitious \newlength\Parallel
+\settowidth\Parallel{\(_{\gamma\|\gamma}\)}
+\begin{alltt}
+\underline{fib(3)} \(\MyArrow{\Parallel}{\gamma}\)            \underline{fib(2)} + \underline{fib(1)}
+       \(\xrightarrow{\smash[t]{\gamma\|\beta}}\) (\underline{fib(1)} + \underline{fib(0)}) +    (1)
+       \(\xrightarrow{\smash[t]{\beta\|\alpha}}\) (   (1) +    (1)) +    (1) = (2) + (1) = 3\textrm{.}
+\end{alltt}
+But this is not the way \Erlang works by default.
+
+A look again at the two rewrites above reveals that \erlcode{fib(1)}
+is computed twice. In order to know whether this is a coincidence, it
+is worth trying a longer example and use the concurrent strategy to
+save space:
+\newlength\ArrowLen
+\settowidth\ArrowLen{\(\xrightarrow{\smash[t]{\gamma\|\gamma}}\)}
+\def\MyVdots{\(\makebox[\ArrowLen][c]{\(\vdots\)}\)}
+\begin{alltt}
+\underline{fib(5)} \(\MyArrow{\Parallel}{\gamma}\)            \underline{fib(4)} +            \underline{fib(3)}
+       \(\xrightarrow{\smash[t]{\gamma\|\gamma}}\) (\underline{fib(3)} + \underline{fib(2)}) + (\underline{fib(2)} + \underline{fib(1)})
+       \(\xrightarrow{\smash[t]{\gamma\|\gamma}}\) ((\underline{fib(2)} + \underline{fib(1)}) + (\underline{fib(1)} + \underline{fib(0)}))
+            + ((\underline{fib(1)} + \underline{fib(0)}) + 1)
+       \(\xrightarrow{\smash[t]{\hphantom{\gamma\|\gamma}}} \ldots\)
+\end{alltt}
+It is clear now that some computations are duplicated, leading to the
+following slow and memory\hyp{}consuming \Erlang program:
+\begin{alltt}
+fib(0) -> 1;
+fib(1) -> 1;
+fib(N) -> fib(N-1) + fib(N-2).\hfill% \emph{Assuming} N > 1
+\end{alltt}
+In order to visualise the inefficiency, it is handy to use a
+two\hyp{}dimensional representation of the calls such as the ones
+unfolding from~\erlcode{fib(5)} and shown in
+\fig~\vref{fig:fib5_tree}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 631 320 721]{fib5_tree}
+\caption{Call tree of \erlcode{fact(5)}
+\label{fig:fib5_tree}}
+\end{figure}
+This kind of graphic is called a \emph{tree}\label{def:tree} and
+\fig~\vref{fig:fib5_shape} shows its general shape. The disks are
+called \emph{nodes} and the segments which connect two nodes are
+called \emph{edges}. There are several kinds of nodes: the one at the
+top is called the \emph{root} and the grey ones are called the
+\emph{leaves}. Reading the tree top\hyp{}down, a node is directly
+connected to some other nodes or none.
+\begin{figure}[b]
+\centering
+\includegraphics{fib5_shape}
+\caption{Shape of the call tree of
+  \erlcode{fib(5)} in \fig~\ref{fig:fib5_tree}
+\label{fig:fib5_shape}}
+\end{figure}
+If any, these nodes are called the \emph{children} of the upper node
+and the latter is the \emph{parent} of the formers. In our particular
+case, the tree is a \emph{call tree} because each node represents a
+function call, the root being the initial call. Moreover, each node
+has two or zero children because each is an instance of a rewrite rule
+of the~\erlcode{fib} definition. For instance, clause \clause{\gamma}
+corresponds to the tree pattern in \fig~\vref{fig:fib_shape}.  It is
+now clear that some subtrees are repeated, the biggest one being
+rooted at the function calls~\erlcode{fib(3)}. Note also that the
+value of the root is the number or leaves, for example, the value
+of~\erlcode{fib(5)} is~\erlcode{8}. An interesting conclusion that can
+be drawn from this analysis is that implicit concurrency does not
+always result in an optimal computation, since some calls may be
+duplicated in parallel rewrites and, therefore, a better course of
+action is to find a faster version of the Fibonacci function within
+the sequential default strategy of \Erlang.
+\begin{figure}[H]
+\centering
+\includegraphics{generative_fib}
+\caption{Generative tree pattern for the Fibonacci
+  function\label{fig:fib_shape}}
+\end{figure}
+
+\paragraph{Linear structures.}
+\label{chap:lists}
+
+Until now, the only data type has been integers. In many situations,
+this is not versatile enough. Consider for example the need for
+summing a finite series of integers, like \(11 + 5 + 7 + 3\). We must
+capture the concept of `a finite series of values' in \Erlang and
+make it amenable to computation. This is the very purpose of the
+\emph{list} data structure. A list is either empty, in which case it
+is denoted in \Erlang by the symbols~\erlcode{[]}, or
+non\hyp{}empty. In the latter case, it is equivalent to say that it
+contains at least one \emph{element}, also called~\emph{item}. Since a
+series is totally ordered, there must be a first item in a
+non\hyp{}empty list. In \Erlang, the first item is called
+the~\emph{head}---not to be confused with the head of a clause. The
+items following the head, if any, wholly constitute a list by
+themselves, called the~\emph{tail}. For instance, the list containing
+the item~\erlcode{1789} is written
+\begin{center}
+\erlcode{[1789 | []]}.
+\end{center}
+Note the vertical bar which joins the head \erlcode{1789} and the tail
+\erlcode{[]}: it is an operator, that is, a predefined function
+denoted by a special symbol, called \emph{push}, also called
+\emph{cons}. The list containing items~\erlcode{1848}
+and~\erlcode{1789}, in this order, is specified as
+\begin{center}
+\erlcode{[1848 | [1789 | []]]}.
+\end{center}
+The head is now~\erlcode{1848} and the tail is
+\erlcode{[1789|[]]}. Variables can stand for any \Erlang value, in
+particular, any item or tail. For instance,
+\begin{center}
+\erlcode{[Head | Tail]}
+\end{center}
+denotes a non\hyp{}empty list. A list with at least two items would be
+written
+\begin{center}
+\erlcode{[First | [Second | Tail]]},
+\end{center}
+where~\erlcode{Tail} represents the tail of the tail of the whole
+list. Again here, \Erlang follows the syntactic convention of the
+\Prolog programming language. If a list, with or without variables, is
+used in the head of a clause, it is called a \emph{pattern}. Actually,
+parameters and integers are patterns.
+
+\medskip
+
+\paragraph{Summing.}
+
+Consider now how to define a function~\erlcode{sum/1} summing all the
+integers in a given list. First, remember that a list is either empty
+or not, which leads to lay out the following canvas:
+\begin{alltt}
+sum(   []) -> \fbcode{N + sum(L)};
+sum([N|L]) -> \fbcode{N + sum(L)}.
+\end{alltt}
+\noindent We have two patterns: \erlcode{[]} (which is also a value)
+and~\erlcode{[N|L]}. The empty boxes are place holders for \Erlang
+expressions to be determined. Firstly, it is worth noticing that the
+order of the clauses is not relevant here, since there cannot be any
+overlap between them (in other words, the two cases exclude each
+other), so
+\begin{alltt}
+sum([N|L]) -> \fbcode{N + sum(L)};
+sum(   []) -> \fbcode{N + sum(L)}.
+\end{alltt}
+\noindent makes perfect sense as well. Thereafter, the programmer
+should focus separately on each body to be completed.
+
+Let us take under examination the case of the empty list, for
+instance, and ponder what should be the outcome of summing no
+integers. It is very important to convince oneself that this matter
+does not make any sense and, in particular, the temptation of
+answering~\erlcode{0} must be vigorously dispelled. Natural numbers
+are often taught in primary school by repeatedly displaying
+heterogeneous collections of objects and stating that they contain the
+same `number' of objects. The pupil is then expected to grasp the
+numerical concept by inductive reasoning. Of course, zero is naturally
+identified with the empty set because this pedagogy introduces the
+number as a cardinal. This conceptualisation of zero hinders the
+comprehension of algebra, where zero is abstractly and
+\emph{positively} postulated as satisfying the equation \(x + 0 = x\),
+for all numbers~\(x\) (and assuming \(x + y = y + x\)). Formal
+thinking is essential to learn programming, therefore, we must
+convince ourselves that there is no natural relationship between zero
+and the empty list. Sometimes they can be associated, sometimes not:
+it all depends on the problem at hand.
+
+Returning to the function~\erlcode{sum/1}, once it is understood that
+the empty list should not be accepted as an argument, the
+corresponding clause is simply removed and the definition boils down
+to
+\begin{alltt}
+sum([N|L]) -> \fbcode{N + sum(L)}.
+\end{alltt}
+In search for inspiration, turning to small and meaningful examples is
+often the way to go. For instance, what if we compute the function
+call \erlcode{sum([5|[3|[7|[]]]])}? By comparing the shape of this
+call to the head of the only remaining clause, it should be apparent
+that if~\erlcode{5} is substituted for the variable \erlcode{N} and
+\erlcode{[3|[7|[]]]} is substituted for \erlcode{L}, the head becomes
+identical to the function call. This is called a \emph{match} and the
+whole process \emph{matching}. It enables the clause to be used for
+computing the call. Since what is expected to be calculated by the
+body is~\(5 + 3 + 7\) or~\(3 + 5 + 7\) or~\(7 + 5 + 3\) etc., it seems
+natural to favour the combinations where the head~\erlcode{5} stands
+out, that is, either at the end of the sum or at the beginning: \(5 +
+\dots\) or~\(\ldots + 5\). Choosing arbitrarily the first form, the
+clause becomes
+\begin{alltt}
+sum([N|L]) -> \textbf{N +} \fbcode{sum(L)}.
+\end{alltt}
+\noindent It remains to understand the ellipsis in the formula. It
+stands either for~\(3 + 7\) or~\(7 + 3\). Is there a direct way to
+relate these additions to the tail \erlcode{L}? In the example, the
+tail corresponds to \erlcode{[3|[7|[]]]}. It should strike us as
+obvious that what remains to be done is exactly the same computation
+as previously but performed on the remaining numbers, that is, on the
+tail~\erlcode{L}. This is thus written:
+\begin{alltt}
+sum([N|L]) -> N + \textbf{sum(L)}.\hfill% \emph{A recursive call}
+\end{alltt}
+\noindent This kind of clause, where the body contains a function call
+to the function being defined, while not being exceptional, is
+qualified by a special adjective in informatics: \emph{recursive}. The
+corresponding definition, even if only one of its defining clause is
+recursive, is said to be recursive as well. Note that it is the
+definition that is recursive, not the function. Generally, a statement
+is recursive if it is self\hyp{}referential. For instance, the
+definition of \erlcode{fact\_tf/2} in module \erlcode{math2} is
+recursive. Once a definition is reached, it is wise to check it
+against another function call and unroll all the calls until a value
+is found:
+\begin{alltt}
+sum([1|[2|[3|[]]]]) \(\rightarrow\) 1 + sum([2|[3|[]]])
+                    \(\rightarrow\) 1 + (2 + sum([3|[]]))
+                    \(\rightarrow\) 1 + (2 + (3 + sum([])))
+                    \(\nrightarrow\)
+\end{alltt}
+The broken arrow (\(\nrightarrow\))\label{broken_arrow} means that no
+clause is available to continue computing the function call
+\erlcode{sum([])}. Indeed, the only clause at hand only accepts, that
+is `is matched by,' non\hyp{}empty lists. But the case of the empty
+list has been previously discarded as meaningless, so what should be
+done? Did we make a mistake?
+
+While the sum of all the integers of the empty list indeed cannot be
+computed, the sum on the list containing \emph{exactly one} integer
+can be, which means that the example above could simply terminate by
+means of an additional clause applied to \erlcode{sum([3|[]])}:
+\begin{alltt}
+sum([N| L]) -> N + sum(L)\textbf{;}
+\textbf{sum([N|[]]) -> N}.\hfill% \emph{New clause for singletons}
+\end{alltt}
+First, we must understand that the variable \erlcode{N} in the two
+clauses denote, in general, different values. In other words, the
+previous definition is exactly equivalent to
+\begin{alltt}
+sum([N| L]) -> N + sum(L);
+sum([\textbf{M}|[]]) -> \textbf{M}.\hfill% \emph{Renaming}
+\end{alltt}
+Second, the attentive reader has already noticed that the given
+complete definition still fails to compute the input above. The reason
+is that the head of the first clause is matched by all non\hyp{}empty
+lists, that is, all lists with at least one item, in particular, the
+lists with exactly one item, called \emph{singletons}. But the second
+clause, which has just been added, is also matched by singletons, so
+the heads of the two clauses overlap partially. Nevertheless, \Erlang
+specifies that the first matching head will select the corresponding
+body, that is to say, heads are tried in turn until one is matched by
+the arguments of the function call to be computed. If none is matched,
+an error occurs at run\hyp{}time, as symbolised by the broken arrow
+(\(\nrightarrow\)) above. In our example, the first clause is always
+matched until the empty list is considered again (as bound
+by~\erlcode{L}), which leads to the exact same failure as presented
+previously. The fix consists simply in swapping the clauses and write
+instead
+\begin{alltt}
+sum([N|[]]) -> N;\hfill% \emph{Must come first}
+sum([N| L]) -> N + sum(L).
+\end{alltt}
+For the sake of legibility, let us label the arrows:
+\begin{alltt}
+sum([N|[]]) \(\xrightarrow{\smash[t]{\alpha}}\) N;
+sum([N| L]) \(\xrightarrow{\smash[t]{\beta}}\) N + sum(L).
+\end{alltt}
+and revisit, now successfully, our running example:
+\begin{alltt}
+sum([1|[2|[3|[]]]]) \(\xrightarrow{\smash[t]{\beta}}\) 1 + sum([2|[3|[[]]]])
+                    \(\xrightarrow{\smash[t]{\beta}}\) 1 + (2 + sum([3|[]]))
+                    \(\xrightarrow{\smash[t]{\alpha}}\) 1 + (2 + (3))         \(=\) 6.
+\end{alltt}
+\noindent As a side\hyp{}note, it is nevertheless possible to write
+the second clause first if a guard is used:
+\begin{alltt}
+sum([N| L]) when L =/= [] -> N + sum(L);\hfill% L \(\neq\) []
+sum([N|[]])               -> N.
+\end{alltt}
+but this version, although more explicit, is generally avoided by good
+programmers, who prefer concise definitions and always keep in mind
+the order \Erlang applies to the clauses.
+
+\medskip
+
+\paragraph{Efficiency.}
+
+What can be said about the speed and the memory usage of the function
+\erlcode{sum/1}? The number of rewrites clearly equals the number of
+integers in the list because every integer is either matched with one
+pattern head or the other. Hence, if the initial function is called on
+a list of \(n\) integers, the number of steps to reach the result is
+\(n\): \(n-1\) times using clause \clause{\beta} and one time using
+clause \clause{\alpha}. Taking a slightly longer list can provide a
+hint about memory usage:
+\begin{alltt}
+sum([1|[2|[3|[4|[]]]]]) \(\xrightarrow{\smash[t]{\beta}}\) 1 + sum([2|[3|[4|[]]]])
+                        \(\xrightarrow{\smash[t]{\beta}}\) 1 + (2 + sum([3|[4|[]]]))
+                        \(\xrightarrow{\smash[t]{\beta}}\) 1 + (2 + (3 + sum([4|[]])))
+                        \(\xrightarrow{\smash[t]{\alpha}}\) 1 + (2 + (3 + (4)))       \(=\) 10\textrm{.}
+\end{alltt}
+which prompts us to consider only the sizes of the right\hyp{}hand
+sides:
+\begin{alltt}
+sum([1|[2|[3|[4|[]]]]]) \(\xrightarrow{\smash[t]{\beta}}\) \fbcode{1 + sum([2|[3|[4|[]]]])}
+                        \(\xrightarrow{\smash[t]{\beta}}\) \fbcode{1 + (2 + sum([3|[4|[]]]))}
+                        \(\xrightarrow{\smash[t]{\beta}}\) \fbcode{1 + (2 + (3 + sum([4|[]])))}
+                        \(\xrightarrow{\smash[t]{\alpha}}\) \fbcode{1 + (2 + (3 + (4)))}\textrm{.}
+\end{alltt}
+It seems that the total memory usage increases slowly and then reduces
+sharply after the last rewrite step. But this calls for a closer
+examination. In particular, the character font used here is
+proportional, which implies that, for instance, (\erlcode{+}) takes
+more horizontal space on the line than (\erlcode{|}). Omitting blanks
+and keeping a monospace font gives
+\begin{verbatim}
+sum([1|[2|[3|[4|[]]]]]) -> 1+sum([2|[3|[4|[]]]])
+                        -> 1+(2+sum([3|[4|[]]]))
+                        -> 1+(2+(3+sum([4|[]])))
+                        -> 1+(2+(3+(4))).
+\end{verbatim}
+it seems now that the expressions are of constant size until clause
+\(\alpha\) applies. Moreover, even if (\erlcode{+}) were instead
+written \erlcode{plus}, its occurrence should not be considered as
+taking more memory than (\erlcode{+}) because names are only
+tags. Also, what about the parentheses and the blanks? Should they be
+considered meaningful, as far as memory allocation is concerned? All
+these considerations bring to the fore the need for a finer
+understanding of how \Erlang functions and data are usually
+represented at run\hyp{}time but, because these encodings depend
+strongly on the compiler and the hardware architecture, it would be
+inappropriate to rely on too detailed a description. Therefore, it is
+sufficient and appropriate here to provide a model of expressions
+which allows to draw conclusions about memory usage which hold up to a
+proportional constant, while reminding the reader that this model is
+unlikely implemented as it is presented next.
+
+\bigskip
+
+\paragraph{Memory.}
+
+Up to now, the only elements composing expressions have been
+variables, integers, function calls, arithmetic operators and lists of
+expressions. (Incidentally, this is a recursive definition.) The key
+is to realise that the essence of an expression is best captured by a
+two\hyp{}dimensional representation, as opposed to a line of
+punctuated text. This kind of model is widespread in mathematics as
+matrices, graphics, graphs etc. The best suited here is a kind of tree
+called \emph{abstract syntax tree}. We introduced trees on
+page~\pageref{def:tree} in the context of the \emph{call trees} of a
+function computing the Fibonacci numbers.
+
+Consider in \fig~\vref{fig:sum} the abstract syntax tree of the
+expression \erlcode{1+(2+sum([3|[4|[]]]))} and the function call it
+contains in \fig~\vref{fig:sum_call_tree}.
+\begin{figure}[!b]
+\centering
+\subfloat[Expression\label{fig:sum}]{%
+  \includegraphics[bb=71 613 134 721]{sum_tree}%
+}
+\qquad
+\subfloat[\ Instances of the control context \erlcode{N
+    + \textvisiblespace}\label{fig:sum:context}]{%
+  \includegraphics[bb=59 613 113 721]{sum_context}%
+}
+\quad
+\subfloat[Call\label{fig:sum_call_tree}]{%
+  \includegraphics[bb=71 654 111 721]{sum_call_tree}%
+}
+\qquad
+\subfloat[Argument\label{fig:sum:arg}]{%
+  \includegraphics[bb=59 671 125 721]{sum_arg}%
+}
+\caption{\erlcode{1+(2+sum([3|[4|[]]]))}}
+\end{figure}
+The leaves here are the integers~\erlcode{1}, \erlcode{2},
+\erlcode{3}~and~\erlcode{4} and the empty list~\erlcode{[]}. The inner
+nodes, that is, the ones which are not leaves, are either arithmetic
+operators, like~(\erlcode{+}), or function names, like~\erlcode{sum},
+or the \emph{list constructor}~(\erlcode{|}). By taking as origin the
+node \erlcode{sum}, the abstract syntax tree can be split into the
+part below it, that is, the argument (see \fig~\vref{fig:sum:arg}),
+and the part above, called \emph{instances of the control context}
+(see \fig~\vref{fig:sum:context}).
+
+The main interest of abstract syntax trees is that no parentheses are
+required, because a sub\hyp{}expression is denoted by a subtree, that
+is, a tree embedded into another. Moreover, blank characters are
+absent as well. This allows us to focus on the essential. To
+illustrate the gained practicality, consider again the previous
+computation in full, from left to right (the node to be rewritten is
+boxed), in \fig~\vref{fig:sum_1234}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 606 360 721]{sum_1234}
+\caption{Computation of \erlcode{sum([1,2,3,4])}\label{fig:sum_1234}}
+\end{figure}
+It is now clear that the instances of the control context accumulate
+so as to grow in inverse proportion to the argument's length: integers
+move one by one from the argument to the control context and the
+associated operation changes from a push (\erlcode{|}) to an
+addition. Therefore, if we use as memory unit a node, the total memory
+is indeed constant---except for the last step.
+
+\label{def:call_stack_heap}
+The part of the memory where the instances of the control context
+accumulate is called the \emph{call stack}. Since the instances have
+always the same shape (an addition), the size of the call stack can be
+thought of as proportional to the control context size, the unit of
+measure being a node. The original function call and its arguments are
+also stored in the call stack, except if the arguments are lists, in
+which case the call stack contains a \emph{reference} to a different
+part of the memory, called the \emph{heap}, where the lists are
+stored. The exact nature of this reference is not relevant
+here. Suffice to say that it is an oriented edge ending downwardly at
+a node (\erlcode{|}) or \erlcode{[]}. Consider again the running
+example and what remains in the call stack, step after step, in
+\fig~\vref{fig:sem_1234_stack}.
+\begin{figure}[b]
+\centering
+\includegraphics[bb=71 634 360 721]{sum_1234_stack}
+\caption{Call stack while computing \erlcode{sum([1,2,3,4])}
+\label{fig:sem_1234_stack}}
+\end{figure}
+The arrow represents a reference to a list in the heap, as it is the
+unique argument of \erlcode{sum/1} (the list is not shown). This
+example shows that the call stack grows until it contains the result
+or a reference to it if it is located in the heap, while the heap size
+will decrease so that the total memory, that is, the size of the call
+stack plus the heap size, remains constant. In case the value of a
+call is a list, the call stack would contain a reference to the heap,
+where the value in question resides.
+
+\smallskip
+
+\paragraph{Tail form.}
+
+On most operating systems, the maximum size of the call stack is often
+much smaller than the maximum heap size, therefore, if this is a
+concern, it is wise to write programs that do not overload the call
+stack. In the case of the function \erlcode{sum/1}, if the input list
+contains \(n\) integers, the size of the call stack increases
+proportionally to \(n\). Is there a way to write another definition of
+the function so that the heap is mainly used instead? The best is to
+try to express \erlcode{sum/1} without using any control context at
+all: the size of the call stack will then be constant because, in this
+configuration, only the arguments will reside in the stack---the
+arguments which are lists are stored in the heap and a reference to
+them is kept in the call stack instead. This kind of function
+definition is said to be in \emph{tail form}. Such a definition was
+presented before, \vpageref{code:fact_tf_alpha}, as a variation on the
+first factorial function: \verbatiminput{fact_tf.def} The abstract
+syntax trees denoting the three bodies are either a value (see
+\fig~\vref{fig:fact:A}) or a function call whose arguments contain no
+user\hyp{}defined function call (see \fig
+\ref{fig:fact:fact_N_1}~and~\vref{fig:fact:fact_N_A}). Arithmetic
+expressions \erlcode{N-1} and \erlcode{A*N} call \emph{operators},
+that is, built\hyp{}in functions represented by symbols.
+\begin{figure}[t]
+\centering
+\subfloat[\erlcode{fact\_tf(N-1,N)}\label{fig:fact:fact_N_1}]{%
+  \includegraphics[bb=55 672 125 721]{fact_N_1} } \qquad
+\subfloat[\erlcode{A}\label{fig:fact:A}]{%
+  \includegraphics[bb=56 672 93 721]{A}}%
+\quad
+  \subfloat[\erlcode{fact\_tf(N-1,A*N)}\label{fig:fact:fact_N_A}]{%
+    \includegraphics[bb=61 672 147 721]{fact_N_A} }
+\caption{Abstract syntax trees from \erlcode{fact\_tf/1} and
+  \erlcode{fact\_tf/2}}
+\end{figure}
+
+Is there a tail form definition of \erlcode{sum/1}? First, let us call
+this new function \erlcode{sum\_tf/1} (\emph{\textbf{t}ail
+  \textbf{f}orm}) in order to avoid any confusion. The idea, very much
+alike the factorial, is to define an auxiliary function
+\erlcode{sum\_tf/2} with a supplementary argument which accumulates
+partial results. This kind of argument is called an
+\emph{accumulator}. The new version should hence look like as follows:
+\begin{alltt}
+sum_tf(L)        -> sum_tf(\fbcode{0},L).
+sum_tf(A,[N|[]]) -> \fbcode{sum_tf(N+A,L)};
+sum_tf(A,[N| L]) -> \fbcode{sum_tf(N+A,L)}.
+\end{alltt}
+or, equivalently,
+\begin{alltt}
+sum_tf(L)        -> sum_tf(L,\fbcode{0}).
+sum_tf([N|[]],A) -> \fbcode{sum_tf(N+A,L)};
+sum_tf([N| L],A) -> \fbcode{sum_tf(L,N+A)}.
+\end{alltt}
+Notice that, just as with \erlcode{sum/1}, the call
+\erlcode{sum\_tf([])} fails without a warning and we may find this
+behaviour questionable. Indeed, it can be considered inappropriate in
+the framework of software engineering, where programming large and
+robust applications is a requisite, but this book focuses primarily on
+programming in the small, therefore the programs introduced here are
+purposefully fragile; in other words, they may fail on some
+undesirable inputs instead of providing the user with some nice
+warnings, error messages or, even better, managing to get the compiler
+itself to reject such programs.
+
+Since it was decided that an accumulator is needed, we must be clear
+on what kind of data it holds. As said previously, an accumulator
+usually contains a part of the final result. From a different
+perspective, an accumulator can be regarded as a partial trace of all
+the previous rewrite steps. Here, since the final result is an
+integer, we bear in mind that the accumulator ought to be a number as
+well.
+
+There is no need to fill the above canvas (the boxes) from the first
+line to the last: this is a program, not an essay. Perhaps the best
+method is to first lie down the heads of the clauses and make sure
+none is missing and that none is useless (taking into account the
+implicit ordering from first to last). Second, we pick up the clause
+whose body seems the easiest to guess. For instance, the first clause
+of \erlcode{sum/2} seems simple enough because it applies when only
+one number, \erlcode{N}, remains in the input list. Since the
+accumulator \erlcode{A} holds the partial sum up to now, only
+\erlcode{N} remains to be processed. Therefore, the answer is
+\erlcode{N+A} or \erlcode{A+N}:
+\begin{alltt}
+sum_tf(L)        -> sum_tf(L,\fbcode{0}).
+sum_tf([N|[]],A) -> \textbf{N+A};
+sum_tf([N| L],A) -> \fbcode{sum_Tf(L,N+A)}.
+\end{alltt}
+The second clause of \erlcode{sum\_tf/2} is chosen next. It applies
+when the input list is not empty and its first item is \erlcode{N} and
+the remaining are in \erlcode{L}. Until now, the partial sum is the
+accumulator \erlcode{A}. It is clear that a recursive call is needed
+here, because if the body were \erlcode{N+A} again, then the rest of
+the integers, \erlcode{L}, would be useless. So the process must be
+resumed with another input:
+\begin{alltt}
+sum_tf(L)        -> sum_tf(L,\fbcode{0}).
+sum_tf([N|[]],A) -> N+A;
+sum_tf([N |L],A) -> \textbf{sum_tf(}\fbcode{L}\textbf{,}\fbcode{N+A}\textbf{)}.
+\end{alltt}
+The question now is to find what the new list and the new accumulator
+should be in this last clause. What is known about the list?
+\erlcode{N} and \erlcode{L}. What can be done with \erlcode{N}? Well,
+the same that was done before, in the first clause of
+\erlcode{sum\_tf/2}, that is, let us add it to the accumulator:
+\begin{alltt}
+sum_tf(L)        -> sum_tf(L,\fbcode{0}).
+sum_tf([N|[]],A) -> N+A;
+sum_tf([N| L],A) -> sum_tf(\fbcode{L},\textbf{N+A}).
+\end{alltt}
+This way, the new accumulator is \erlcode{N+A}, which is fine since the
+purpose of the accumulator is to hold the partial sum until the
+present number, which is \erlcode{N} now. What new list of numbers
+should be used? It is clear that \erlcode{N} cannot be reused here,
+because it has already been added to the accumulator, and it must not
+be added twice. This means that it is not needed anymore. Remains
+\erlcode{L}, which is what is sought, since it represents all the
+remaining numbers to be added to the accumulator:
+\begin{alltt}
+sum_tf(L)        -> sum_tf(L,\fbcode{0}).
+sum_tf([N|[]],A) -> N+A;
+sum_tf([N| L],A) -> sum_tf(\textbf{L},N+A).
+\end{alltt}
+The last unfinished business is the initial value of the
+accumulator. It is important not to rush and to deal with this value
+at the last moment. What kind of operation is being carried out on the
+accumulator? Additions. Without knowing anything about the integers in
+\erlcode{L}, as it is the case in the clauses of \erlcode{sum\_tf/1},
+what integer could be taken as an initial value? It is well known
+that, for all \(n\), \(0 + n = n + 0 = n\), thus \erlcode{0}~appears
+to be the only possible value here, because it does not change the
+total sum:
+\begin{alltt}
+sum_tf(L)        -> sum_tf(L,\textbf{0}).
+sum_tf([N|[]],A) -> N+A;
+sum_tf([N| L],A) -> sum_tf(L,N+A).
+\end{alltt}
+The last step consists in trying some examples after the labelling
+\begin{alltt}
+sum_tf(L)        \(\xrightarrow{\smash[t]{\alpha}}\) sum_tf(L,0).
+sum_tf([N|[]],A) \(\xrightarrow{\smash[t]{\beta}}\) N+A;
+sum_tf([N| L],A) \(\xrightarrow{\smash[t]{\gamma}}\) sum_tf(L,N+A).
+\end{alltt}
+Consider our running example again:
+\begin{alltt}
+sum\_tf([1|[2|[3|[4|[]]]]])
+  \(\xrightarrow{\smash[t]{\alpha}}\) sum\_tf([1|[2|[3|[4|[]]]]],0)
+  \(\xrightarrow{\smash[t]{\gamma}}\) sum\_tf([2|[3|[4|[]]]],1+0) \(=\) sum\_tf([2|[3|[4|[]]]],1)
+  \(\xrightarrow{\smash[t]{\gamma}}\) sum\_tf([3|[4|[]]],2+1)     \(=\) sum\_tf([3|[4|[]]],3)
+  \(\xrightarrow{\smash[t]{\gamma}}\) sum\_tf([4|[]],3+3)         \(=\) sum\_tf([4|[]],6)
+  \(\xrightarrow{\smash[t]{\beta}}\)  4 + 6                     \(=\) 10\textrm{.}
+\end{alltt}
+Let us recall here the run
+\begin{verbatim}
+sum([1|[2|[3|[4|[]]]]]) -> 1+sum([2|[3|[4|[]]]])
+                        -> 1+(2+sum([3|[4|[]]]))
+                        -> 1+(2+(3+sum([4|[]])))
+                        -> 1+(2+(3+(4))).
+\end{verbatim}
+The difference between \erlcode{sum\_tf/1} and \erlcode{sum/1} lies
+not in the result (both functions are indeed equivalent) but in the
+way the additions are performed. They are equivalent because
+\begin{equation*}
+4 + (3 + (2 + (1 + 0))) = 1 + (2 + (3 + 4)).
+\end{equation*}
+This equality holds because, for all numbers \(x\), \(y\) and
+\(z\),\label{proof_sum}
+\begin{enumerate}
+
+  \item \label{add_assoc} the addition is associative: \(x + (y + z) =
+    (x + y) + z\),
+
+  \item \label{add_comm} the addition is symmetric: \(x + y = y +
+    x\),
+
+  \item \label{add_zero} zero is a right\hyp{}neutral number: \(x+0 =
+    x\).
+
+\end{enumerate}
+To show exactly why, let us write (\(\eqn{\ref{add_assoc}}\)),
+(\(\eqn{\ref{add_comm}}\)) and (\(\eqn{\ref{add_zero}}\)) to denote,
+respectively, the use of associativity, symmetry and neutrality, and
+lay out the following equalities leading from one expression to the
+other:
+\begin{align*}
+4 + (3 + (2 + (1 + 0)))
+  &\eqn{\ref{add_zero}}  4 + (3 + (2 + 1))\\
+  &\eqn{\ref{add_comm}}  (3 + (2 + 1)) + 4\\
+  &\eqn{\ref{add_comm}}  ((2 + 1) + 3) + 4\\
+  &\eqn{\ref{add_comm}}  ((1 + 2) + 3) + 4\\
+  &\eqn{\ref{add_assoc}} (1 + 2) + (3 + 4)\\
+  &\eqn{\ref{add_assoc}} 1 + (2 + (3 + 4)).\quad \text{\textsc{qed}.}
+\end{align*}
+This seems a bit heavy for such a small program. Is there a way to
+rewrite further \erlcode{sum\_tf/1} so that less hypotheses are needed
+to prove the equivalence with \erlcode{sum/1}? Let us start with the
+most obvious difference: the use of zero. This zero is the initial
+value of the accumulator and its sole purpose is to be added to the
+first number in the list. We could then simply first load the
+accumulator with this number, so the neutrality of zero is no more
+required:
+\begin{alltt}
+sum_tf(\textbf{[N|}L\textbf{]})    -> sum_tf(L,\textbf{N}).
+sum_tf([N|[]],A) -> N+A;
+sum_tf([N| L],A) -> sum_tf(L,N+A).
+\end{alltt}
+But this definition of \erlcode{sum\_tf/1} fails on lists containing
+exactly one number, because \erlcode{L} can be empty. Therefore, we
+must allow the list to be empty in the definition of
+\erlcode{sum\_tf/2}:
+\begin{alltt}
+sum_tf([N|L])   -> sum_tf(L,N).
+\textbf{sum_tf(   [],A) -> A;}
+sum_tf([N|L],A) -> sum_tf(L,N+A).
+\end{alltt}
+Now, we can easily get rid of the hypothesis that the addition is
+symmetric: by replacing \erlcode{N+A} by
+\erlcode{A+N}:\label{code:sum_tf}
+\begin{alltt}
+sum_tf([N|L])   -> sum_tf(L,N).
+sum_tf(   [],A) -> A;
+sum_tf([N|L],A) -> sum_tf(L,\textbf{A+N}).
+\end{alltt}
+Let us relabel the arrows
+\begin{alltt}
+sum_tf([N|L])   \(\xrightarrow{\smash[t]{\alpha}}\) sum_tf(L,N).
+sum_tf(   [],A) \(\xrightarrow{\smash[t]{\beta}}\) A;
+sum_tf([N|L],A) \(\xrightarrow{\smash[t]{\gamma}}\) sum_tf(L,A+N).
+\end{alltt}
+and consider again our running example:
+\begin{alltt}
+sum\_tf([1|[2|[3|[4|[]]]]])
+          \(\xrightarrow{\smash[t]{\alpha}}\) sum\_tf([2|[3|[4|[]]]],1)
+          \(\xrightarrow{\smash[t]{\gamma}}\) sum\_tf([3|[4|[]]],1+2) \(=\) sum\_tf([3|[4|[]]],3)
+          \(\xrightarrow{\smash[t]{\gamma}}\) sum\_tf([4|[]],3+3)     \(=\) sum\_tf([4|[]],6)
+          \(\xrightarrow{\smash[t]{\gamma}}\) sum\_tf([],4+6)         \(=\) sum\_tf([],10)
+          \(\xrightarrow{\smash[t]{\beta}}\)  10\textrm{.}
+\end{alltt}
+This time, the series of additions corresponds to the expression
+\(((1+2)+3)+4\), which we can prove equal to \(1+(2+(3+4))\) by means
+of the associativity of (\erlcode{+}) only:
+\begin{equation*}
+((1 + 2) + 3) + 4
+  \eqn{\ref{add_assoc}} (1 + 2) + (3 + 4)
+  \eqn{\ref{add_assoc}} 1 + (2 + (3 + 4)).\quad \text{\textsc{qed}.}
+\end{equation*}
+What about the speed and the memory usage of \erlcode{sum\_tf/1}?
+While this is not an exact measure, let us assume that the speed is
+proportional to the number of rewrites. Then, it is easy to convince
+ourselves that each step by means of clauses \clause{\beta} and
+\clause{\gamma} process exactly one integer from the input list, so
+the total number of rewrite steps is the number of integers plus one
+due to the initial rewrite through clause \clause{\alpha}. In other
+words, if the initial input list contains \(n\)~integers, the number
+of rewrites is exactly~\(n+1\). When \(n\)~is large and taking into
+account the assumption we made about this measure of speed, this means
+that the execution time is proportional to the size of the input, for
+all inputs. In particular, if the input size (taken here as the length
+of the list) triples, then the running time also triples.
+
+Consider the abstract syntax trees of the rewritten expressions in
+\fig~\vref{fig:sum_tf_1234},
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 606 358 721]{sum_tf_1234}
+\caption{Abstract syntax trees of \erlcode{sum\_tf([1,2,3,4])}
+    \(\twoheadrightarrow\) \erlcode{10} \label{fig:sum_tf_1234}}
+\end{figure}
+where the arrow (\(\twoheadrightarrow\)) means `at least one rewrite.'
+Two expressions \(e_1\)~and~\(e_2\) are said to be equal, noted \(e_1
+\mathrel{\equiv} e_2\), if \(e_1 \twoheadrightarrow v\) and \(e_2
+\twoheadrightarrow v\). For instance, \(\erlcode{sum([1,2,3,4])}
+\mathrel{\equiv} \erlcode{sum([5,5])}\). The intermediary trees where
+the abstract syntax tree of \erlcode{A+N} appears have been skipped to
+show the point, which is that the size of the trees strictly decreases
+and the size of the call stack is constant (the boxed nodes all remain
+at the first level). There is no control context to the recursive call
+of \erlcode{sum\_tf/2}, so no call stack space is needed for it, but
+the call stack is not empty because the initial function call to
+rewrite is always put in the call stack, including the arguments which
+are integers and the references to lists in the heap (but not the
+arguments which are lists). The parts of the trees which reside in the
+call stack at each step are shown in
+\fig~\vref{fig:sum_tf_1234_stack}.
+\begin{figure}[h]
+\centering
+\includegraphics[bb=71 686 360 721]{sum_tf_1234_stack}
+\caption{Call stack while computing \erlcode{sum\_tf([1,2,3,4])}
+\label{fig:sum_tf_1234_stack}}
+\end{figure}
+As mentionned earlier, the downward arrows stand for references to
+values in the heap, where the first argument, being a list, is
+stored. It becomes clear now that the size of the call stack remains
+constant and the heap size decreases during the computation, hence so
+does the total memory size used by the program. As a conclusion, the
+\erlcode{sum\_tf/1} is to be preferred over \erlcode{sum/1} because it
+consumes less call stack and heap usage also decreases during the
+calculation after the first rewrite.
+
+Does this mean that \erlcode{sum\_tf/1} should always be used when
+summing integers?
+
+Let us consider again the previous example. In mathematical notations,
+what is aimed at are sums of the type \(S_n = 1 + 2 + \dots + n\). By
+writing it from right to left, this is still \(S_n = n + (n-1) + \dots
++ 1\). Adding side by side these two equalities yields
+\begin{align*}
+S_n + S_n   &= (1 + n) + (2 + (n-1)) + \dots + (n + 1),\\ 
+2 \cdot S_n &= \underbrace{(n+1) + \ldots + (n+1)}_{n \,\; \text{times}}
+           = (n + 1) \cdot n,
+\end{align*}
+so \(S_n = n(n+1)/2\). In particular, it comes without a surprise that
+\(S_4 = 4 \cdot (4+1)/2=10\). In \Erlang, this is the program
+\begin{verbatim}
+s(N) when N >= 0 -> N*(N+1)/2.
+\end{verbatim}
+This function is very efficient, both in terms of speed and memory
+usage, since only one step, involving only arithmetic operators, is
+needed. The moral of this story is that sometimes a specialised
+version is more suitable.
+
+\medskip
+
+\paragraph{Multiplying.}
+
+Consider this time multiplying all the integers in a list. The first
+thing that should come to the mind is that this problem is very
+similar to the previous one, only the arithmetic operator is
+different, so the following definition can be written immediately, by
+modification of \erlcode{sum/1}:
+\begin{verbatim}
+mult([N|[]]) -> N;
+mult([N| L]) -> N * mult(L).
+\end{verbatim}
+Similarly, a definition in tail form can be derived from
+\erlcode{sum\_tf/1}:\label{code:mult_tf}
+\begin{verbatim}
+mult_tf([N|L])   -> mult_tf(L,N).
+mult_tf(   [],A) -> A;
+mult_tf([N|L],A) -> mult_tf(L,A*N).
+\end{verbatim}
+This program inherits the constant call stack of \erlcode{sum\_tf/1}.
+Moreover, the reason why \erlcode{mult\_tf/1} is equivalent to
+\erlcode{mult/1} is the same reason why \erlcode{sum\_tf/1} is
+equivalent to \erlcode{sum/1}: the arithmetic operator (\erlcode{*})
+is associative, just as (\erlcode{+}) is.
+
+What could be improved that could not be in \erlcode{sum\_tf/1}? In
+other words, what can speed up a long series of multiplications? The
+occurrence of at least one zero, for example. In that case, it is not
+necessary to keep multiplying the remaining numbers, because the
+result is going to be zero anyway. This optimisation can be done by
+setting apart the case when \erlcode{N} is \erlcode{0}:
+\begin{alltt}
+mult_tf([N|L])   -> mult_tf(L,N).
+mult_tf(   [],A) -> A;
+\textbf{mult_tf([0|L],A) -> 0;}\hfill% \emph{Improvement.}
+mult_tf([N|L],A) -> mult_tf(L,A*N).
+\end{alltt}
+How often a zero occurs in the input? In the \emph{worst case}, there
+is no zero and thus the added clause is useless. But if it is known
+that zero is likely to be in the input with a probability higher than
+for other numbers, this added clause could be useful in the long term,
+that is, on the average time of different runs of the
+program. Actually, even if the numbers are uniformly random over an
+interval including zero, it makes sense to keep the clause.
+
+Here have been reviewed different ways of assessing the computation
+time: one is to count the exact number of rewrite steps for any input;
+another is to find, when the input is large for some measure, an
+equivalent function, for example, saying that the running time \(t_n\)
+is proportional to the input of size \(n\) can be written \(t_n
+\mathrel{\sim} an\), as \(n \rightarrow \infty\), for some positive
+constant \(a\) and measure \(n\); another way consists in considering
+the running time when the input is large and has the topology that
+maximally slows down the execution (the worst case); another one is to
+consider the average running time for random inputs.

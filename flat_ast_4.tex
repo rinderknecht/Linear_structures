@@ -1,0 +1,79 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+\usepackage{amsmath}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\zeta}\)}\hspace{8pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \erlnode{a}
+  \Tn
+  \pstree{\erlnode{|}}{
+    \erlnode{b}
+    \psset{nodesepB=0pt}
+    \pstree[nodesepA=0pt,nodesepB=2pt]{\erlbox{flat}}{
+      \pstree[nodesepA=2pt]{\erlnode{|}}{
+        \erlnode{[]}
+        \pstree{\erlnode{|}}{
+          \erlnode{c}
+          \erlnode{[]}
+        }
+      }
+    }
+  }
+}
+\hspace{-25pt}\raisebox{-3pt}{\(\xrightarrow{\zeta}\)}\hspace{5pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \erlnode{a}
+  \Tn
+  \pstree{\erlnode{|}}{
+    \erlnode{b}
+    \psset{nodesepB=0pt}
+    \pstree[nodesepA=0pt,nodesepB=2pt]{\erlbox{flat}}{
+      \pstree[nodesepA=2pt]{\erlnode{|}}{
+        \erlnode{c}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace{-15pt}\raisebox{-3pt}{\(\xrightarrow{\theta}\)}\hspace{8pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \erlnode{a}
+  \Tn
+  \pstree{\erlnode{|}}{
+    \erlnode{b}
+    \Tn
+    \pstree{\erlnode{|}}{
+      \erlnode{c}
+      \psset{nodesepB=0pt}
+      \pstree[nodesepA=0pt,nodesepB=2pt]{\erlbox{flat}}{
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace{-30pt}\raisebox{-3pt}{\(\xrightarrow{\epsilon}\)}\hspace{14pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \erlnode{a}
+  \pstree{\erlnode{|}}{
+    \erlnode{b}
+    \pstree{\erlnode{|}}{
+      \erlnode{c}
+      \erlnode{[]}
+    }
+  }
+}
+\endTeXtoEPS
+
+\end{document}

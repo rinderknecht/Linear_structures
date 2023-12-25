@@ -1,0 +1,55 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\raisebox{-3pt}{\(\stackrel{\beta}{\dashrightarrow}\)}
+\hspace*{-3pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\Tn}{
+  \pstree{\erlnode{|}}{
+    \erlnode{3}
+    \pstree{\erlnode{|}}{
+      \erlnode{7}
+      \pstree{\erlnode{|}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-20pt}
+\phantom{%
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\erlnode{sum\_tf}}{
+  \Tn
+  \Tn
+}}
+\hspace*{-2pt}
+\phantom{%
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\erlnode{sum\_tf}}{
+  \erlnode{10}
+  \Tn
+}}
+\hspace*{-2pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\Tn}{
+  \TR{\rnode[r]{fifteen}{\erlcode{15}}}
+  \Tn
+}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\TR{\rnode[cb]{circ}{\(\circ\)}}}{}
+%
+\nccurve[angleA=-90,angleB=20,nodesepA=-1pt,nodesepB=2pt]{->}{circ}{fifteen}
+\endTeXtoEPS
+
+\end{document}

@@ -1,0 +1,5 @@
+\begin{alltt}
+rev(L)            \(\smashedrightarrow{\alpha}\) rev_join(L,[]).
+rev_join(   [],Q) \(\smashedrightarrow{\beta}\) Q;
+rev_join([I|P],Q) \(\smashedrightarrow{\gamma}\) rev_join(P,[I|Q]).
+\end{alltt}

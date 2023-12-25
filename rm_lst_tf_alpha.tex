@@ -1,0 +1,8 @@
+\begin{alltt}
+rm_lst_tf(I,L)      \(\xrightarrow{\alpha}\) rev_join(L,[],I).
+rev_join(   [],Q,I) \(\xrightarrow{\beta}\) rm_fst(I,Q,[]);
+rev_join([J|P],Q,I) \(\xrightarrow{\gamma}\) rev_join(P,[J|Q],I).
+rm_fst(_,   [],A)   \(\xrightarrow{\delta}\) A;
+rm_fst(I,[I|Q],A)   \(\xrightarrow{\epsilon}\) rev_join(Q,A);
+rm_fst(I,[J|Q],A)   \(\xrightarrow{\zeta}\) rm_fst(I,Q,[J|A]).
+\end{alltt}

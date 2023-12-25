@@ -1,0 +1,561 @@
+%%-*-latex-*-
+
+\chapter{Permutations and Sorting}
+\label{permutations}
+
+Intimately connected to the issue of \emph{sorting}, which we shall
+study later, is the problem of generating all \emph{permutations} of a
+finite set of objects. Without any loss of generality and for the sake
+of simplicity, let us consider the tuple \((1,2,\dots,n)\). A
+permutation of this tuple is another tuple \((a_1,a_2,\dots,a_n)\)
+such that each~\(a_i\) is one of the integers, such that~\(a_i \neq
+a_j\) for all~\(i \neq j\). For example, all the permutations
+of~\((1,2,3)\) are
+\[
+(1,2,3) \quad (1,3,2) \quad (2,1,3) \quad (2,3,1) \quad (3,1,2) \quad
+(3,2,1).
+\]
+How many permutations of a group of \(n\)~objects are there? This
+question is easy to answer by considering the components in the tuple
+from left to right. The first component can be filled with an object
+amongst~\(n\). For the second, we can choose only amongst~\(n-1\),
+since we already picked an object for the first component and we are
+not allowed to repeat it. Finally, the last component is compulsorily
+the remaining object. Since choosing an object for each component does
+not depend on the previous selections (only non\hyp{}repetition is
+disallowed), the number of possible choices is multiplied each time,
+that is, there are \(n \cdot (n-1) \cdot \ldots \cdot 1 = n!\)
+distinct permutations. In the example above, we indeed counted \(3! =
+6\) permutations of~\((1,2,3)\). This is not the first time we have
+encountered the factorial function. Here is a simple derivation
+enabling the characterisation of its asymptotic growth, proposed by
+Graham, Knuth and Patashnik in their famous textbook \emph{Concrete
+  Mathematics} (Addison\hyp{}Wesley). We start by squaring the
+factorial and regrouping the factors as follows:
+\[
+n!^2 = (1 \cdot 2 \cdot \ldots \cdot n)
+       (n \cdot \ldots \cdot 2 \cdot 1)
+     = \prod_{k=1}^{n}{k(n+1-k)}.
+\]
+The parabola \(P(k) := k(n+1-k) = -k^2 + (n+1)k\) reaches its maximum
+where its derivative is zero: \(P'(k_{\max}) = 0 \Leftrightarrow
+k_{\max}=(n+1)/2\). The corresponding ordinate is \(P(k_{\max}) =
+((n+1)/2)^2 = k_{\max}^2\). When \(k\)~ranges from~\(1\) to~\(n\), the
+minimal ordinate,~\(n\), is reached at absissas \(1\)~and~\(n\), as
+shown in \fig~\vref{fig:parabola}. Hence, \(1 \leqslant k \leqslant
+k_{\max}\) implies
+\[
+P(1) \leqslant P(k) \leqslant P(k_{\max}),\quad \text{that is,} \quad
+n \leqslant k(n+1-k) \leqslant \left(\frac{n+1}{2}\right)^2.
+\]
+\begin{figure}[H]
+\centering
+\includegraphics{parabola}
+\caption{Parabola \(P(k) := k(n+1-k)\)\label{fig:parabola}}
+\end{figure}
+\noindent Multiplying the sides by varying \(k\) over the discrete
+interval \([1..n]\) yields
+\begin{gather*}
+n^n = \prod_{k=1}^{n}{n} \leqslant n!^2 
+\leqslant
+\prod_{k=1}^{n}{\left(\!\frac{n+1}{2}\!\right)^2} \!\!=
+\left(\!\frac{n+1}{2}\!\right)^{2n}
+\!\!\!\Rightarrow\!
+n^{n/2} \leqslant n! \leqslant \left(\!\frac{n+1}{2}\!\right)^n
+\end{gather*}
+It is clear now that \(n!\)~is \emph{exponential}, so it
+asymptotically outgrows any polynomial. Concretely, a function whose
+delay is proportional to a factorial is useless even for small
+inputs. For the cases where an equivalence is preferred, Stirling's
+formula states that
+\begin{equation*}
+n! \mathrel{\sim} n^n e^{-n} \sqrt{2\pi n},\quad \text{as} \,\; n
+\rightarrow \infty.
+\end{equation*}
+The reckoning we used to count all permutations of~\((1,2,\dots,n)\)
+makes use of series of choices among a set of decreasing size. Instead
+of thinking globally like this, which is often a daunting task, let us
+instead try inductively, that is, let us find a way, given all the
+permutations of~\((1,2,\dots,n-1)\), to build all the permutations of
+\((1,2,\dots,n)\). If~\((a_1,a_2,\dots,a_{n-1})\) is a permutation of
+\((1,2,\dots,n-1)\), then we can construct \(n\)~permutations
+of~\((1,2,\dots,n)\) by inserting the number~\(n\) at all possible
+places in~\((a_1,a_2,\dots,a_{n-1})\): before~\(a_1\), between
+\(a_2\)~and~\(a_3\), etc., until after~\(a_{n-1}\):
+\[
+(\boldsymbol{n},a_1,a_2,\dots,a_{n-1})\quad
+(a_1,\boldsymbol{n},a_2,\dots,a_{n-1})\quad \ldots \quad
+(a_1,a_2,\dots,a_{n-1},\boldsymbol{n}).
+\]
+For example, it is obvious that all the permutations of~\((1,2)\) are
+\((1,2)\)~and~\((2,1)\). Our method leads from~\((1,2)\) to
+\[
+(\textbf{3},1,2) \quad (1,\textbf{3},2) \quad (1,2,\textbf{3})
+\]
+and from~\((2,1)\) to
+\[
+(\textbf{3},2,1) \quad (2,\textbf{3},1) \quad (2,1,\textbf{3}).
+\]
+If we name~\(p_n\) the number of permutations on \(n\)~elements, we
+draw from this the recurrence \(p_n = n \cdot p_{n-1}\), which, with
+the additional obvious \(p_1 = 1\), leads to~\(p_n = n!\), for all~\(n
+> 0\), exactly as expected. If the \(n\)~objects to permute are
+not~\((1,2,\dots,n)\), for example,
+\((\textsf{b},\textsf{d},\textsf{a},\textsf{c})\), simply associate
+each of them to their index in the tuple, for example, \textsf{b}~is
+represented by~\(1\), \textsf{d}~by~\(2\), \textsf{a}~by~\(3\) and
+\textsf{c}~by~\(4\), so the tuple is then associated to~\((1,2,3,4)\)
+and, for instance, the permutation~\((4,1,2,3)\)
+means~\((\textsf{c},\textsf{b},\textsf{d},\textsf{a})\).
+
+Let us start by defining the function~\erlcode{perm/1} such that the
+call \erlcode{perm(\(L\))} is the list of all permutations of the
+items of list~\(L\). We implement the inductive method presented
+above, which worked by inserting a new object into all possible places
+of a shorter permutation. We have
+\begin{alltt}
+perm(   []) \(\smashedrightarrow{\alpha}\) [];
+perm(  [I]) \(\smashedrightarrow{\beta}\) [[I]];
+perm([I|L]) \(\smashedrightarrow{\gamma}\) dist(I,perm(L)).
+\end{alltt}
+where the function~\erlcode{dist/2} (``distribute'') is such that a
+call~\erlcode{dist(\(I\),\(L\))} inserts the item~\(I\) into all
+places of all the permutations contained in the list~\(L\). Because
+the insertion of~\(I\) everywhere into a given permutation of
+length~\(n\) leads to~\(n+1\) permutations of length~\(n+1\), we must
+append these new permutations to the others of same length:
+\begin{alltt}
+dist(_,          []) \(\smashedrightarrow{\delta}\) [];
+dist(I,[Perm|Perms]) \(\smashedrightarrow{\epsilon}\) join(ins(I,Perm),dist(I,Perms)).
+\end{alltt}
+The call~\erlcode{ins(I,Perm)} computes the list of permutations
+resulting from inserting~\erlcode{I} in all places in the permutation
+\erlcode{Perm}. We thus derive
+\begin{alltt}
+ins(I,        []) \(\smashedrightarrow{\zeta}\) [[I]];
+ins(I,Perm=[J|L]) \(\smashedrightarrow{\eta}\) [[I|Perm]|push(J,ins(I,L))].
+\end{alltt}
+where the function~\erlcode{push/2} is such that any
+call~\erlcode{push(\(I\),\(L\))} pushes item~\(I\) on top of all the
+permutations of the list of permutations~\(L\). The order, as usual up
+to now, is unchanged:\label{code:push}
+\begin{alltt}
+push(_,          []) \(\smashedrightarrow{\theta}\) [];
+push(I,[Perm|Perms]) \(\smashedrightarrow{\iota}\) [[I|Perm]|push(I,Perms)].
+\end{alltt}
+Now we can compute all the permutations of~\((4,1,2,3)\)
+or~\((\textsf{c},\textsf{b},\textsf{d},\textsf{a})\) by
+calling~\erlcode{perm([4,1,2,3])} or~\erlcode{perm([c,b,d,a])}. Note
+that, after computing the permutations of length~\(n+1\), the
+permutations of length~\(n\) are not needed anymore, which allows the
+garbage collector to reclaim the corresponding memory cells for other
+uses. As far as the delays are concerned, the definition
+of \erlcode{push/2} leads to
+\[
+\comp{push}{0} \eqn{\theta} 1;\qquad
+\comp{push}{n+1} \eqn{\iota} 1 + \comp{push}{n},\quad \text{with}
+                  \,\; n \geqslant 0.
+\]
+We can easily deduce a simple closed expressions for the delay:
+\[
+\comp{push}{n} = n + 1,\quad \text{with} \,\; n \geqslant 0.
+\]
+We know that the result of \erlcode{ins(\(I\),\(\pi\))} is a list of
+length~\(n+1\) if~\(\pi\) is a permutation of \(n\)~objects into which
+we insert one more object~\(I\). Hence, the definition
+of \erlcode{ins/2} leads to
+\[
+\comp{ins}{0}   \eqn{\zeta} 1;\quad
+\comp{ins}{p+1} \eqn{\eta} 1 + \comp{push}{p+1} + \comp{ins}{p}
+                 = 3 + p + \comp{ins}{p}, \quad \text{with} \,\; p
+                   \geqslant 0,
+\]
+where~\(\comp{ins}{p}\) is the delay of \erlcode{ins(\(I\),\(\pi\))}
+with~\(\pi\) of length~\(p\). By summing for all~\(p\) from
+\(0\)~to~\(n-1\), for~\(n>0\), on both sides and then cancelling
+equals, we have
+\begin{align*}
+\sum_{p=0}^{n-1}{\comp{ins}{p+1}}
+  &= \sum_{p=0}^{n-1}{3} + \sum_{p=0}^{n-1}{p}
+     + \sum_{p=0}^{n-1}{\comp{ins}{p}},
+\intertext{By cancelling identical terms in the sums
+  \(\sum_{p=0}^{n-1}{\comp{ins}{p+1}}\) and
+  \(\sum_{p=0}^{n-1}{\comp{ins}{p}}\) (this is called the
+  \emph{telescoping} or \emph{difference} method), we draw}
+\comp{ins}{n}
+  &= 3n + n(n-1)/2 + \comp{ins}{0}
+   = 3n + n(n-1)/2 + 1,\quad \text{by} \,\; (\eqn{\zeta}),\\
+  &= \frac{1}{2}{n^2} + \frac{5}{2}{n} + 1.
+\end{align*}
+This last equation is actually valid even if~\(n =
+0\). Let~\(\comp{dist}{n!}\) be the delay for distributing an item
+among \(n!\)~permutations of length~\(n\). The definition of
+\erlcode{dist/2} shows that it repeats calls to \erlcode{join/2}
+and \erlcode{ins/2} whose arguments are always of length
+\(n+1\)~and~\(n\), respectively, because all processed permutations
+here have the same length. Thus, we deduce, for~\(p \geqslant 0\),
+that
+\[
+\comp{dist}{0} \eqn{\delta} 1;\quad
+\comp{dist}{p+1}
+  \eqn{\epsilon} 1 + \comp{join}{n+1} + \comp{ins}{n}
+                    + \comp{dist}{p}
+  = \frac{1}{2}{n^2} + \frac{7}{2}{n} + 4 + \comp{dist}{p},
+\]
+since we already know that \(\comp{join}{n} = n + 1\) and the value
+of~\(\comp{ins}{n}\). By summing both sides of the last equation for
+all~\(p\) from \(0\)~to~\(n!-1\), we can eliminate most of the terms
+and find a non recursive definition of \(\comp{dist}{n!}\),
+for~\(n>0\):
+\begin{align*}
+\sum_{p=0}^{n!-1}{\comp{dist}{p+1}}
+   &= \sum_{p=0}^{n!-1}{\left(\frac{1}{2}{n^2}
+      + \frac{7}{2}{n} + 4\right)} 
+      + \sum_{p=0}^{n!-1}{\comp{dist}{p}},\\
+\comp{dist}{n!}
+  &= \left(\frac{1}{2}{n^2}+\frac{7}{2}{n}+4\right)n! + \comp{dist}{0}
+   = (n^2 + 7n + 8)\frac{n!}{2} + 1.
+\intertext{Let us finally compute the delay of \erlcode{perm(\(L\))},
+  noted \(\comp{perm}{p}\), where \(p\) is the length of the list
+  \(L\). From the clauses \clause{\alpha} to \clause{\gamma}, we
+  deduce the following equations, where \(p > 0\):}
+\comp{perm}{0}   &\eqn{\alpha} 1;\qquad
+\comp{perm}{1}   \eqn{\beta} 1;\\
+\comp{perm}{p+1}
+  &\eqn{\gamma} 1 + \comp{perm}{p} + \comp{dist}{p!}
+   = (p^2 + 7p + 8)p!/2 + 2 + \comp{perm}{p}.
+\intertext{Again, summing both sides, most of the terms cancel out:}
+\sum_{p=1}^{n-1}{\comp{perm}{p+1}}
+  &= \frac{1}{2}\sum_{p=1}^{n-1}{(p^2+7p+8)p!} + \sum_{p=1}^{n-1}{2}
+     + \sum_{p=1}^{n-1}{\comp{perm}{p}}\\
+\comp{perm}{n}
+  &= \frac{1}{2}\sum_{p=1}^{n-1}{(p^2 + 7p + 8)p!}
+     + 2(n-1) + \comp{perm}{1},\;\,\text{with} \,\; n > 1,\\
+  &= \frac{1}{2}\sum_{p=1}^{n-1}{((p+2)(p+1)+6+4p)p!} + 2n - 1\\
+  &= \frac{1}{2}\sum_{p=1}^{n-1}{(p+2)(p+1)p!}
+     + 3 \sum_{p=1}^{n-1}{p!} + 2 \sum_{p=1}^{n-1}{pp!} + 2n - 1\\
+  &= \frac{1}{2}\sum_{p=1}^{n-1}{(p+2)!}
+     + 3 \sum_{p=1}^{n-1}{p!} + 2 \sum_{p=1}^{n-1}{pp!} + 2n - 1\\
+  &= \frac{1}{2}\sum_{p=3}^{n+1}{p!}
+     + 3 \sum_{p=1}^{n-1}{p!} + 2 \sum_{p=1}^{n-1}{pp!} + 2n - 1\\
+  &= \left(\frac{1}{2}((n+1)! + n! - 2! - 1!)
+     + \frac{1}{2}\sum_{p=1}^{n-1}{p!}\right)
+     + 3 \sum_{p=1}^{n-1}{p!}\\
+  &\phantom{= x} + 2 \sum_{p=1}^{n-1}{pp!} + 2n - 1.\\
+  &= \frac{1}{2}{(n+2)n!} + \frac{7}{2}\sum_{p=1}^{n-1}{p!}
+     + 2 \sum_{p=1}^{n-1}{pp!} + 2n - \frac{5}{2}.
+\end{align*}
+This last equation is actually valid even if~\(n = 1\). Let us prove
+by induction the conjecture
+\[
+\sum_{p=1}^{n-1}{pp!} = n! - 1,\quad \text{for} \,\; n > 2.
+\]
+First, we check the equation for the smallest value of~\(n\):
+\[
+\sum_{p=1}^{1-1}{pp!} := 0 = 1! - 1.
+\]
+Now, let us suppose the conjecture valid for a given~\(n\), called the
+\emph{induction hypothesis}, and let us prove that it holds
+for~\(n+1\):
+\begin{align*}
+\sum_{p=1}^{n}{pp!}
+   &= \sum_{p=1}^{n-1}{pp!} + nn!.
+\intertext{We can use the induction hypothesis now:}
+\sum_{p=1}^{n}{pp!}
+   &= (n! - 1) + nn! = (n+1)n! - 1 = (n+1)! - 1,
+\end{align*}
+which we recognise as the equality to be proved for~\(n+1\), hence the
+theorem is valid for all~\(n > 0\), according to the induction
+principle. For such values of~\(n\), it then leads to
+\begin{align*}
+\comp{perm}{n}
+  &= \frac{1}{2}{nn!} + n! + \frac{7}{2}\sum_{p=1}^{n-1}{p!}
+     + 2(n! - 1) + 2n - \frac{5}{2}\\
+  &= \frac{1}{2}{nn!} + 3n! 
+     + 2n - \frac{9}{2} + \frac{7}{2}\sum_{p=1}^{n-1}{p!},\quad
+     \text{with} \,\; n > 0.
+\end{align*}
+The remaining sum is called the \emph{left factorial} and is usually
+defined
+\[
+!n := \sum_{p=1}^{n-1}{p!},\quad \text{with} \,\; n > 0.
+\]
+Unfortunately, no closed expression of the left factorial is
+known. This is actually a common situation when determining the delay
+of relatively complex \Erlang functions. When confronted to this kind
+of situation, the best course of action is to study the asymptotic
+approximation of the delay. First, we remark that
+\begin{align*}
+!n        &= (n-1)! + {!}(n-1),\\
+!n/(n-1)! &= 1 + {!}(n-1)/(n-1)!\\
+          &= 1 + ((n-2)! + {!}(n-2))/(n-1)!\\
+          &= 1 + 1/(n-1) + {!}(n-2)/(n-1)!\\
+!n/(n-1)! &= 1 + 1/(n-1) + 1/(n-1)(n-2) + \dots + 1/(n-1)!.%\\
+%          &= 1 + \sum_{p=1}^{n-1}\prod_{q=1}^{p}\frac{1}{n-p}.
+\end{align*}
+Furthermore, the following obvious inequalities hold for~\(n > 0\):
+\begin{align*}
+  1        &\leqslant 1,\\
+n-1        &\leqslant n-1,\\
+n-1        &< (n-1)(n-2),\\
+           &\;\;\vdots\\
+n-1        &< (n-1)(n-2)\cdot\ldots\cdot 1 = (n-1)!.
+\intertext{Inversing the sides and summing them we deduce}
+1 + \frac{n-1}{n-1} &> 1 + \frac{1}{n-1} + \frac{1}{(n-1)(n-2)} +
+\dots + \frac{1}{(n-1)!},\\
+2 &> \frac{!n}{(n-1)!}.
+\end{align*}
+Therefore, we have the bounds
+\[
+(n-1)! < {!}n < 2 (n-1)!.
+\]
+This is enough to proceed conclusively. Let us define the bounds for
+\(\comp{perm}{n}\) as \(L(n) < \comp{perm}{n} < U(n)\), where
+\begin{align*}
+L(n) &:= \frac{1}{2}{nn!} + 3n! + 2n - \frac{9}{2}
+                 + \frac{7}{2}{(n-1)!},\\
+U(n) &:= \frac{1}{2}{nn!} + 3n! + 2n - \frac{9}{2}
+                 + 7(n-1)!.
+\end{align*}
+Then
+\begin{align*}
+\frac{2}{nn!}{L(n)}
+     &= 1 + \frac{6}{n} + \frac{4}{n!} - \frac{9}{nn!}
+        + \frac{7}{n^2}
+     \rightarrow 1,\quad \text{as} \,\; n \rightarrow \infty,\\
+\frac{2}{nn!}{U(n)}
+     &= 1 + \frac{6}{n} + \frac{4}{n!} - \frac{9}{nn!}
+        + \frac{14}{n^2}
+     \rightarrow 1,\quad \text{as} \,\; n \rightarrow \infty,
+\end{align*}
+that is, \(L(n) \mathrel{\sim} U(n) \mathrel{\sim}
+\frac{1}{2}{nn!}\). Hence
+\[
+\comp{perm}{n} \mathrel{\sim} \frac{1}{2}{nn!},\quad \text{as} \,\; n
+\rightarrow \infty.
+\]
+Stirling's approximation allows us finally to conclude
+\[
+\comp{perm}{n} \mathrel{\sim} \sqrt{\frac{\pi n}{2}} e^{-n}
+n^{n+1},\quad \text{as} \,\; n \rightarrow \infty.
+\]
+This is an unbearably slow program, as expected. We should not hope to
+compute \(\comp{perm}{11}\) easily and there is no way to improve
+significantly the delay because the number of permutations it computes
+is inherently exponential, so it would even suffice to spend only one
+function call per permutation to obtain an exponential delay.
+
+Permutations are worth studying in detail because of their intimate
+relationship with \emph{sorting}, which is the process of ordering a
+finite series of objects. The result of a sort can indeed be viewed as
+a permutation of the objects of a given permutation, so that they
+become ordered. In other words, the initial permutation can be thought
+of as scrambling originally ordered objects and the sorting
+permutation then puts them back to their place. To understand this
+precisely, it is perhaps helpful to use a slightly different notation
+for permutations, one which shows the indexes together with the
+objects. For example, instead of writing unidimensionally \(\pi_1 =
+(2,4,1,5,3)\), we would write
+\[
+\pi_1 =
+\begin{pmatrix}
+1 & 2 & 3 & 4 & 5\\
+2 & 4 & 1 & 5 & 3
+\end{pmatrix}.
+\]
+The first line is made of the ordered indexes and the second line
+contains the objects, which are integers in the same range as the
+indexes, usually unordered. In general, if we have a permutation \(\pi
+= (a_1,a_2,\dots,a_n)\), it is written with more details as
+\[
+\pi =
+\begin{pmatrix}
+     1 &      2 & \dots &     n\\
+\pi(1) & \pi(2) & \dots & \pi(n)
+\end{pmatrix},
+\]
+where~\(a_i = \pi(i)\), for all~\(i\) from \(1\)~to~\(n\). For the
+sake of simplicity, we shall require that the objects are the same as
+the indexes, that is, integers in the same interval starting
+at~\(1\). Then the result of any sorting algorithm on \(\pi_1\) is the
+following permutation~\(\pi_s\), which has to be interpreted as a
+permutation on the objects of~\(\pi_1\):
+\[
+\pi_s =
+\begin{pmatrix}
+1 & 2 & 3 & 4 & 5\\
+3 & 1 & 5 & 2 & 4
+\end{pmatrix}.
+\]
+Technically, to see how it works, we need first to define the
+\emph{composition of two permutations} \(\pi_a\)~and~\(\pi_b\) as
+\[
+\pi_b \circ \pi_a :=
+\begin{pmatrix}
+              1 &               2 & \dots & n\\
+\pi_b(\pi_a(1)) & \pi_b(\pi_a(2)) & \dots & \pi_b(\pi_a(n)) 
+\end{pmatrix},
+\]
+then the permutation~\(\pi_s\) sorting~\(\pi_1\) has the defining
+property that \(\pi_s~\circ~\pi_1 = \mathcal{I}\), where the
+\emph{identity permutation}~\(\mathcal{I}\) is such that
+\(\mathcal{I}(i) = i\), for all indexes~\(i\). In other words, \(\pi_s
+= \pi_1^{-1}, \) that is, \emph{sorting a permutation consists in
+  building its inverse}. If one considers a permutation, other than
+the identity, to shuffle initially ordered numbers, its inverse puts
+them back to their original place. We can now check that, indeed,
+\(\pi_1^{-1}~\circ~\pi_1 = \mathcal{I}\):
+\[
+\begin{pmatrix}
+1 & 2 & 3 & 4 & 5\\
+3 & 1 & 5 & 2 & 4
+\end{pmatrix}
+\circ
+\begin{pmatrix}
+1 & 2 & 3 & 4 & 5\\
+2 & 4 & 1 & 5 & 3
+\end{pmatrix}
+=
+\begin{pmatrix}
+1 & 2 & 3 & 4 & 5\\
+1 & 2 & 3 & 4 & 5
+\end{pmatrix}.
+\]
+An alternative representation of permutations and their composition is
+based on considering them as \emph{bijections from an interval onto
+  itself}, denoted by \emph{bipartite graphs}, also called
+\emph{bigraphs}. Such graphs are made of two disjoint, ordered sets of
+vertices of same cardinal, the indexes and the objects, and the edges
+always go from an index to an object, without sharing the vertices
+with other edges. Note that we state nothing about the nature of the
+indexes and the objects, as only the total order over both and their
+relationships do matter, but, for consistency with the previous
+presentation, we shall assume that both the indexes and the objects
+are integers belonging to the same interval. For example,
+permutation~\(\pi_1\) is shown in \fig~\vref{fig:pi_1_bigraph} and its
+inverse,~\(\pi_1^{-1}\), is displayed in \fig~\vref{fig:pi_s_bigraph}.
+\begin{figure}[t]
+\centering
+\subfloat[Bigraph of \(\pi_1^{-1} =(3,1,5,2,4)\)\label{fig:pi_s_bigraph}]{%
+\includegraphics[bb=81 662 204 721]{pi_s_bigraph}
+}
+\qquad\qquad
+\subfloat[Bigraph of \(\pi_1 =(2,4,1,5,3)\)\label{fig:pi_1_bigraph}]{%
+\includegraphics[bb=81 662 204 721]{pi_1_bigraph}
+}
+\caption{Sorting permutation \(\pi_{1}^{-1}\) and permutation to be
+  sorted \(\pi_1\)\label{fig:pi_1}}
+\end{figure}
+The composition of \(\pi_1^{-1}\)~and~\(\pi_1\) is then obtained by
+identifying the object vertices of~\(\pi_1\) with the index vertices
+of~\(\pi_1^{-1}\), as shown in \fig~\vref{fig:pi_1_pi_s}.
+\begin{figure}[b]
+\centering
+\subfloat[\(\pi_1^{-1} \circ \pi_1\)\label{fig:pi_1_pi_s}]{%
+\includegraphics[bb=81 634 204 721]{pi_1_pi_s}
+}%
+\qquad\qquad
+\subfloat[\(\mathcal{I} = \pi_1^{-1} \circ \pi_1\)\label{fig:pi_2}]{%
+\includegraphics[bb=81 634 204 721]{pi_2}
+}
+\caption{Applying \(\pi_1\) to its sorting permutation
+  \(\pi_1^{-1}\).}
+\end{figure}
+The resulting identity permutation,~\(\mathcal{I}\), is obtained by
+replacing two adjacent edges by their transitive closure and erasing
+the intermediate vertices, as shown in \fig~\vref{fig:pi_2}. Note that
+the edges in~\(\mathcal{I}\) do not cross over each other: it is a
+characteristic feature of the identity permutation. As an amusing
+occurrence, it may be that \(\pi_1^{-1} = \pi_1\), that is, the given
+permutation is equal to its inverse, or, in other words, the sorting
+permutation may be the same as the permutation to be sorted. Consider
+for instance the permutation
+\[
+\pi_3 =
+\begin{pmatrix}
+1 & 2 & 3 & 4 & 5\\
+3 & 4 & 1 & 2 & 5
+\end{pmatrix}
+\]
+and, in \fig~\vref{fig:involution}, the representation as a bigraph of
+\(\pi_3~\circ~\pi_3\). This kind of permutation, such that
+\(\pi_3~\circ~\pi_3 = \mathcal{I}\), is called an \emph{involution}.
+
+Studying permutations and their basic properties helps understanding
+sorting algorithms, in particular, their average delay. It also
+provides a way to quantify the disorder of a permutation. Given
+\((1,3,5,2,4)\), we can see that only the pairs of objects \((3,2)\),
+\((5,2)\) and~\((5,4)\) are out of order. In general, given \((a_1,
+a_2, \dots, a_n)\), the pairs \((a_i,a_j)\) such that~\(i < j\)
+and~\(a_i > a_j\) are called \emph{inversions}. The more inversions,
+the greater disorder. As expected, the identity permutation has no
+inversions and previously studied permutation \(\pi_1 = (2,4,1,5,3)\)
+has \(4\). When considering permutations as represented by bigraphs,
+an inversion corresponds to an intersection of two edges, more
+precisely, it is the pair made of the objects pointed at by two
+arrows. Therefore, the number of inversions corresponds to the number
+of edge crossings, so, for instance, \(\pi_1^{-1}\)~has
+\(4\)~inversions. In fact, \emph{the inverse of a permutation has the
+  same number of inversions as the permutation itself}. This can be
+clearly seen when comparing the digraphs of \(\pi_1\) and
+\(\pi_1^{-1}\) in \fig~\vref{fig:pi_1}: in order to deduce the bigraph
+of~\(\pi_1^{-1}\) from the one corresponding to~\(\pi_1\), let us
+reverse each edge, that is, the direction in which the arrows are
+pointing, then swap the indexes and the objects, that is, exchange the
+two lines of vertices---alternatively, we can imagine that we fold
+down the paper along the object line, then look through and reverse
+the arrows. The horizontal symmetry is especially obvious in
+\fig~\vref{fig:pi_1_pi_s} and \fig~\vref{fig:involution_1}.
+\begin{figure}[h]
+\centering
+\subfloat[\(\pi_3 \circ \pi_3\)\label{fig:involution_1}]{%
+\includegraphics[bb=81 634 204 721]{involution_1}
+}
+\qquad\qquad
+\subfloat[\(\pi_3 \circ \pi_3\)]{%
+\includegraphics[bb=81 634 204 721]{involution_2}
+}
+\caption{Involution \(\pi_3\) sorts itself\label{fig:involution}}
+\end{figure}
+From a programming standpoint, the sorting problem is stated as
+follows: given a list of integers, we want to order them in
+\emph{nondecreasing order}, that is, to output a list containing the
+same numbers with the additional property that, for all integers
+\(N\)~and~\(M\), if \(N\)~is located before~\(M\), then~\(N \leqslant
+M\). For example, if the input list is \erlcode{[6,3,1,7,5,3,0]}, the
+result is \erlcode{[0,1,3,3,5,6,7]}. Note that equal integers will end
+up being adjacent and they are the reason why we qualified the sort as
+non\hyp{}decreasing, instead of increasing---the latter assuming
+strict monotonicity. This programming approach to sorting can be
+understood if permutations are kept in mind, although there are slight
+practical issues, which are threefold. First, the objects may not
+necessarily be integers in the same range as the indexes. This is not
+a real obstacle because what matters most in a permutation is the
+relative order of the objects, irrespective of their nature. Second,
+the result as just stated is not the sorting permutation, but the
+sorted permutation, which corresponds to the identity permutation in
+our theoretical presentation above. In fact, we are not going to build
+any sorting permutation explicitly, but, instead, the sorted
+permutation directly. Last, we allow the permutation objects to be
+repeated, that is, they do not constitute a mathematical set. This
+situation can be handled by considering that an object appearing
+before another equal object is actually smaller, as far as the
+ordering relationship is concerned. Take for instance the permutation
+\((\textsf{d},\textsf{b},\textsf{a},\textsf{a},\textsf{c})\), where
+\textsf{a}~occurs twice. We then decide, during the sorting process,
+that the first occurrence is smaller than the second one. One may
+wonder if that is an issue at all, since there is no way to
+distinguish between the two objects~\textsf{a}, but later on we shall
+attach potentially different data to these~\textsf{a}, so they will be
+considered different in certain contexts. A sorting algorithm that
+thus maintain the initial order between identical objects is called
+\emph{stable}, otherwise it is said to be \emph{unstable}.
+
+\medskip
+
+\paragraph{Exercise.}
+\label{ex:permutations_and_sorting}
+\noindent [See answer page~\pageref{ans:permutations_and_sorting}.]
+
+Transform~\erlcode{perm/1} and all the definitions it depends upon
+into tail form.

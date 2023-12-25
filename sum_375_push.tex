@@ -1,0 +1,135 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[levelsep=20pt,treesep=14pt]{\erlbox{sum}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \erlnode{3}
+    \pstree{\erlnode{|}}{
+      \erlnode{7}
+      \pstree{\erlnode{|}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-21pt}
+\raisebox{-3pt}{\(\stackrel{\beta}{\dashrightarrow}\)}
+\hspace*{-4pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{three1}{\erlcode{3}}}
+    \pstree{\TR{\rnode[r]{sevenRoot1}{\erlcode{|}}}}{
+      \erlnode{7}
+      \pstree{\erlnode{|}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-34pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\TR{\rnode[lb]{plus1}{\erlcode{+}}}}{
+  \Tn
+  \psset{nodesepB=0pt}
+  \pstree{\TR{\rnode[bc]{sum1}{\fbox{\erlcode{sum}}}}}{
+    \Tn
+  }
+}
+\hspace*{-21pt}
+\raisebox{-3pt}{\(\stackrel{\beta}{\dashrightarrow}\)}
+\hspace*{-2pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{three2}{\erlcode{3}}}
+    \pstree{\TR{\rnode[r]{sevenRoot2}{\erlcode{|}}}}{
+      \TR{\rnode[rt]{seven}{\erlcode{7}}}
+      \pstree{\TR{\rnode[r]{fiveRoot}{\erlcode{|}}}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-32pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\TR{\rnode[lb]{plus2}{\erlcode{+}}}}{
+  \Tn
+  \pstree{\TR{\rnode[bc]{sum2}{\erlcode{sum}}}}{
+    \Tn
+  }
+}
+\hspace*{-8pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\TR{\rnode[lb]{plus3}{\erlcode{+}}}}{
+  \Tn
+  \psset{nodesepB=0pt}
+  \pstree{\TR{\rnode[bc]{sum3}{\fbox{\erlcode{sum}}}}}{
+    \Tn
+  }
+}
+
+\hspace*{-21pt}
+\raisebox{-3pt}{\(\stackrel{\alpha}{\dashrightarrow}\)}
+\hspace*{-2pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{three21}{\erlcode{3}}}
+    \pstree{\TR{\rnode[r]{sevenRoot21}{\erlcode{|}}}}{
+      \TR{\rnode[rt]{seven1}{\erlcode{7}}}
+      \pstree{\TR{\rnode[r]{fiveRoot1}{\erlcode{|}}}}{
+        \TR{\rnode[rt]{five}{\erlcode{5}}}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-32pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\TR{\rnode[lb]{plus21}{\erlcode{+}}}}{
+  \Tn
+  \pstree{\TR{\rnode[bc]{sum21}{\erlcode{sum}}}}{
+    \Tn
+  }
+}
+\hspace*{-8pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\TR{\rnode[lb]{plus31}{\erlcode{+}}}}{
+  \Tn
+  \pstree{\TR{\rnode[bc]{sum31}{\erlcode{sum}}}}{
+    \Tn
+  }
+}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\TR{\rnode[cb]{circ}{\(\circ\)}}}{}
+\ncarc[arcangle=30,nodesep=2pt]{->}{plus1}{three1}
+\nccurve[angleA=-90,angleB=20]{->}{sum1}{sevenRoot1}
+
+\ncarc[arcangle=30,nodesep=2pt]{->}{plus2}{three2}
+\nccurve[angleA=-90,angleB=20,nodesepA=2pt]{->}{sum2}{sevenRoot2}
+\nccurve[angleA=-90,angleB=25,ncurvA=1,nodesep=2pt]{->}{plus3}{seven}
+\nccurve[angleA=-90,angleB=20]{->}{sum3}{fiveRoot}
+
+\ncarc[arcangle=30,nodesep=2pt]{->}{plus21}{three21}
+\nccurve[angleA=-90,angleB=20,nodesepA=2pt]{->}{sum21}{sevenRoot21}
+\nccurve[angleA=-90,angleB=20,ncurvA=1,nodesep=2pt]{->}{plus31}{seven1}
+\nccurve[angleA=-90,angleB=20,nodesepA=2pt]{->}{sum31}{fiveRoot1}
+
+\nccurve[angleA=-90,angleB=20,ncurv=1,nodesepA=-1pt,nodesepB=2pt]{->}{circ}{five}
+\endTeXtoEPS
+
+\end{document}

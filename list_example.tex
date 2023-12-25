@@ -1,0 +1,41 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \erlnode{3}
+  \Tn
+  \Tn
+  \psset{linewidth=0.8pt,linestyle=dashed}
+  \pstree{\erlnode{|}}{
+    \psset{linestyle=solid}
+    \pstree{\erlnode{|}}{
+      \erlnode{1}
+      \pstree{\erlnode{|}}{
+        \erlnode{[]}
+        \erlnode{[]}
+      }
+    }
+    \psset{linewidth=0.8pt,linestyle=dashed}
+    \pstree{\erlnode{|}}{
+      \psset{linestyle=solid}
+      \erlnode{[]}
+      \Tn
+      \psset{linewidth=0.8pt,linestyle=dashed}
+      \erlnode{[]}
+    }
+  }
+}
+\endTeXtoEPS
+
+\end{document}

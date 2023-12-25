@@ -1,0 +1,45 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{Ndown1}{\erlcode{N}}}
+    \erlnode{[]}
+  }
+}
+\hspace*{-4pt}\raisebox{-3pt}{\(\xrightarrow{\alpha}\)}\hspace*{4pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\TR{\rnode[cb]{Nup}{\(\circ\)}}}{}
+\qquad\qquad
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{sum}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{Ndown2}{\erlcode{N}}}
+    \TR{\rnode[r]{L}{\erlcode{L}}}
+  }
+}
+\hspace*{0pt}\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\hspace*{-4pt}
+\pstree[nodesep=2pt,levelsep=15pt,treesep=14pt]%
+  {\TR{\rnode[lb]{plus}{\erlcode{+}}}}{
+  \Tn
+  \pstree{\TR{\rnode[bc]{sum}{\erlcode{sum}}}}{
+    \Tn
+  }
+}
+\nccurve[angleA=-90,angleB=20,nodesepB=2pt,nodesepA=-1pt]{->}{Nup}{Ndown1}
+\ncarc[arcangle=12,nodesep=2pt]{->}{plus}{Ndown2}
+\nccurve[angleA=-90,angleB=10,nodesep=2pt]{->}{sum}{L}
+\endTeXtoEPS
+
+\end{document}

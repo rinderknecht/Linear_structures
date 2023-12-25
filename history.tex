@@ -1,0 +1,61 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlcirc[1]{\Tcircle[linestyle=solid]{\erlcode{#1}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[levelsep=20pt,treesep=14pt,nodesepA=-1pt,nodesepB=2pt,arrows=->]{\TR{\(\circ\)}}{
+  \pstree[nodesep=2pt,levelsep=20pt,treesep=14pt,arrows=-]{\erlnode{|}}{
+    \begin{skiplevels}{1}
+      \pstree{\TR{\rnode[rb]{root_d_from}{\erlcode{|}}}}{
+        \erlnode{d}
+        \Tn
+      }
+    \end{skiplevels}
+    \Tn
+    \pstree{\TR{\rnode[lb]{solo_from}{\erlcode{|}}}}{
+      \Tn
+      \Tn
+      \pstree{\erlnode{|}}{
+        \pstree{\TR{\rnode[rb]{root_c_from}{\erlcode{|}}}}{
+          \erlnode{c}
+          \Tn
+        }
+        \pstree{\erlnode{|}}{
+          \pstree{\TR{\rnode[l]{root_b_l_to}{\rnode[lb]{root_b_lb_to}{\rnode[br]{root_b_from}{\erlcode{|}}}}}}{
+            \erlnode{b}
+            \Tn
+          }
+          \pstree{\erlnode{|}}{
+            \pstree{\TR{\rnode[l]{root_a_to}{\erlcode{|}}}}{
+              \erlnode{a}
+              \erlnode{[]}
+            }
+            \Tn
+            \pstree{\erlnode{|}}{
+              \erlnode{[]}
+              \erlnode{[]}
+            }
+          }
+        }
+      }
+    }
+  }
+}
+%
+\ncline[nodesep=2pt]{->}{root_b_from}{root_a_to}
+\ncline[nodesep=2pt]{->}{root_c_from}{root_b_l_to}
+\nccurve[angleA=-130,angleB=-150,nodesep=2pt,ncurvA=2,ncurvB=1.7]{->}{solo_from}{root_b_l_to}
+\nccurve[angleA=-70,angleB=-130,nodesep=2pt,ncurvA=0.1,ncurvB=2]{->}{root_d_from}{root_b_lb_to}
+\endTeXtoEPS
+
+\end{document}

@@ -1,0 +1,48 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-infixplot,pst-eps}
+
+\begin{document}
+
+\TeXtoEPS
+\begin{pspicture}(-0.5,-0.5)(4,3)
+%% Axes
+%
+  \psaxes{->}(0,0)(0,-0.5)(4,3)
+%  \psset{linewidth=0.6pt}
+
+%
+% Abscissa x
+%
+\rput[C](4,-0.25){\(x\)}
+%
+% Ordinate h(x)
+%
+\rput[rC](-0.2,3){\(h(x)\)}
+\rput[rC](-0.2,0.5){\(0.5\)}
+\rput[rC](-0.2,1.5){\(1.5\)}
+ 
+% h(x) := 2^x - (x^2 + 7x - 4)/4
+%
+\psPlot{0.6}{3.4}{2^x - (x^2 + 7*x - 4)/4}
+
+% Segments and intersections
+%
+\psline[linestyle=dotted](1,0)(1,1)
+\psline[linestyle=dotted](0,1)(1,1)
+\qdisk(1,1){2pt}
+
+\psline[linestyle=dotted](2,0)(2,0.5)
+\psline[linestyle=dotted](0,0.5)(2,0.5)
+\qdisk(2,0.5){2pt}
+
+\psline[linestyle=dotted](3,0)(3,1.5)
+\psline[linestyle=dotted](0,1.5)(3,1.5)
+\qdisk(3,1.5){2pt}
+\end{pspicture}
+\endTeXtoEPS
+
+\end{document}

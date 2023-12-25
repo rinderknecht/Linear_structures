@@ -1,0 +1,27 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-eps}
+\usepackage{booktabs}
+
+\input{commands}
+
+\begin{document}
+
+\TeXtoEPS
+\(
+\begin{array}{rcccccccccc}
+\toprule
+                    n & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10\\
+\erlcode{mean(\(n\))} & 4 & 10 & \frac{50}{3} & \frac{65}{3} 
+                      & \frac{442}{15} & \frac{524}{15} 
+                      & \frac{611}{15} & \frac{701}{15} 
+                      & \frac{2548}{45} & \frac{2828}{45}\\
+\bottomrule
+\end{array}
+\)
+\endTeXtoEPS
+
+\end{document}

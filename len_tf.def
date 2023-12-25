@@ -1,0 +1,3 @@
+len_tf(L)    -> len(L,0).
+len(   [],N) -> N;
+len([_|L],N) -> len(L,N+1).

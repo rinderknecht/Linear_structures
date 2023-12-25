@@ -1,0 +1,4 @@
+sflat(       []) -> [];
+sflat(   [[]|L]) -> sflat(L);
+sflat([[I|M]|L]) -> join(sflat([I|M]),sflat(L));
+sflat(    [I|L]) -> [I|sflat(L)].

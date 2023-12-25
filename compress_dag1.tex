@@ -1,0 +1,37 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{compress}}{
+  \pstree{\erlnode{|}}{
+    \erlnode{I}
+    \pstree{\erlnode{|}}{
+      \TR{\rnode[b]{to_I}{\erlcode{I}}}
+      \TR{\rnode[b]{to_L}{\erlcode{L}}}
+    }
+  }
+}
+\quad\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\quad
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\erlnode{\erlcode{compress}}}{
+    \pstree{\TR{\rnode[bl]{from_I}{\rnode[br]{from_L}{\erlcode{|}}}}}{
+      \Tn
+    }
+  }
+\nccurve[angleA=-120,angleB=-90,ncurv=1,nodesep=2pt]{->}{from_I}{to_I}
+\nccurve[angleA=-30,angleB=-90,ncurv=1,nodesep=2pt]{->}{from_L}{to_L}
+\endTeXtoEPS
+
+\end{document}

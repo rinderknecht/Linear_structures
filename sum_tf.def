@@ -1,0 +1,3 @@
+sum_tf([N|L])   -> sum_tf(L,N).
+sum_tf(   [],A) -> A;
+sum_tf([N|L],A) -> sum_tf(L,A+N).

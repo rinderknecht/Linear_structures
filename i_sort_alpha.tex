@@ -1,0 +1,6 @@
+\begin{alltt}
+isort(   [])               \(\smashedrightarrow{\beta}\) [];
+isort([I|L])               \(\smashedrightarrow{\gamma}\) insert(I,isort(L)).
+insert(I,[J|S]) when I > J \(\smashedrightarrow{\delta}\) [J|insert(I,S)];
+insert(I,    S)            \(\smashedrightarrow{\epsilon}\) [I|S].
+\end{alltt}

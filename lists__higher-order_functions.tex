@@ -1,0 +1,1634 @@
+%%-*-latex-*-
+
+\chapter{Higher-Order Functions}
+\label{chap:higher-order_functions}
+
+\paragraph{Polymorphic sorting.}
+
+There is an aspect of \erlcode{isort/1} and \erlcode{isort\_tf/1}
+which deserves a second thought. We described \vpageref{polymorphism}
+a very useful property of many \Erlang functions, called
+\emph{polymorphism}, which is the ability to process values of any
+kind in the same, uniform manner. For example, reversing a list does
+not depend on the nature of the items it contains---it is a purely
+structural algorithm. By contrast, our definitions of
+\erlcode{isort/1} and \erlcode{isort\_tf/1} rely on the usage of the
+predefined comparison operator~(\erlcode{<}) in guards. This implies
+that all items in the list must be pairwise comparable---for example,
+they can be integers. But what if we want to sort other kinds of
+values, like lists? Consider the very practical need to sort a set of
+bills: each bill can be represented by a list of prices rounded to the
+closest integer and the set in question by a list itself; we would
+then want to sort by insertion the bills by nondecreasing total
+amounts. If we set on writing a version of \erlcode{isort/1} tailored
+to work only with items which are lists of integers, we are
+duplicating code and we would have to write a different instance every
+time a different kind of values to be sorted presents itself. As a
+consequence, what is needed here is polymorphism on \emph{function
+  parameters}, more precisely, the possibility of a function to be a
+value, thus to be used as an argument. \Erlang provides this facility
+in a natural way and many functional languages do as well. In our
+case, we need the caller of \erlcode{isort/1} to provide an additional
+parameter which is a comparison function between the items. Then
+\erlcode{isort/2} would make use of this caller\hyp{}defined
+comparison, instead of always applying the default
+operator~(\erlcode{<}) which works only (or mostly) on integers. Here
+is again the definition of \erlcode{isort/1}: \input{i_sort_alpha}
+Then, our first attempt at modification leads us straightforwardly to
+\begin{alltt}
+isortf(\textbf{\_},   [])               \(\smashedrightarrow{\beta}\) [];
+isortf(\textbf{F},[I|L])               \(\smashedrightarrow{\gamma}\) insert(\textbf{F},I,isortf(\textbf{F},L)).
+insert(\textbf{F},I,[J|S]) when \textbf{F(I,J)} \(\smashedrightarrow{\delta}\) [J|insert(\textbf{F},I,S)];
+insert(\textbf{\_},I,    S)             \(\smashedrightarrow{\epsilon}\) [I|S].
+\end{alltt}
+But the \Erlang compiler would reject this program because the
+language does not allow a user\hyp{}defined function to be called in a
+guard. The rationale is that the call \erlcode{F(I,J)} above may not
+terminate and the semantics, that is, the expected behaviour of
+\Erlang constructs, is that pattern matching with guards always
+ends. Because it is impossible to automatically check whether a
+function call terminates on all inputs (this problem is equivalent to
+the famous \emph{Turing halting problem}, which is
+\emph{undecidable}), the compiler does not even try and prefers to
+reject all guards made of function calls. Thus we must move the call
+\erlcode{F(I,J)} inside the body of the same clause, which begets the
+question as how to merge clauses \clause{\delta}~and~\clause{\epsilon}
+into a new clause~\clause{\delta\sb{0}}. A simple way out is to create
+another function, \erlcode{triage/4}, whose task is to take the result
+of the comparison and proceed with the rest of the computation. Of
+course, this means that \erlcode{triage/4} must also receive all
+necessary information to carry on:
+\newlength\dblarrow\settowidth\dblarrow{\(\delta\sb{0}\)}
+\begin{alltt}
+isortf(_,   [])        \(\MyArrow{\dblarrow}{\beta}\) [];
+isortf(F,[I|L])        \(\MyArrow{\dblarrow}{\gamma}\) insert(F,I,isortf(F,L)).
+insert(F,I,[J|S])      \(\MyArrow{\dblarrow}{\delta\sb{0}}\) triage(F,I,[J|S],F(I,J)).
+triage(F,I,[J|S],\fbcode{true}) \(\MyArrow{\dblarrow}{\zeta}\) [J|insert(F,I,S)];
+triage(F,I,[J|S],\fbcode{true}) \(\MyArrow{\dblarrow}{\eta}\) [I|S].
+\end{alltt}
+The empty boxes must be filled with the result of a comparison. In our
+case, we want a comparison with two possible outputs, depending on the
+first argument argument being lower or greater than the second. By
+definition, the result of \erlcode{I~>~J} is the atom~\erlcode{true}
+if the value of~\erlcode{I} is greater than the value of~\erlcode{J}
+and~\erlcode{false} otherwise. Let us follow the same convention
+for~\erlcode{F} and impose that the value of \erlcode{F(I,J)} is the
+atom~\erlcode{true} if~\erlcode{I} is greater than \erlcode{J} and
+\erlcode{false} otherwise. It is even better to rename the
+parameter~\erlcode{F} into something more intuitive according to its
+behaviour, like~\erlcode{Gt} (\emph{\textbf{G}reater \textbf{t}han}):
+\begin{alltt}
+triage(Gt,I,[J|S],\textbf{true})    \(\MyArrow{\dblarrow}{\zeta}\) [J|insert(Gt,I,S)];
+triage(Gt,I,[J|S],\textbf{false})   \(\MyArrow{\dblarrow}{\eta}\) [I|S].
+\end{alltt}
+We notice that clause~\clause{\eta} makes no use of~\erlcode{J}, which
+means we actually lose an item. What went wrong and when? The mistake
+came from not realising that clause~\clause{\epsilon} covered two
+cases, \erlcode{S}~is empty or not, therefore we should have untangled
+these two cases before merging clause~\clause{\epsilon} with
+clause~\clause{\delta}, because in~\clause{\delta} we have the pattern
+\erlcode{[J|S]}, that is, the non\hyp{}empty case. Let us rewind and
+split~\clause{\epsilon} into
+\clause{\epsilon\sb{0}}~and~\clause{\epsilon\sb{1}}:
+\begin{alltt}
+isortf( _,   [])               \(\MyArrow{\dblarrow}{\beta}\) [];
+isortf(Gt,[I|L])\hfill\(\MyArrow{\dblarrow}{\gamma}\) insert(Gt,I,isortf(Gt,L)).
+insert(Gt,I,[J|S]) when Gt(I,J) \(\MyArrow{\dblarrow}{\delta}\) [J|insert(Gt,I,S)];
+insert(\textbf{Gt},I,\textbf{[J|S]})              \(\MyArrow{\dblarrow}{\epsilon\sb{0}}\) [I|\textbf{[J|S]}];
+insert( _,I,   \textbf{[]})              \(\MyArrow{\dblarrow}{\epsilon\sb{1}}\) \textbf{[I]}.
+\end{alltt}
+Notice that we did not write
+\begin{alltt} 
+insert(_,I,   [])               \(\MyArrow{\dblarrow}{\epsilon\sb{1}}\) [I];
+insert(_,I,    S)               \(\MyArrow{\dblarrow}{\epsilon\sb{0}}\) [I|S].
+\end{alltt}
+even though it would have been correct, because we had in mind the
+fusion with clause~\clause{\delta}, so we needed to make the pattern
+\erlcode{[J|S]} conspicuous in~\clause{\epsilon\sb{0}}. For even more
+clarity, we made apparent the parameter~\erlcode{Gt}: the heads of
+clauses \clause{\delta}~and~\clause{\epsilon\sb{0}} are now identical
+and ready to merge into a new clause~\clause{\delta\sb{0}}:
+\begin{alltt}
+isortf( _,   [])         \(\MyArrow{\dblarrow}{\beta}\) [];
+isortf(Gt,[I|L])         \(\MyArrow{\dblarrow}{\gamma}\) insert(Gt,I,isortf(Gt,L)).
+insert(Gt,I,[J|S])       \(\MyArrow{\dblarrow}{\delta\sb{0}}\) triage(Gt,I,[J|S],Gt(I,J)).
+insert( _,I,   [])       \(\MyArrow{\dblarrow}{\epsilon\sb{1}}\) [I].
+triage(Gt,I,[J|S],true)  \(\MyArrow{\dblarrow}{\zeta}\) [J|insert(Gt,I,S)];
+triage( _,I,[J|S],false) \(\MyArrow{\dblarrow}{\eta}\) [I|[J|S]].
+\end{alltt}
+We can improve a little bit clause~\clause{\eta} by not distinguishing
+\erlcode{J}~and~\erlcode{S}:
+\begin{alltt}
+triage( _,I,    \textbf{S},false) \(\MyArrow{\dblarrow}{\eta}\) [I|\textbf{S}].
+\end{alltt}
+This transformation is correct because \erlcode{S}~is never
+empty. Instead of using an auxiliary function like \erlcode{triage/4},
+which takes many arguments and serves no purpose other than performing
+a test on the value of \erlcode{Gt(I,J)} and proceed accordingly, we
+can make good use of a special \Erlang construct based on the new
+keywords \erlcode{case}, \erlcode{of}~and~\erlcode{end}:
+\begin{alltt}
+isortf( _,   [])   \(\MyArrow{\dblarrow}{\beta}\) [];
+isortf(Gt,[I|L])   \(\MyArrow{\dblarrow}{\gamma}\) insert(Gt,I,isortf(Gt,L)).
+insert(Gt,I,[J|S]) \(\MyArrow{\dblarrow}{\delta\sb{0}}\) \textbf{case Gt(I,J) of
+                         true  \(\smashedrightarrow{\zeta}\) [J|insert(Gt,I,S)];
+                         false \(\smashedrightarrow{\eta}\) [I|[J|S]]
+                       end;}
+insert( _,I,   []) \(\MyArrow{\dblarrow}{\epsilon\sb{1}}\) [I].
+\end{alltt}
+We can decrease the memory usage again in the clause~\clause{\eta}
+(case~\erlcode{false}), this time by means of an alias for the pattern
+\erlcode{[J|S]}, so the best version of the code is
+\begin{alltt}
+isortf( _,   [])     \(\MyArrow{\dblarrow}{\beta}\) [];
+isortf(Gt,[I|L])     \(\MyArrow{\dblarrow}{\gamma}\) insert(Gt,I,isortf(Gt,L)).
+insert(Gt,I,\textbf{Q=}[J|S]) \(\MyArrow{\dblarrow}{\delta\sb{0}}\) case Gt(I,J) of
+                           true  \(\smashedrightarrow{\zeta}\) [J|insert(Gt,I,S)];
+                           false \(\smashedrightarrow{\eta}\) [I|\textbf{Q}]
+                         end;
+insert( _,I,     []) \(\MyArrow{\dblarrow}{\epsilon\sb{1}}\) [I].
+\end{alltt}
+Before we keep on studying \erlcode{isortf/2} and \erlcode{insert/3},
+let us put to good use the \erlcode{case} construct of \Erlang to
+improve the definition of \erlcode{i2wb/4}, \vpageref{code:i2wb}. We
+always determine the delay of a function by counting the number of
+rewrites (in other words, the number of function calls) it requires to
+compute its result. Of course, this is not the whole story. For
+instance, comparisons do take some real time to be performed, although
+they are individually fast when applied to integers. Another reason
+why we ignored them up to now is that we always included these integer
+comparisons into guards, so they were not taken into account, just as
+the very real time taken to match an argument against a pattern in the
+head has been ignored all along. We may improve the legibility of our
+programs by factoring some matches on integers \emph{outside the
+  heads}. A speed\hyp{}up is not guaranteed because we do not suppose
+anything about how the compiler processes the heads. Here is a better
+\erlcode{isort2wb/4}:
+\begin{alltt}
+isort2wb(L) -> isort2wb([],[],L,0).
+
+isort2wb(   [],    Q,   [],_)            -> Q;
+isort2wb([I|P],    Q,   [],D)            ->
+\hfill isort2wb(P,[I|Q],[],D);
+isort2wb(    P,[J|Q],[K|R],D) when J < K ->
+  \textbf{case} D \textbf{of}
+    1 -> isort2wb([J|P],    ins_up(K,Q),R,0);
+    0 -> isort2wb(    P,[J|ins_up(K,Q)],R,1)
+  \textbf{end};
+isort2wb([I|P],    Q,[K|R],D) when K < I ->
+  \textbf{case} D \textbf{of}
+    1 -> isort2wb([I|ins_down(K,P)],    Q,R,0);
+    0 -> isort2wb(    ins_down(K,P),[I|Q],R,1)
+  \textbf{end};
+isort2wb(    P,    Q,[K|R],D)            ->
+  \textbf{case} D \textbf{of}
+    1 -> isort2wb([K|P],    Q,R,0);
+    0 -> isort2wb(    P,[K|Q],R,1)
+  \textbf{end}.
+\end{alltt}
+Let us resume now our examination of \erlcode{isortf/1} by determining
+its average delay. It is important \emph{not} to count the arrows in a
+\erlcode{case} construct because these arrows are certainly not
+compiled as a function call but as a conditional. Of course, the
+expression between the \erlcode{case} and \erlcode{of} keywords may
+contain function calls and these must be accounted for. In the
+function under consideration, the relevant call is \erlcode{Gt(I,J)},
+where the function \erlcode{fun Gt/2} is a parameter. Because of this
+polymorphism, the delay of the call cannot be determined statically,
+that is, by solely examining the definition, and the delay of
+\erlcode{isortf/2} depends on the delay of its parameter~\erlcode{Gt},
+whose delay is a priori unknown because an infinite number of
+functional arguments are possible. Let us suppose that this delay is
+constant and let us call it \(\comp{Gt}{}\). The only difference, as
+far as delays are concerned, between \erlcode{isortf/1} and
+\erlcode{isort/1}, is the call \erlcode{Gt(I,J)}. We can make an
+analysis similar to the one we did on page~\pageref{def:ave_isort}:
+\[
+\ave{isortf}{0}   \eqn{\beta} 1;\quad
+\ave{isortf}{k+1} \eqn{\gamma} 1 + \ave{insert}{k} +
+  \ave{isortf}{k},\,\; \text{with} \;\, k \geqslant 0.
+\]
+Telescoping both sides in a sum yields, for~\({n \geqslant 0}\),
+\[
+\ave{isortf}{n} = 1 + n + \sum_{k=0}^{n-1}{\ave{insert}{k}}.
+\]
+The delay for using once clause~\clause{\delta\sb{0}} does not include
+any delay due to \clause{\zeta}~nor~\clause{\eta} because these are
+not clauses but cases, therefore it amounts to \(\comp{Gt}{} +
+1\). There are \(k+1\)~ways to insert an item into a list of
+\(k\)~items. For an insertion before the item at location~\(j\), the
+head of the list being at location~\(0\), it thus takes \((\comp{Gt}{}
++ 1)j\)~rewrites. The insertion at the end of the list, that is, at
+position~\(k+1\), is special, because the insertion, properly
+speaking, is performed by clause~\clause{\epsilon\sb{1}} instead
+of~\clause{\eta}, which means that \erlcode{Gt}~is not called for the
+last rewrite. So the delay for inserting after the last item
+is~\((\comp{Gt}{} + 1)k + 1\). Now we can form
+\begin{align*}
+\ave{insert}{k}
+  &= \frac{1}{k+1}\left(\sum_{j=1}^{k}{((\comp{Gt}{} + 1)j)} +
+     ((\comp{Gt}{} + 1)k + 1)\!\!\right)\\
+  &= (\comp{Gt}{} + 1)\left(\frac{1}{2}{k} + 1\right) -
+     \frac{\comp{Gt}{}}{k+1}.
+\intertext{We can check the case~\(\comp{Gt}{}=0\), which coincides
+  with equation~\eqref{ave:insert} \vpageref{ave:insert}:}
+\ave{insert}{k}
+  &= \frac{k}{2} + 1,\,\; \text{if} \,\; \comp{Gt}{} = 0.
+\intertext{Let us resume:}
+\sum_{k=0}^{n-1}{\ave{insert}{k}}
+  &= \frac{1}{2}{(\comp{Gt}{} + 1)} \sum_{k=0}^{n-1}{k}
+     + (\comp{Gt}{} + 1)n - \comp{Gt}{}
+     \sum_{k=0}^{n-1}\frac{1}{k+1}\\
+  &= \frac{1}{4}{(\comp{Gt}{} + 1)n^2}
+     + \frac{3}{4}{(\comp{Gt}{} + 1)n} - \comp{Gt}{} H_n.
+\end{align*}
+With the convention \(H_0 = 0\), we finally conclude,
+for~\({n\geqslant 0}\),
+\begin{align}
+\ave{isortf}{n} 
+  &= 1 + n
+     + \left(\frac{1}{4}{(\comp{Gt}{} + 1)n^2}
+     + \frac{3}{4}{(\comp{Gt}{} + 1)n} - \comp{Gt}{} H_n\!\right)\notag\\
+  &= \frac{1}{4}{(\comp{Gt}{} + 1)n^2}
+     + \frac{1}{4}{(3\comp{Gt}{}+7)n} - \comp{Gt}{} H_n +
+     1.\label{delay:i_sortf}
+\intertext{A quick check again consists in plugging \(\comp{Gt}{} =
+  0\) into the formula and it indeed becomes identical to
+  equation~\eqref{ave:isort} \vpageref{ave:isort}:}
+\ave{isort}{n} &= \frac{1}{4}{n^2} + \frac{7}{4}{n} + 1,\,\;
+\text{if} \,\; \comp{Gt}{} = 0.\notag
+\end{align}
+
+How would we call \erlcode{isortf/2} so the resulting value is the
+same as calling \erlcode{isort/1}? First, we need a comparison
+function which behaves exactly like the operator~(\erlcode{>}):
+\begin{verbatim}
+gt_int(I,J) when I > J -> true;
+gt_int(_,_)            -> false.
+\end{verbatim}
+If we try now to form the call
+\begin{center}
+\erlcode{isortf(gt\_int,[5,3,1,4,2])},
+\end{center}
+we find that an error occurs at run\hyp{}time because
+\erlcode{gt\_int} is an atom, not a function. That is why \Erlang
+provides a special syntax for denoting functions used as values:
+\begin{center}
+\erlcode{isortf(\textbf{fun} gt\_int\textbf{/2},[5,3,1,4,2])}.
+\end{center}
+Notice the new keyword~\erlcode{fun} and the usual indication of the
+number of arguments the function is expected to operate on (here,
+two).
+
+What would happen if we passed as a parameter the function
+\erlcode{lt\_int/2} defined as follows?
+\begin{verbatim}
+lt_int(I,J) when I < J -> true;
+lt_int(I,J)            -> false.
+\end{verbatim}
+The consequence is that the result is sorted non\hyp{}increasingly and
+all we had to do was to change the comparison function, \emph{not the
+  sorting function itself.}
+
+It may seem a burden to have to name even simple comparison functions
+like \erlcode{lt\_int/2}, which is none other than the predefined
+operator~(\erlcode{<}). Fortunately, \Erlang provides a way to define
+functions without giving them a name. The rule consists in using the
+\erlcode{fun}~keyword together with the \erlcode{end}~keyword and put
+the usual definition in\hyp{}between, without a function
+name. Reconsider for example the previous calls but using such
+anonymous functions (sometimes called \emph{lambdas}):
+\begin{center}
+\erlcode{isortf(\textbf{fun}(I,J) -> I > J \textbf{end},[5,3,1,4,2])}
+\end{center}
+results in \erlcode{[1,2,3,4,5]} and
+\begin{center}
+\erlcode{isortf(\textbf{fun}(I,J) -> I < J \textbf{end},[5,3,1,4,2])}
+\end{center}
+results in \erlcode{[5,4,3,2,1]}. The delay for these two comparison
+functions is~\(1\), so the average delay of the function call
+\erlcode{isortf(fun(I,J) -> I > J end,\(L\))}, where \(L\)~is a list
+of \(n\)~integers, is obtained by setting \(\comp{Gt}{} = 1\) in the
+previously found equation \eqref{delay:i_sortf}
+\vpageref{delay:i_sortf}:
+\begin{align*}
+\ave{isortf}{n} 
+  &= \frac{1}{4}{(\comp{Gt}{} + 1)n^2}
+     + \frac{1}{4}{(3\comp{Gt}{}+7)n} - \comp{Gt}{} H_n + 1\\
+  &= \frac{1}{2}{n^2} + \frac{5}{2}{n} - H_n + 1,\,\; \text{if} \,\;
+     \comp{Gt}{} = 1.
+\end{align*}
+Let us now use \erlcode{isortf/2} to sort lists of lists of
+integers, according to the sum of the integers in each list---this is
+the practical application of sorting bills we previously mentioned. As
+the example of sorting in non\hyp{}increasing order hints at, we only
+need here to write how to compare two lists of integers by means of
+the \erlcode{sum/1} function, whose several definitions we have
+already reviewed. Here is a simple one
+\vpageref{code:sum_tf}:\label{code:sum_tf_repeated}
+\verbatiminput{sum_tf.def}
+We have \(\comp{sum\_tf}{n} = n + 2\). Now we can define the
+comparison function \erlcode{gt\_bill/2}, based upon the operator
+(\erlcode{>}):
+\begin{alltt}
+gt_bill(P,Q) -> sum_tf(P) > sum_tf(Q).
+\end{alltt}
+Notice in passing that the predefined \Erlang comparison
+operator~(\erlcode{>}) results in either the atom
+\erlcode{true}~or~\erlcode{false}, so there is no need to use a
+\erlcode{case} construct. Then we can sort our bills by simply calling
+\begin{center}
+\erlcode{isortf(fun gt\_bill/2,[[1,5,2,9],[7],[2,5,11],[4,3]])}
+\end{center}
+or, simply,
+\begin{alltt}
+      isortf(\textbf{fun}(P,Q) -> sum_tf(P) < sum_tf(Q) \textbf{end},
+             [[1,5,2,9],[7],[2,5,11],[4,3]]).
+\end{alltt}
+(By the way, do you expect~\erlcode{[7]} to appear before or after
+\erlcode{[4,3]} in the answer? What would you have to modify so the
+relative order of these two lists is reversed?) It is just as easy to
+sort the bills in non\hyp{}increasing order. This great easiness in
+passing around functions as any other kind of values is what justifies
+the adjective \emph{functional} for a language like \Erlang and many
+others. A function taking another function as a parameter is said to
+be a \emph{higher\hyp{}order function}.
+
+\medskip
+
+\paragraph{Sorted association lists.}
+\label{sorted_association_lists}
+
+There is something that we could improve in the previous definition of
+\erlcode{isortf/2}. Sorting by comparison, as the worst case of
+insertion sort demonstrates eloquently, may imply that some items are
+compared more than once with others. It may be that the comparison has
+a small delay but, compounded over many uses, it leads to a
+significant delay. In the case of sorting bills, it is more efficient
+to compute all the total amounts first and then only use these amounts
+during the sort process, because comparing one integer to another is
+much faster than recomputing the sum of many integers in a list. So,
+what is sorted is a list of pairs whose first component, called the
+\emph{key}, is a simple and small representative of the second
+component, called the \emph{value} (improperly, as keys are \Erlang
+values as well, but such is the traditional nomenclature). This data
+structure is sometimes called an \emph{association list}. Only the key
+is used for sorting, not the value, therefore, if the key is an
+integer, the comparison on the key is likely to be faster than on the
+values. The only penalty is that all the keys must be precomputed in a
+first pass over the initial data and they must be stripped from the
+final result in an additional post\-processing. This time we shall
+design these first and last passes in the most general fashion by
+parameterisation upon the computation~\erlcode{Mk} of the keys:
+\begin{verbatim}
+% Preprocessing
+mk_keys( _,        [])  -> [];
+mk_keys(Mk,[V|Values])  -> [{Mk(V),V}|mk_keys(Mk,Values)].
+
+% Postprocessing
+rm_keys(            []) -> [];
+rm_keys([{_,V}|KeyVal]) -> [V|rm_keys(KeyVal)].
+\end{verbatim}
+The delay of \erlcode{mk\_keys/2} depends on the delay
+of~\erlcode{Mk}. The delay of \erlcode{rm\_keys(\(L\))} is~\(n+1\) if
+\(L\)~contains \(n\)~pairs key\hyp{}value. Now we can sort by calling
+\erlcode{isortf/2} with a comparison on two keys and with the function
+to build the keys, \erlcode{sum\_tf/1}. For instance:
+\begin{verbatim}
+ rm_keys(isortf(fun({K1,_},{K2,_}) -> K1 > K2 end,
+                mk_keys(fun sum_tf/1,
+                        [[1,5,2,9],[7],[2,5,11],[4,3]])))
+\end{verbatim}
+It is very important to notice that we did not need to redefine
+\erlcode{isortf/2}. Actually, \erlcode{isortf/2}, \erlcode{mk\_keys/2}
+and \erlcode{rm\_keys/1} would very well constitute a library by
+grouping their definitions in the same module. The client, that is,
+the user of the library, would then provide the comparison function
+fitted to her data to be sorted and the function making the keys. This
+\emph{modularisation} is enabled by polymorphism and higher\hyp{}order
+functions. Finally, let us determine the general average delay of
+\begin{alltt}
+      rm\_keys(isortf(fun(\{K1,\_\},\{K2,\_\}) -> K1 > K2 end,
+                     mk\_keys(fun sum\_tf/1,\(L\))))
+\end{alltt}
+where \(L=\erlcode{[}L_0,L_1,\dots,L_{n-1}\erlcode{]}\) is a list of
+\(n\)~lists, each of them containing \(l_i\)~integers and, in total,
+\(p\)~integers. Since the call is the composition of several calls,
+let us decompose it as the sum of the following delays:
+\[
+\comp{mk\_keys}{n,p} + \ave{isortf}{n} + \comp{rm\_keys}{n}.
+\]
+Furthermore, we have
+\begin{align*}
+\comp{mk\_keys}{n,p}
+  &= (n+1) + \sum_{i=0}^{n-1}{(\comp{sum\_tf}{l_i} + 2)} = 3n + p + 1,\\
+\ave{isortf}{n}
+  &= \frac{1}{2}{n^2} + \frac{5}{2}{n} - H_n + 1,\quad
+\comp{rm\_keys}{n}
+  = n + 1.
+\end{align*}
+Therefore, the total average delay is
+\[
+\frac{1}{2}{n^2} + \frac{13}{2}{n} - H_n + p + 3.
+\]
+This delay is quadratic in the number of sub\hyp{}lists but linear in
+the total number of integers, so the \emph{maximum average delay}
+(sometimes called \emph{max\hyp{}mean delay}) happens, for a fixed
+value of~\(p\), when \(n\)~is maximum, that is, when \(n=p\)---in
+other words, when each sub\hyp{}list is a singleton. Dually, the
+\emph{minimum average delay} (called \emph{min\hyp{}mean delay})
+happens when \(n=1\), that is, when there is only one sub\hyp{}list.
+
+As a last example proving the versatility of our program, let us sort
+lists by their non\hyp{}increasing lengths:
+\begin{verbatim}
+ rm_keys(isortf(fun({K1,_},{K2,_}) -> K1 < K2 end,
+                mk_keys(fun len_tf/1,
+                        [[1,5,2,9],[7],[2,5,11],[4,3]])))
+\end{verbatim}
+where \erlcode{len\_tf/1} is defined as\label{code:len_tf}
+\verbatiminput{len_tf.def}
+The result is \erlcode{[[1,5,2,9],[2,5,11],[4,3],[7]]}. Notice that
+\erlcode{[4,3]} occurs before~\erlcode{[7]} because the former is
+longer.
+
+Let us specialise further \erlcode{isortf/1}. Here is the definition
+again:
+\begin{alltt}
+isortf( _,   [])     \(\MyArrow{\dblarrow}{\beta}\) [];
+isortf(Gt,[I|L])     \(\MyArrow{\dblarrow}{\gamma}\) insert(Gt,I,isortf(Gt,L)).
+insert(Gt,I,Q=[J|S]) \(\MyArrow{\dblarrow}{\delta\sb{0}}\) case Gt(I,J) of
+                           true  \(\smashedrightarrow{\zeta}\) [J|insert(Gt,I,S)];
+                           false \(\smashedrightarrow{\eta}\) [I|Q]
+                         end;
+insert( _,I,     []) \(\MyArrow{\dblarrow}{\epsilon\sb{1}}\) [I].
+\end{alltt}
+It is clear that if items are repeated in the input list, the call
+\erlcode{Gt(I,J)} is expected to be rewritten to~\erlcode{false} at
+least once, therefore duplicates are kept by clause~\clause{\eta} and
+their relative order is preserved, that is, the sorting algorithm is
+\emph{stable}. What if we do not want to preserve such duplicates in
+the output? We need to rewrite the definition to support this
+choice. The choice itself, that is, to keep or not to keep, would
+naturally be implemented as an additional functional parameter,
+say~\erlcode{Eq}. Also, we would need to change our assumption about
+the values of the comparison: we need three cases, so the equality
+case is explicit. Let us modify the variable~\erlcode{Gt} to reflect
+this increase in detail and call it more generally~\erlcode{Cmp}
+(\emph{compare}). The corresponding arguments should be values amongst
+the user\hyp{}defined axioms~\erlcode{lt} (\emph{lower than}),
+\erlcode{gt} (\emph{greater than}) and~\erlcode{eq} (\emph{equal}). We
+have
+\begin{alltt}
+isortf(  _, _,   [])     \(\MyArrow{\dblarrow}{\beta}\) [];
+isortf(Cmp,\textbf{Eq},[I|L])     \(\MyArrow{\dblarrow}{\gamma}\)
+  insert(Cmp,\textbf{Eq},I,isortf(Cmp,\textbf{Eq},L)).
+insert(Cmp,\textbf{Eq},I,Q=[J|S]) \(\MyArrow{\dblarrow}{\delta\sb{0}}\)
+  case Cmp(I,J) of
+    gt  \(\smashedrightarrow{\zeta}\) [J|insert(Cmp,\textbf{Eq},I,S)];
+    lt  \(\smashedrightarrow{\eta}\) [I|Q];
+    eq  \(\smashedrightarrow{\theta}\) \textbf{Eq(I,Q)}\hfill% \emph{New case}
+  end;
+insert(  _, _,I,     []) \(\MyArrow{\dblarrow}{\epsilon\sb{1}}\) [I].
+\end{alltt}
+Now, let us say that we want to sort nondecreasingly a list of
+integers and retain possible redundant numbers, just as the previous
+version allowed. We have (novelty in bold):
+\begin{alltt}
+isortf(fun(I,J) -> I>J end,\textbf{fun(I,Q) -> [I|Q] end},[5,3,1,4])
+\end{alltt}
+which results in \erlcode{[1,3,4,5]}. If we do not want the numbers
+repeated, we form instead the call
+\begin{alltt}
+isortf(fun(I,J) -> I>J end,fun(_,Q) ->     \textbf{Q} end,[5,3,1,4])
+\end{alltt}
+resulting in \erlcode{[1,3,4,5]}. In passing, this technique allows us
+to solve the problem of removing duplicates in a list of items for
+which there is a total order. However, if only successive duplicates
+have to be removed from a list, the function \erlcode{compress/1} on
+page~\pageref{code:compress}:
+\verbatiminput{compress.def} is more efficient because its growth is
+linear in the input size.
+
+We would be remiss if we do not mention that a higher\hyp{}order
+function is not only a function whose at least one parameter is a
+function, but it also can be a function whose calls evaluate in a
+function. This kind of function is said to be \emph{curried}, as an
+homage to the logician Haskell Curry. The possibility was already
+there when we introduced the keywords \erlcode{fun}~and~\erlcode{end},
+because they allow us to define an anonymous function and use it just
+like another value, so nothing impeded us from using such a functional
+value as the result of a named function, like in the following
+function mathematically composing two functions:
+\begin{verbatim}
+compose(F,G) -> (fun(X) -> F(G(X)) end).
+\end{verbatim}
+Actually, the parentheses around the functional value are useless if
+we remember that the keywords \erlcode{fun}~and~\erlcode{end} play the
+role of parentheses when the anonymous function is not called:
+\begin{verbatim}
+compose(F,G) -> fun(X) -> F(G(X)) end.
+\end{verbatim}
+The higher\hyp{}order function \erlcode{compose/2} can be used to
+compute the composition of two other functions, the result being a
+function, of course.
+
+\medskip
+
+\paragraph{Maps.}
+\label{maps}
+
+We may want to compute a function which sums the images of a
+list~\(L\) of integers by a given function~\(f\). In mathematical
+notation, the final result would be expressed as
+\[
+\sum_{k \in L}{f(k)}.
+\]
+In order to implement this in \Erlang, we must proceed in two steps:
+firstly, we need a higher\hyp{}order function which computes the
+images of the items of a list by a function; secondly, we need a
+function summing the integers of a list. We already have the latter,
+known from page~\pageref{code:sum_tf_repeated} as
+\erlcode{sum\_tf/1}. The former is traditionally called
+\erlcode{map/2}, such that the call \erlcode{map(\(F\),\(L\))} applies
+function~\(F\) to all the items of list~\(L\) and evaluates into the
+list of the results. That is,
+\[
+\erlcode{map(\(F\),[\(I_0\),\(I_1\),\(\ldots\),\(I_{n-1}\)])}
+\mathrel{\equiv}
+\erlcode{[\(F\)(\(I_0\)),\(F\)(\(I_1\)),\(\ldots\),\(F\)(\(I_{n-1}\))]}.
+\]
+With this goal in mind, it is straightforward to define \erlcode{map/2}:
+\begin{verbatim}
+map(_,   []) -> [];
+map(F,[I|L]) -> [F(I)|map(F,L)].
+\end{verbatim}
+The function we were looking for is now compactly defined as the
+composition of \erlcode{map/2} and \erlcode{sum\_tf/1} as follows:
+\begin{verbatim}
+sum_f(F) -> fun(L) -> sum_tf(map(F,L)) end.
+\end{verbatim}
+For instance, the function call
+\begin{center}
+\erlcode{sum\_f(fun(X) -> X*X end)}
+\end{center}
+denotes the function which sums the squares of the numbers in a list
+to be provided. It is equivalent to the value
+\begin{center}
+\erlcode{fun(L) -> sum\_tf(map(fun(X) -> X*X end,L)) end.}
+\end{center}
+It is possible to call this function just after is has been computed,
+but \emph{parentheses must be added around a function being called
+  when it is anonymous}. For instance, see the bold typefaces in
+\begin{center}
+\erlcode{\textbf{(}sum\_f(fun(X) -> X*X end)\textbf{)}([1,2,3])}.
+\end{center}
+The function \erlcode{map/2} is often used because it captures a
+common operation on lists. For example, \vpageref{code:push}, we
+defined
+\begin{alltt}
+push(_,          []) -> [];
+push(I,[Perm|Perms]) -> [[I|Perm]|push(I,Perms)].
+\end{alltt}
+It is equivalent to
+\begin{alltt}
+push(I,Perms) -> map(fun(Perm) -> [I|Perm] end,Perms).
+\end{alltt}
+This style leads to clearer programs as it shows the underlying
+recursive computation without having to read or write a definition for
+it. In other words, using a higher\hyp{}order function like
+\erlcode{map/2} allows us to identify a common recursive pattern and
+let the programmer focus instead on the specific processing of the
+items. We shall encounter other examples in the next sections but,
+before we move on, imagine we typed instead
+\begin{alltt}
+push(I,Perms) -> map(fun(\textbf{Perms}) -> [I|\textbf{Perms}] end,Perms).
+\end{alltt}
+The \Erlang compiler would issue the following warning:
+\begin{center}
+\emph{\texttt{Warning: variable 'Perms' shadowed in
+    'fun'.}}\label{shadowing}
+\end{center}
+What happens is that the parameter \textbf{\erlcode{Perms}} (in bold)
+``hides'' the parameter \erlcode{Perms} of \erlcode{push/2} in the
+sense that, in the body of the anonymous function, any occurrence
+of~\erlcode{Perms} refers to \textbf{\erlcode{Perms}}. In this case,
+it is not an error, but the compiler designers worried about
+programmers walking on the shadowy side of the street. For example,
+\begin{alltt}
+push(I,Perms) -> map(fun(I) -> [I|I] end,Perms).\hfill% \emph{Capture}
+\end{alltt}
+is definitely wrong because the two variables~\erlcode{I} in
+\erlcode{[I|I]}, which is the body of the anonymous function, are the
+parameter of the anonymous function. A faulty shadowing is called a
+\emph{capture}. Here, the parameter~\erlcode{I} bound by
+\erlcode{push(I,Perms)} has been captured to mean instead the
+parameter of \erlcode{fun(I)}. As a guideline, it is best to avoid
+shadowing a parameter by another, as the \Erlang compiler reminds us
+for our own sake. Note that
+\begin{center}
+\erlcode{sum\_tf(fun(L) -> L*L end)}
+\end{center}
+is fine because it is equivalent to
+\begin{center}
+\erlcode{fun(L) -> sum\_tf(map(fun(L) -> L*L end,L)) end}
+\end{center}
+which is a correct shadowing.
+
+\medskip
+
+\paragraph{Folds.}
+
+Some other useful and frequently recursive patterns can be
+conveniently reified into some other higher\hyp{}order
+functions. Consider a function which traverses completely a list while
+processing an accumulator depending on the current visited item. In
+the end, the result is the final value of the accumulator, or else
+another function is called to finalise it. A simple example is a
+function computing the length of a list found \vpageref{code:len_tf}:
+\verbatiminput{len_tf.def}
+In this case, the accumulator is an integer and the operation on it
+consists in incrementing it, whatever the current item is. Another
+function reverses a list, \vpageref{code:rev}:
+\verbatiminput{rev.def} 
+Here, the accumulator is a list and the operation on it consists in
+pushing the current item on top of it. Let us abstract separately
+these two concerns in a higher\hyp{}order function
+\begin{enumerate}
+
+  \item which takes as input the function creating a new accumulator
+    from the current item and the previous accumulator and
+
+  \item which applies it successively to all the items of a parameter
+    list.
+
+\end{enumerate}
+One famous function doing exactly this is called \erlcode{foldl/3} in
+\Erlang, which stands for ``fold left,'' because once the new
+accumulator for some item has been computed, the prefix of the list up
+to it can be folded back, as if the list were written down on a sheet
+of paper, because it is no longer useful. So the name should be better
+read as ``fold from left to right'' or \emph{rightward fold}. We want
+\[
+\erlcode{foldl(\(F\),\(A\),[\(I_0\),\(I_1\),\(\ldots\),\(I_{n-1}\)])}
+\mathrel{\equiv}
+\erlcode{\(F\)(\(I_{n-1}\),\(\ldots\),\(F\)(\(I_1\),\(F\)(\(I_0\),\(A\)))\(\ldots\))},
+\]
+where \(A\)~is the initial value of the
+accumulator. \Fig~\vref{fig:foldl} shows the corresponding abstract
+syntax trees.
+\begin{figure}
+\centering
+\subfloat[List \erlcode{L}]{%
+  \includegraphics[bb=71 650 148 721]{a_list}
+}
+\qquad
+\subfloat[Value of \erlcode{foldl(F,A,L)}]{%
+  \includegraphics[bb=69 651 164 721]{foldl}
+}
+\caption{The result of \erlcode{foldl/3} on a non\hyp{}empty list
+\label{fig:foldl}}
+\end{figure}
+The following definition implements the desired effect:
+\begin{verbatim}
+foldl(_,A,   []) -> A;
+foldl(F,A,[I|L]) -> foldl(F,F(I,A),L).
+\end{verbatim}
+Now we can rewrite new definitions of \erlcode{len\_tf/1} and
+\erlcode{rev/1}:
+\begin{verbatim}
+lenl(L) -> foldl(fun(_,A) ->   A+1 end, 0,L).
+revl(L) -> foldl(fun(I,A) -> [I|A] end,[],L).
+\end{verbatim}
+Function \erlcode{foldl/3} is not in tail form because of the embedded
+call \erlcode{F(I,A)}, but only a constant amount of control stack is
+used for the recursion of \erlcode{foldl/3} itself (one node). In our
+two examples, \erlcode{F}~is in tail form, therefore these new
+definitions are \emph{almost} in tail form and can stand against the
+originals. More definitions almost in tail form are
+\begin{verbatim}
+suml([N|L])    -> foldl(fun(I,A) ->      I+A end, N,L).
+rev_joinl(P,Q) -> foldl(fun(I,A) ->    [I|A] end, Q,P).
+rev_map(F,L)   -> foldl(fun(I,A) -> [F(I)|A] end,[],L).
+\end{verbatim}
+Again, the reason why these definitions are not exactly in tail form
+is due to the call \erlcode{F(I,A)} in the definition of
+\erlcode{foldl/3}, \emph{not} because of the functional arguments
+\erlcode{fun(I,A) -> ... end} in the calls to \erlcode{foldl/3}: they
+are not function calls but function definitions. The main advantage of
+using \erlcode{foldl/3} is that it allows the programmer to focus
+exclusively on the processing of the accumulator, whilst
+\erlcode{foldl/3} itself provides the ride for free. Moreover, we can
+easily compare different functions defined by means of
+\erlcode{foldl/3}.
+
+When the accumulator is a list on which values are pushed, the result
+is in reverse order with respect to the input. That is why
+\erlcode{rev\_map/2}, above, is not \erlcode{map/2}. The former is to
+be preferred over the latter if the order of the items is not
+relevant, because \erlcode{map/2} requires a control stack as long as
+the input list. This leads us quite naturally to introduce another
+higher\hyp{}order function: \erlcode{foldr/3}, meaning ``fold from
+right to left,'' or \emph{leftward fold}. We expect
+\[
+\erlcode{foldr(\(F\),\(A\),[\(I_0\),\(I_1\),\(\ldots\),\(I_{n-1}\)])}
+\mathrel{\equiv}
+\erlcode{\(F\)(\(I_0\),\(F\)(\(I_1\),\(\ldots\),\(F\)(\(I_{n-1}\),\(A\)))\(\ldots\))}.
+\]
+\Fig~\vref{fig:foldr} shows the corresponding abstract syntax trees.
+\begin{figure}
+\centering
+\subfloat[List \erlcode{L}]{%
+  \includegraphics[bb=71 650 148 721]{a_list}
+}
+\qquad
+\subfloat[Value of \erlcode{foldr(F,A,L)}]{%
+  \includegraphics[bb=62 651 155 721]{foldr}
+}
+\caption{The result of \erlcode{foldr/3} on a non\hyp{}empty list
+\label{fig:foldr}}
+\end{figure}
+We achieve this behaviour with the following definition:
+\begin{verbatim}
+foldr(_,A,   []) -> A;
+foldr(F,A,[I|L]) -> F(I,foldr(F,A,L)).
+\end{verbatim}
+This definition, like \erlcode{foldl/3}, is not in tail form but,
+unlike \erlcode{foldl/3}, it requires a control stack as long as the
+input list. This is due to \emph{the recursive call of
+  \erlcode{foldl/3} being in tail position}, that is, if its arguments
+were in tail form, the recursive call would be in tail form as
+well. In the case of \erlcode{foldr/3}, it is the recursive call
+itself which is not in tail position, so, even if the functional
+parameter~\erlcode{F} were in tail form, the amount of control stack
+used by the call to \erlcode{foldr/3} would be proportional to the
+length of the input list.
+
+With the help of \erlcode{foldr/3}, we can redefine \erlcode{map/2}
+and \erlcode{join/2} as
+\begin{verbatim}
+mapr(F,L)  -> foldr(fun(I,A) -> [F(I)|A] end,[],L).
+joinr(P,Q) -> foldr(fun(I,A) ->    [I|A] end, P,Q).
+\end{verbatim}
+Compare \erlcode{rev\_joinl/2}, defined above, with \erlcode{joinr/2}:
+the role of the accumulator and of the input list have been exchanged,
+as well as \erlcode{foldl/3} and \erlcode{foldr/3}. It is also
+possible to define
+\begin{alltt}
+lenr(L)     -> foldr(fun(_,A) -> 1+A end, 0,L).\hfill% \emph{To avoid}
+sumr([N|L]) -> foldr(fun(I,A) -> I+A end, N,L).\hfill% \emph{To avoid}
+isortr(L)   -> foldr(fun insert/2,       [],L).\hfill% \emph{To avoid}
+\end{alltt}
+but that would be unwise because \erlcode{foldr/3} does not use a
+bounded amount of control stack, contrary to \erlcode{foldl/3}. In the
+case of \erlcode{isort/1}, it is best to call \erlcode{foldl/3}
+instead because the order of insertion does not matter in average
+(although it swaps the best and worst cases if numbers are not
+repeated, as seen \vpageref{best_worst_swapped}). This leads us to
+formulate some guidelines about the transformation into tail form. We
+already know that a definition in tail form is worth having or even
+necessary if the maximum size of the control stack is smaller than
+some input recursively traversed in its greatest extension. No
+speed\hyp{}up should be expected a priori from turning a definition
+not in tail form into one in tail form---although this may happen
+sometimes. Usually,
+\begin{itemize}
+
+  \item it is preferable, if possible, to use \erlcode{foldl/3}
+    instead of \erlcode{foldr/3} because, provided the functional
+    parameter is in tail form, the call will use a small limited
+    amount of control stack (if the parameter is not in tail form, at
+    least \erlcode{foldl/3} won't burden further the control stack,
+    contrary to \erlcode{foldr/3});
+
+  \item when writing our own recursion, that is, without resorting to
+    folds, it is best to have it in tail form if the accumulator is an
+    integer, otherwise, the maximum size of the control stack may need
+    to be proportional to the size of the input, despite the output
+    being a single integer. (Contrast \erlcode{sum/1} and
+    \erlcode{sum\_tf/2}, as well as \erlcode{len/1} and
+    \erlcode{len\_tf/1}.)
+
+\end{itemize}
+Independently of stack allocation, there can be a significant
+difference in delay when using one fold instead of the other. Take for
+example the following two calls computing the same value:
+\begin{center}
+\erlcode{foldl(fun join/2,[],L)}
+\(\mathrel{\equiv}\)
+\erlcode{foldr(fun join/2,[],L)}.
+\end{center}
+The first one will be slower than the second. See exercise
+\vpageref{ex:delay}.
+
+What cannot be programmed with folds? As the defining properties show,
+folds traverse the input list in its entirety, hence there is no way
+to get off the bus while it is running. For instance,
+\erlcode{rm\_fst/2} \vpageref{code:rm_fst_alpha}, \input{rm_fst_alpha}
+cannot be implemented by means of a fold because there are two ends to
+the function calls: either the item has not been found and we ran
+afoul the end of the list in clause~\clause{\alpha}, or it has been
+found somewhere inside the list in clause~\clause{\beta}. However, in
+theory, if we accept a full traversal of the list for every call, then
+\erlcode{rm\_fst/2} can be programmed by means of a rightward
+fold. The usual technique is to have an accumulator which is either an
+atom meaning ``not found'' or a pair with an atom meaning ``found''
+and the current built list. If the result is ``not found'' then we
+just return the original list. The following function makes a stronger
+case because it is really impossible to express by means of a fold,
+even inefficiently. It is the ``complete tail''
+function:\label{code:ctail} \verbatiminput{ctail.def} In general, a
+function~\(F\) can be equivalently expressed by a call to a fold if,
+and only if, for all lists \(P\)~and~\(Q\), for all item~\(I\), we
+have\label{prop:fold}
+\begin{equation}
+\erlcode{\(F\)(\(P\))} \mathrel{\equiv} \erlcode{\(F\)(\(Q\))}
+\Rightarrow
+\erlcode{\(F\)([\(I\)|\(P\)])}
+\mathrel{\equiv}
+\erlcode{\(F\)([\(I\)|\(Q\)])}.\label{eq:fold_theory}
+\end{equation}
+We have \(\erlcode{ctail([])} \mathrel{\equiv} \erlcode{ctail([2])}\)
+but \(\erlcode{ctail([1])} \mathrel{\not\equiv}
+\erlcode{ctail([1,2])}\).
+
+One positive side\hyp{}effect of using maps and folds is that they
+sometimes allow the programmer to recognise some compositions that can
+be optimised by means of some algebraic transformation of the abstract
+syntax tree. As an example of a simple equation, we have, for all
+functions \(F\)~and~\(G\):
+\[
+\erlcode{map(\(F\),map(\(G\),\(L\)))}
+\mathrel{\equiv}
+\erlcode{map(compose(\(F\),\(G\)),\(L\))}.
+\]
+Without counting in the delays of \(F\)~and~\(G\), the left\hyp{}hand
+side induces the delay \(2n+2\), if \(L\)~contains \(n\)~items,
+whereas the right\hyp{}hand side incurs the delay \(n+2\), so it is
+much preferable to the former. Another interesting equation is
+\begin{equation}
+\erlcode{foldl(\(F\),\(A\),\(L\))}
+\mathrel{\equiv}
+\erlcode{foldr(\(F\),\(A\),\(L\))}\label{eq:foldlr}
+\end{equation}
+\emph{if \(F\)~is associative and symmetric.} Let us prove it. The
+first clause of the definition of \erlcode{foldl/3} and the first
+clause of the definition of \erlcode{foldr/3} imply that, for all
+\(F\)~and~\(A\),
+\[
+\erlcode{foldl(\(F\),\(A\),[])}
+\mathrel{\equiv} A
+\mathrel{\equiv}
+\erlcode{foldr(\(F\),\(A\),[])}.
+\]
+For non\hyp{}empty lists, this equation means:
+\[
+F(I_{n-1},\ldots,F(I_1,F(I_0,A))\ldots)
+\mathrel{\equiv}
+F(I_0,F(I_1,\ldots,F(I_{n-1},A))\ldots).
+\]
+Although the ellipses in the previous equation are intuitive, they are
+not a valid foundation for a rigorous mathematical argument. By
+definition, we have
+\begin{align*}
+\erlcode{foldl(\(F\),\(A\),[\(I\)|\(L\)])}
+  &\mathrel{\equiv}
+   \erlcode{foldl(\(F\),\(F\)(\(I\),\(A\)),\(L\))}.
+\intertext{Dually, by definition, we also have}
+\erlcode{foldr(\(F\),\(A\),[\(I\)|\(L\)])}
+  &\mathrel{\equiv}
+   \erlcode{\(F\)(\(I\),foldr(\(F\),\(A\),\(L\)))}.
+\intertext{The original equation would thus be established for all
+  lists if we prove}
+\erlcode{foldl(\(F\),\(F\)(\(I\),\(A\)),\(L\))}
+  &\mathrel{\equiv}
+   \erlcode{\(F\)(\(I\),foldr(\(F\),\(A\),\(L\)))}.
+\end{align*}
+Let us call this conjecture~\(\mathcal{P}\) and prove it by
+\emph{structural induction}. This principle states that, given a
+finite data structure~\(S\), a property~\(\mathcal{P}\) to be proved
+about it, then
+\begin{enumerate}
+
+  \item if \(\mathcal{P}\)~is provable for all the atomic~\(S\), that
+    is, configurations of~\(S\) that cannot be decomposed;
+
+  \item if, assuming that \(\mathcal{P}\)~is proved for all immediate
+    substructures of~\(S\), then \(\mathcal{P}(S)\)~is proved;
+
+  \item then \(\mathcal{P}(S)\)~is proved for \emph{all}~\(S\).
+
+\end{enumerate}
+The data structure~\(S\) being a list here, actually named~\(L\),
+there is a unique atomic list: the empty list. So we must first prove
+\(\mathcal{P}(\erlcode{[]})\). The first clause of the definition of
+\erlcode{foldl/3} and the first clause of the definition of
+\erlcode{foldr/3} imply that, for all \(F\)~and~\(A\),
+\[
+\erlcode{foldl(\(F\),\(F\)(\(I\),\(A\)),[])}
+\mathrel{\equiv} \erlcode{\(F\)(\(I\),\(A\))}
+\mathrel{\equiv}
+\erlcode{\(F\)(\(I\),foldr(\(F\),\(A\),[]))},
+\]
+which is \(\mathcal{P}(\erlcode{[]})\). Next, let us consider a
+non\hyp{}empty list \erlcode{[\(J\)|\(L\)]}. What are its immediate
+substructures? By construction of lists, there is only one immediate
+sub\hyp{}list of \erlcode{[\(I\)|\(L\)]}, namely~\(L\). Therefore, let
+us assume \(\mathcal{P}(L)\) for a given list \(L\) and suppose that
+\(F\)~is associative and symmetric (This is called the
+\emph{structural induction hypothesis}) and let us prove
+\(\mathcal{P}(\erlcode{[\(J\)|\(L\)]})\) for all~\(J\). For~\(F\) to
+be associative means that, for all values~\(X\), \(Y\)~and~\(Z\), we
+have
+\begin{align*}
+F(X,F(Y,Z)) &\mathrel{\equiv} F(F(X,Y),Z).
+\intertext{The symmetry of \(F\) means that, for all \(X\) and \(Y\),
+  we have}
+F(X,Y) &\mathrel{\equiv} F(Y,X).
+\end{align*}
+Let us start with the left\hyp{}hand side of
+\(\mathcal{P}(\erlcode{[\(J\)|\(L\)]})\):
+\begin{align*}
+&\erlcode{foldl(\(F\),\(F\)(\(I\),\(A\)),[\(J\)|\(L\)])}\\
+  &\phantom{X}\mathrel{\equiv}
+   \erlcode{foldl(\(F\),\(F\)(\(J\),\(F\)(\(I\),\(A\))),\(L\))},
+  &&\text{by definition of \erlcode{foldl/3},}\\
+  &\phantom{X}\mathrel{\equiv}
+   \erlcode{foldl(\(F\),\(F\)(\(F\)(\(J\),\(I\)),\(A\)),\(L\))},
+  &&\text{by associativity of \(F\),}\\
+  &\phantom{X}\mathrel{\equiv}
+   \erlcode{foldl(\(F\),\(F\)(\(F\)(\(I\),\(J\)),\(A\)),\(L\))},
+  &&\text{by symmetry of \(F\),}\\
+  &\phantom{X}\mathrel{\equiv}
+   \erlcode{\(F\)(\(F\)(\(I\),\(J\)),foldr(\(F\),\(A\),\(L\)))}
+  &&\text{by induction hypothesis \(\mathcal{P}(L)\),}\\
+  &\phantom{X}\mathrel{\equiv}
+   \erlcode{\(F\)(\(I\),\(F\)(\(J\),foldr(\(F\),\(A\),\(L\))))}
+  &&\text{by associativity of \(F\),}\\
+  &\phantom{X}\mathrel{\equiv}
+   \erlcode{\(F\)(\(I\),foldr(\(F\),\(A\),[\(J\)|\(L\)]))},
+  &&\text{by definition of \erlcode{foldr/3}.}
+\end{align*}
+This proves \(\mathcal{P}(\erlcode{[\(J\)|\(L\)]})\). The principle of
+structural induction then implies that \(\mathcal{P}(L)\) is proved
+for all lists~\(L\), hence the original equation \eqref{eq:foldlr}
+\vpageref{eq:foldlr}. The previous derivation suggests a variation in
+the definition of \erlcode{foldl/3}:
+\begin{alltt}
+foldl_alt(_,A,   []) -> A;
+foldl_alt(F,A,[I|L]) -> foldl_alt(F,F(\textbf{A,I}),L).
+\end{alltt}
+The difference lies in the order of the parameters of~\erlcode{F}. We
+would then have to prove a slightly different conjecture:
+\[
+\erlcode{foldl\_alt(\(F\),\(F\)(\(A\),\(I\)),\(L\))}
+\mathrel{\equiv}
+\erlcode{\(F\)(\(I\),foldr(\(F\),\(A\),\(L\)))}.
+\]
+The previous derivation would read now as follows:
+\begin{align*}
+&\erlcode{foldl\_alt(\(F\),\(F\)(\(A\),\(I\)),[\(J\)|\(L\)])}\\
+  &\phantom{}\mathrel{\equiv}
+   \erlcode{foldl\_alt(\(F\),\(F\)(\(F\)(\(A\),\(I\)),\(J\)),\(L\))},
+  &&\text{by definition,}\\
+  &\phantom{}\mathrel{\equiv}
+   \erlcode{fold\_alt(\(F\),\(F\)(\(A\),\(F\)(\(I\),\(J\))),\(L\))}
+  &&\text{by associativity of \(F\),}\\
+  &\phantom{}\mathrel{\equiv}
+   \erlcode{\(F\)(\(F\)(\(I\),\(J\)),foldr(\(F\),\(A\),\(L\)))},
+  &&\text{by induction hypothesis \(\mathcal{P}(L)\),}\\
+  &\phantom{}\mathrel{\equiv}
+   \erlcode{\(F\)(\(I\),\(F\)(\(J\),foldr(\(F\),\(A\),\(L\))))}
+  &&\text{by associativity of \(F\),}\\
+  &\phantom{}\mathrel{\equiv}
+   \erlcode{\(F\)(\(I\),foldr(\(F\),\(A\),[\(J\)|\(L\)]))},
+  &&\text{by definition of \erlcode{foldr/3}.}
+\end{align*}
+We see that the symmetry of~\(F\) is not required anymore but in only
+one remaining place: when the list is empty. Indeed, we have
+\begin{align*}
+\erlcode{foldl\_alt(\(F\),\(F\)(\(A\),\(I\)),[])}
+  &\mathrel{\equiv} \erlcode{\(F\)(\(A\),\(I\))},
+  &&\text{by definition.}\\
+\erlcode{\(F\)(\(I\),foldr(\(F\),\(A\),[]))}
+  &\mathrel{\equiv} \erlcode{\(F\)(\(I\),\(A\))},
+  &&\text{by definition of \erlcode{foldr/3}.}
+\end{align*}
+Therefore, in order to prove the variant conjecture about
+\erlcode{foldl\_alt/3} and \erlcode{foldr/3}, we must have
+\[
+\erlcode{\(F\)(\(A\),\(I\))}
+\mathrel{\equiv}
+\erlcode{\(F\)(\(I\),\(A\))},
+\]
+that is,~\(A\), which is the initial value of the accumulator, must be
+symmetric with all items~\(I\) through~\(F\). This is not a clear
+improvement over the first theorem about \erlcode{foldl/3}, which
+required all pairs of successive items to be symmetric. Nevertheless,
+there is an interesting special case, which is when \(A\)~is a neutral
+element for~\(F\), that is, for all~\(I\),
+\[
+\erlcode{\(F\)(\(A\),\(I\))}
+\mathrel{\equiv}
+\erlcode{\(F\)(\(I\),\(A\))} \mathrel{\equiv} A.
+\]
+Then symmetry altogether is no more required. Therefore,
+\erlcode{foldl\_alt/3} is preferable over \erlcode{foldl/3}, because
+it provides more opportunities when transforming applications of
+\erlcode{foldr/3}. But, since the standard library of \Erlang offers
+the definition \erlcode{foldl/3}, we shall stick to it. The standard
+library of \OCaml, however, proposes the function
+\erlcode{fold\_left}, which corresponds to \erlcode{foldl\_alt/3}.
+
+Anyway, theorem \eqref{eq:foldlr} allows us to transform immediately
+some calls to \erlcode{foldr/3}, which requires an amount of control
+stack at least proportional to the size of the input list, into calls
+to \erlcode{foldl/3}, whose parameter~\(F\) is the only function
+possibly not using a small and constant amount of control stack (if it
+does, the gain is immediate and obvious). This is why the following
+definitions are equivalent:
+\begin{verbatim}
+lenl(L) -> foldl(fun(_,A) -> A+1 end,0,L).
+lenr(L) -> foldr(fun(_,A) -> A+1 end,0,L).
+\end{verbatim}
+Proving that the following two definitions are equivalent happens to
+be a bit trickier:
+\begin{verbatim}
+suml([N|L]) -> foldl(fun(I,A) -> I+A end,N,L).
+sumr([N|L]) -> foldr(fun(I,A) -> I+A end,N,L).
+\end{verbatim}
+The reason is that the first item of the list serves as the initial
+value of the accumulator in both cases, despite the order of traversal
+of the list being reversed (rightward versus leftward). Actually, we
+already proved that they were equivalent \vpageref{proof_sum}. It is
+much more obvious to see that the following definitions are
+equivalent:
+\begin{verbatim}
+sum_tf(L=[_|_]) -> foldl(fun(I,A) -> I+A end,0,L).
+sum(L=[_|_])    -> foldr(fun(I,A) -> I+A end,0,L).
+\end{verbatim}
+only because addition is associative and symmetric.
+
+\medskip
+
+\paragraph{Mappings without association lists.}
+
+In order to illustrate further the expressive power of
+higher\hyp{}order functions, let us muse about a small, albeit
+unlikely, example. We mentioned \vpageref{sorted_association_lists}
+association lists being a collection of pairs key\hyp{}value,
+straightforwardly implemented with lists, for instance,
+\erlcode{[\{a,0\},\{b,1\},\{a,5\}]}. A \emph{mapping} is an
+association list which is searched based on the first component of the
+pairs. Typically, we have
+\begin{alltt}
+find(_,       []) -> absent;
+find(I,[\{I,V\}|L]) -> V;\hfill% \emph{Associated value found}
+find(I,    [_|L]) -> find(I,L).\hfill% \emph{Keep searching}
+\end{alltt}
+Notice that if a key is repeated, only the first pair will be
+considered, for instance, \erlcode{find(a,[\{a,0\},\{b,1\},\{a,5\}])}
+evaluates to~\erlcode{0}, not~\erlcode{5}. These pairs are called
+\emph{bindings}. Let us assume that we want to present formally what a
+mapping is but without relying upon any particular programming
+language. In this case, we must count on mathematics to convey the
+concept, more precisely, on mathematical functions. We would say that
+a mapping~\(M\) is a function from some finite set of
+values~\(\mathcal{K}\) to some finite set of
+values~\(\mathcal{V}\). Therefore, what was previously the conjunction
+of a data type (a list) and a lookup function (\erlcode{find/2}) is
+now a single function, representing the mapping \emph{and} the lookup
+at the same time. A binding \(x \mapsto y\) is just another notation
+for the pair~\((x, y)\), where \(x \in \mathcal{K}\) and \(y \in
+\mathcal{V}\). We need now to express how a mapping is updated, that
+is, how a mapping is extended with new bindings. With a list, this is
+simply done by pushing a new pair but, without a list, we would say
+that an update is a function itself, taking a mapping and a binding as
+arguments and returning a new mapping. \emph{An update is thus a
+  higher\hyp{}order function.}  Let the function~\((\oplus)\) be such
+that \(M \mathrel{\oplus} x_1 \mapsto y\) is the \emph{update} of the
+mapping~\(M\) by the binding \(x_1 \mapsto y\), as defined by
+\begin{equation*}
+(M \mathrel{\oplus} x_1 \mapsto y)(x_2) :=
+\begin{cases}
+  y      & \text{if} \; x_1 = x_2,\\
+  M(x_2) & \text{otherwise.}
+\end{cases}
+\end{equation*}
+We can check that we return the value associated to the first key
+matching the input, as expected. The empty mapping would be a special
+function returning a special symbol meaning ``not found,'' like
+\(M_\varnothing(x) = \bot\), for all~\(x\). The mapping containing the
+binding \((1,5)\) would be \(M_\varnothing \mathrel{\oplus} 1 \mapsto
+5\). This is very abstract and independent of any programming
+language, whilst being totally precise. If now the need arises to show
+how this definition can be programmed, this is when functional
+languages can shine. An update would be directly written in \Erlang as
+\begin{verbatim}
+update(M,{X1,Y}) -> fun(X2) -> case X2 of X1 -> Y; 
+                                           _ -> M(X2) 
+                               end
+                    end.
+\end{verbatim}
+The correspondence with the formal definition is almost immediate,
+there is no need to introduce a data structure and its
+interpretation. The empty mapping is simply
+\begin{verbatim}
+empty(_) -> absent.
+\end{verbatim}
+For example, the mapping as list \erlcode{[\{a,0\},\{b,1\},\{a,5\}]}
+can be modelled with higher\hyp{}order functions only as
+\begin{center}
+\erlcode{update(update(update(fun empty/1,\{a,5\}),\{b,1\}),\{a,0\})}.
+\end{center}
+Perhaps what needs to be learnt from all this is that lists in
+functional languages, despite having a distinctive syntax and being
+used pervasively, are not a fundamental data type: functions are.
+
+\medskip
+
+\paragraph{Functional encoding of tuples.}
+
+Let us start by abstracting the tuple into its essence and, because in
+a functional language, functions are the main feature, we should ask
+ourselves what is \emph{done} with something we think of as a
+tuple. Actually, we rushed because we should have realised first that
+all tuples can actually be expressed in terms of the empty tuple and
+\emph{pairs}, that is, tuples with exactly two components. For
+instance, \erlcode{\{5,foo,\{fun(X) -> X*X end\}\}} can be rewritten
+as \erlcode{\{5,\{foo,\{fun(X) -> X*X end,\{\}\}\}\}}. So let us
+rephrase the question in terms of pairs only. Basically, a pair is
+constructed (or \emph{injected}) and matched, that is, deconstructed (or
+\emph{projected}). In the latter, two components can result: either
+the first component of the pair or the second. This analysis leads to
+the conclusion that the functional encoding of pairs requires three
+functions: one for making, \erlcode{mk\_pair/2}, and two for unmaking,
+\erlcode{fst/1} and \erlcode{snd/1}. Once a pair is built, it is
+represented as a function, therefore functions extracting the
+components take as an argument another function denoting the pair,
+thus they are higher\hyp{}order functions. Consider
+\begin{alltt}
+mk_pair(X,Y) \(\smashedrightarrow{\alpha}\) fun(Pr) \(\smashedrightarrow{\beta}\) Pr(X,Y) end.\hfill%Pr \emph{is a projection}
+fst(P) \(\smashedrightarrow{\gamma}\) P(fun(X,_) \(\smashedrightarrow{\delta}\) X end).\hfill% P \emph{denotes a pair}
+snd(P) \(\smashedrightarrow{\epsilon}\) P(fun(_,Y) \(\smashedrightarrow{\zeta}\) Y end).
+\end{alltt}
+We have the following expected behaviour:
+\begin{alltt}
+fst(mk_pair(3,5)) \(\smashedrightarrow{\alpha}\) fst(fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5))
+                  \(\smashedrightarrow{\gamma}\) (fun(Pr) \(\!\smashedrightarrow{\beta}\!\) Pr(3,5))(fun(X,_) \(\!\smashedrightarrow{\delta}\!\) X end)
+                  \(\smashedrightarrow{\beta}\) (fun(X,_) \(\smashedrightarrow{\delta}\) X end)(3,5)
+                  \(\smashedrightarrow{\delta}\) 3.
+\end{alltt}
+To proof the versatility of this encoding, let us define a function
+\erlcode{add/1} which adds the components of the pair passed to it:
+\begin{alltt}
+add(P) \(\smashedrightarrow{\eta}\) fst(P) + snd(P).
+\end{alltt}
+A call to \erlcode{add/1} would unravel as follows, assuming that
+arguments are evaluated rightward:
+\begin{alltt}
+add(mk_pair(3,5))
+         \(\smashedrightarrow{\alpha}\) add(fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5) end)
+         \(\smashedrightarrow{\eta}\)   fst(fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5) end)
+            + snd(fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5) end)
+         \(\smashedrightarrow{\gamma}\)   (fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5) end)(fun(X,_) \(\smashedrightarrow{\delta}\) X end)
+            + snd(fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5) end)
+         \(\smashedrightarrow{\beta}\)   (fun(X,_) \(\smashedrightarrow{\delta}\) X end)(3,5)
+            + snd(fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5) end)
+         \(\smashedrightarrow{\delta}\) 3 + snd(fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5) end)
+         \(\smashedrightarrow{\epsilon}\) 3 + (fun(Pr) \(\smashedrightarrow{\beta}\) Pr(3,5) end)(fun(_,Y) \(\smashedrightarrow{\zeta}\) Y end)
+         \(\smashedrightarrow{\beta}\) 3 + (fun(_,Y) \(\smashedrightarrow{\zeta}\) Y end)(3,5)
+         \(\smashedrightarrow{\zeta}\) 3 + 5 \(=\) 8.
+\end{alltt}
+This is very nicely done but the keen reader may feel cheated, though,
+because we could have simply defined \erlcode{add/2} as
+\begin{verbatim}
+add(X,Y) -> X + Y.
+\end{verbatim}
+Indeed, this critique is valid. The ability of functions to receive
+various arguments at once amounts to them receiving \emph{one} tuple
+exactly, whose components are these various values. Therefore, we have
+to retry and make sure that our functions are \emph{nullary} or
+\emph{unary}, that is, take zero or one argument. This is achieved by
+taking the one value as argument and rewrite the call into a function
+which will take in turn the next value as argument etc. This
+translation is called \emph{currying}.
+\begin{alltt}
+mk_pair(X) \(\smashedrightarrow{\alpha}\) fun(Y) \(\smashedrightarrow{\beta}\) fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(X))(Y) end end.
+fst(P) \(\smashedrightarrow{\delta}\) P(fun(X) \(\smashedrightarrow{\epsilon}\) fun(_) \(\smashedrightarrow{\zeta}\) X end end).
+snd(P) \(\smashedrightarrow{\eta}\) P(fun(_) \(\smashedrightarrow{\theta}\) fun(Y) \(\smashedrightarrow{\iota}\) Y end end).
+add(P) \(\smashedrightarrow{\kappa}\) fst(P) + snd(P).
+\end{alltt}
+Remember that writing \erlcode{fun(X) -> fun(P) -> ...} is the same as
+\erlcode{fun(X) -> (fun(P) -> ...)} Also, the parentheses around
+\erlcode{Pr(X)} are necessary in \Erlang because this call is in the
+place of a function being called itself. Now we can run the example
+again and the call now unfolds as follows, supposing that arguments
+are computed rightward:
+\begin{alltt}
+add((mk_pair(3))(5))
+  \(\smashedrightarrow{\alpha}\) add((fun(Y) \(\smashedrightarrow{\beta}\) fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(3))(Y) end end)(5))
+  \(\smashedrightarrow{\beta}\) add(fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(3))(5) end)
+  \(\smashedrightarrow{\kappa}\)   fst(fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(3))(5) end)
+     + snd(fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(3))(5) end)
+  \(\smashedrightarrow{\delta}\)   (fun(Pr)\(\smashedrightarrow{\gamma}\)(Pr(3))(5) end)(fun(X)\(\smashedrightarrow{\epsilon}\)fun(_)\(\smashedrightarrow{\zeta}\)X end end)
+     + snd(fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(3))(5) end)
+  \(\smashedrightarrow{\gamma}\)   ((fun(X) \(\smashedrightarrow{\epsilon}\) fun(_) \(\smashedrightarrow{\zeta}\) X end end)(3))(5)
+     + snd(fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(3))(5) end)
+  \(\smashedrightarrow{\epsilon}\) (fun(_) \(\smashedrightarrow{\zeta}\) 3 end)(5) + snd(fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(3))(5) end)
+  \(\smashedrightarrow{\zeta}\) 3 + snd(fun(Pr) \(\smashedrightarrow{\gamma}\) (Pr(3))(5) end)
+  \(\smashedrightarrow{\eta}\) 3
+     + (fun(Pr)\(\smashedrightarrow{\gamma}\)(Pr(3))(5) end)(fun(_)\(\smashedrightarrow{\theta}\)fun(Y)\(\smashedrightarrow{\iota}\)Y end end)
+  \(\smashedrightarrow{\gamma}\) 3 + ((fun(_) \(\smashedrightarrow{\theta}\) fun(Y) \(\smashedrightarrow{\iota}\) Y end end)(3))(5)
+  \(\smashedrightarrow{\theta}\) 3 + (fun(Y) \(\smashedrightarrow{\iota}\) Y end)(5)
+  \(\smashedrightarrow{\iota}\) 3 + 5 \(=\) 8.
+\end{alltt}
+Of course, this encoding is usually not worth doing because the number
+of function calls is much greater than using a data
+structure.
+
+\medskip
+
+\paragraph{Functional encoding of lists.}
+
+To gain more insight into the nature of lists as a data structures, we
+can encode lists only with higher\hyp{}order functions. In the former
+view, a list is an infrastructure, a kind of inert container for data
+and functions are expected to operate on it. In the latter, it is a
+composition of functions containing data as arguments and waiting to
+be called to \emph{do} something with them. The difference between
+both points of view is not an imagined dichotomy between data and
+functions, which is blurred in object\hyp{}oriented languages too, but
+the fact that higher\hyp{}order functions \emph{alone} can make up a
+list.
+
+Since we already know how to encode pairs with higher\hyp{}order
+functions, a first approach to encoding lists with functions simply
+consists in encoding them with pairs. Abstractly, a list can either be
+empty or constructed by pushing an item into another list, so all we
+need is to translate these two concepts. The empty list can readily be
+represented by the empty tuple~\erlcode{\{\}} and pushing becomes
+pairing:
+\begin{verbatim}
+push(I,L) -> {I,L}.
+\end{verbatim}
+This encoding was introduced \vpageref{tuples_vs_list} to save memory
+on linear accumulators. Here, we want to go one step further and get
+rid of the pairs themselves by means of their functional
+interpretation seen above, so \erlcode{push/2} becomes a renaming of
+\erlcode{mk\_pair/2}:
+\begin{alltt}
+push(I,L) -> fun(Pr) -> Pr(I,L) end.\hfill% \emph{See} mk_pair/2
+\end{alltt}
+To understand the status of the empty list, we must switch to consider
+projections on lists. These are usually called \emph{head} and
+\emph{tail}, as we saw long ago \vpageref{chap:lists}. We implement
+them as the original versions of \erlcode{fst/2} and \erlcode{snd/2},
+where~\erlcode{L}, \erlcode{H}~and~\erlcode{T} denote, respectively,
+an encoding of a list, a head and a tail:
+\begin{alltt}
+head(L) -> L(fun(H,_) -> H end).\hfill% \emph{See} fst/2
+tail(L) -> L(fun(_,T) -> T end).\hfill% \emph{See} snd/2
+\end{alltt}
+Let us now think \emph{how} the empty list is used. It is a list such
+that any projection of its putative contents fails, that is,
+projecting the first component (the head) fails, as well as projecting
+the second component (the tail). A trick consists in defining
+\begin{alltt}
+empty() -> fail.\hfill% \emph{The atom} fail \emph{is arbitrary}
+\end{alltt}
+The point is that \erlcode{empty/0} is nullary, so calling it with an
+argument fails, as in \erlcode{head(fun empty/0)}. For example, the
+list \erlcode{[a,b,c]} is encoded as
+\begin{center}
+\erlcode{push(a,push(b,push(c,fun empty/0))).}
+\end{center}
+This solution relies on the \emph{arity}, that is, the number of
+parameters, of \erlcode{empty/0} to lead to failure. This failure is
+consistent with the way classic lists, that is, lists as data structures,
+are used: \erlcode{tail([\_|L]) -> L} and the call \erlcode{tail([])}
+fails to match a clause. The limit of this encoding is that, being
+based on functions, the encoded lists cannot be matched by the heads
+of the clauses. For example, the function \erlcode{ctail/1}
+\vpageref{code:ctail} \verbatiminput{ctail.def} cannot not be encoded
+because we would need a way to check whether an encoded list is empty
+without crashing the program if it is not. If we prefer the caller to
+be gently informed of the problem instead, that is, we want the
+definition of the projections to be complete, we could allow
+\erlcode{empty/1} to take a projection which is then discarded:
+\begin{verbatim}
+empty(_) -> fail.
+\end{verbatim}
+We would have the rewrite \erlcode{head(fun empty/1) \(\rightarrow\)
+  fail}, which is not a failure insofar the run\hyp{}time system is
+concerned, but is interpreted by the application as a \emph{logical}
+failure. Of course, it becomes the burden of the caller to check
+whether the atom~\erlcode{fail} is returned and the burden of the list
+maker to make sure not to push this atom in the encoded list,
+otherwise a caller would confuse the empty list with a regular item.
+
+\medskip
+
+\paragraph{Local recursion.}
+
+Many functions need some other auxiliary functions to carry out
+subtasks. For example, consider
+\verbatiminput{len_tf.def} where \erlcode{len/2} is the auxiliary
+function, supposed not to be used by any other function. To forbid its
+usage outside the scope of the module, it is simply omitted in the
+\erlcode{-export} clause at the beginning. But it still could be
+called from within the module it is defined. How could we avoid this
+as well? This is where anonymous functions comes handy:
+\begin{alltt}
+len_tf(L) -> 
+  Len = fun(   [],N) -> N;
+           ([_|L],N) -> \textbf{Len}(L,N+1)\hfill% \emph{Does not compile}
+        end,
+  Len(L,0).
+\end{alltt}
+This limits the visibility of the anonymous function bound to
+variable~\erlcode{Len} to the body of \erlcode{len\_tf/1}, which is
+exactly what we wanted. The problem here is that this definition is
+rejected by the \Erlang compiler because the binding
+construct~(\erlcode{=}) does not make the variable on its
+left\hyp{}hand side visible to the right\hyp{}side, hence
+\erlcode{Len}~is unknown in the call \erlcode{Len(L,N+1)}. In some
+other functional languages, there is a specific construct to allow
+recursion on local definitions, for instance, \erlcode{let~rec} in
+\OCaml, but the following hypotyposis is nevertheless theoretically
+relevant. The original problem becomes another one: how can we define
+anonymous \emph{recursive} functions? A workaround is to pass an
+additional function parameter, which is used in stead of the recursive
+call:
+\begin{alltt}
+len1(L) -> Len = fun(_,   [],N) -> N;
+                    (\textbf{F},[_|L],N) -> \textbf{F}(\textbf{F},L,N+1)
+                 end,
+           Len(\textbf{Len},L,0).
+\end{alltt}
+Notice that we renamed \erlcode{len\_tf/1} into \erlcode{len1/1}
+because we are going to envisage several variants. Moreover, the
+anonymous function is not equivalent to \erlcode{len/2} because it
+takes three arguments. Also, the compiler emits the following warning
+(we removed the line number):
+\begin{center}
+\emph{\texttt{Warning: variable 'L' shadowed in 'fun'.}}
+\end{center}
+We have seen this before, \vpageref{shadowing}. Here, the shadowing is
+harmless, because inside the anonymous function denoted
+by~\erlcode{Len}, the original value of~\erlcode{L}, that is, the
+argument of \erlcode{len1/1}, is not needed. Nevertheless, for the
+sake of tranquillity, a simple renaming will get rid of the warning:
+\begin{alltt}
+len1(L) -> Len = fun(_,   [],N) -> N;
+                    (F,[_|\textbf{P}],N) -> F(F,\textbf{P},N+1)\hfill% \emph{Renaming}
+                 end,
+           Len(Len,L,0).
+\end{alltt}
+We can alter this definition by currying the anonymous function and
+renaming it so \erlcode{Len}~now is equivalent to \erlcode{fun len/2}:
+\begin{alltt}
+len2(L) -> H = \textbf{fun(F) ->} fun(   [],N) -> N;
+                            ([_|P],N) -> \textbf{(F(F))}(P,N+1)
+                         end
+               \textbf{end},
+           Len = H(H),\hfill% \emph{Equivalent to} fun len/2
+           Len(L,0).
+\end{alltt}
+Let us define a function \erlcode{u/1} which auto\hyp{}applies its
+functional argument and let us make use of it in stead of
+\erlcode{F(F)}:
+\begin{alltt}
+u(F) -> fun(X,Y) -> (F(F))(X,Y) end.\hfill% \emph{Self\hyp{}application}
+
+len3(L) -> H = fun(F) -> fun(   [],N) -> N;
+                            ([_|P],N) -> \textbf{(u(F))}(P,N+1)
+                         end
+               end,
+           (H(H))(L,0).\hfill% \emph{Expanded} Len
+\end{alltt}
+Let us replace now \erlcode{u(F)} by~\erlcode{F}. This transformation
+does not preserve the semantics of~\erlcode{H}, so let us rename the
+resulting function~\erlcode{G} and we redefine~\erlcode{H} to be
+equivalent to its prior instance:
+\begin{alltt}
+len3(L) -> G = fun(F) -> fun(   [],N) -> N;
+                            ([_|P],N) -> F(P,N+1)
+                         end
+               end,
+           \textbf{H = fun(F) -> G(u(F)) end},
+           (H(H))(L,0).
+\end{alltt}
+The interesting point is that the anonymous function referred to by
+variable~\erlcode{G} is very similar to~\erlcode{Len} at the
+beginning. (It may sound paradoxical to speak of anonymous functions
+with names, but, in \Erlang, variables and function names are two
+distinct syntactic categories, so there is no contradiction in terms.)
+Here it is again:
+\begin{alltt}
+len_tf(L) -> 
+  Len = fun(   [],N) -> N;
+           ([_|L],N) -> Len(L,N+1)\hfill% \emph{Unfortunately invalid}
+        end,
+  Len(L,0).
+\end{alltt}
+The difference is that \erlcode{G}~abstracts over~\erlcode{F} instead
+of having a (problematic) recursive call. Let us expand back the call
+\erlcode{u(F)} and getting rid of~\erlcode{u/1} altogether:
+\begin{alltt}
+len4(L) ->
+  G = fun(F) -> fun(   [],N) -> N;
+                   ([_|P],N) -> F(P,N+1)
+                end
+      end,
+  H = fun(F) -> G(\textbf{fun(X,Y) -> (F(F))(X,Y) end}) end,
+  (H(H))(L,0).
+\end{alltt}
+To gain some generality, we can extract the assignments to
+\erlcode{H}~and~\erlcode{Len}, put them into a new function
+\erlcode{y/1} and expand~\erlcode{Len} in place:
+\begin{alltt}
+\textbf{y(G) -> H=fun(F) -> G(fun(X,Y)->(F(F))(X,Y) end) end, H(H).}
+
+len5(L) -> G = fun(F) -> fun(   [],N) -> N;
+                            ([_|P],N) -> F(P,N+1)
+                         end
+               end,
+           (y(G))(L,0).
+\end{alltt}
+By putting the definition of function \erlcode{y/1} into a dedicated
+module, we can now easily define recursive anonymous functions. There
+is a limitation, though, which is that \erlcode{y/1} is tied to the
+arity of~\erlcode{F}. For instance, we cannot use it for the
+factorial:
+\begin{alltt}
+fact(N) -> G = fun(F) -> fun(0) -> 1;
+                            (N) -> N * F(N-1)
+                         end
+               end,
+           (y(G))(L,0).\hfill% Arity mismatch
+\end{alltt}
+Therefore, if we really want a general scheme, we should work with
+fully curried functions, so all functions are unary:
+\begin{alltt}
+y(G) -> H = fun(F) -> G(fun(\textbf{X}) -> (F(F))(\textbf{X}) end) end, H(H).
+
+len6(L) -> G=fun(F) -> fun(N) -> fun(   []) -> N;
+                                    ([_|P]) -> (F(N+1))(P)
+                                 end
+                       end
+             end,
+           ((y2(G))(0))(L).
+\end{alltt}
+Notice that we swapped the order of the list and the integer, since
+there is no pattern matching to be done on the latter. The grammar of
+\Erlang obliges us to put parentheses around every function call
+resulting in a function being immediately called, so calling fully
+curried functions with all their arguments, like
+\erlcode{((y2(G))(0))(L)}, ends up being a bit fastidious, although a
+good text editor can help us in paring properly the parentheses.
+
+\emph{The theoretical point of this derivation is that we can write
+  recursive functions without relying on recursion at all,} since even
+\erlcode{y/1}~is not recursive. In fact, nothing special is required
+as long as we have function calls unrestricted by typing rules. Some
+strongly and statically typed languages like \OCaml reject the
+definition of~\erlcode{y/1} above precisely because of this, but other
+valid, albeit more complex, definitions are possible. (In the case of
+\OCaml, the switch \erlcode{-rectypes} allows us to compile the one
+above, though.) If we grant ourselves the use of recursion, which we
+never banned, we can actually write a simpler definition
+of~\erlcode{y/1}, named \erlcode{y\_\_/1}:
+\begin{alltt}
+y__(F) -> fun(X) -> (F(y__(F)))(X) end.\hfill% \emph{Recursive}
+\end{alltt}
+This definition is actually very easy to come by, as it relies on the
+computational equivalence, for all~\erlcode{X},
+\[
+\erlcode{(y\_\_(F))(X)} \mathrel{\equiv} \erlcode{(F(y\_\_(F)))(X)},
+\]
+If we assume the mathematical property \(\forall x.f(x) = g(x)
+\Rightarrow f = g\), the previous equivalence would yield
+\[
+\erlcode{y\_\_(F)} \mathrel{\equiv} \erlcode{F(y\_\_(F))},
+\]
+which, by definition, shows that \erlcode{y\_\_(F)} is a fixpoint of
+\erlcode{F}. Beware that
+\begin{alltt}
+y__(F) -> F(y__(F)).\hfill% \emph{Infinite loop}
+\end{alltt}
+does not work because the call \erlcode{y\_\_(\(F\))} would
+\emph{immediately} start evaluating the call \erlcode{y\_\_(\(F\))} in
+the body, therefore never ending. Some functional programming
+languages have a different rewrite strategy than \Erlang and do not
+always start by evaluating the argument in a function call, making
+this definition directly workable. Another example:
+\begin{verbatim}
+fact(N) -> F = fun(F) -> fun(A) -> fun(0) -> A;
+                                      (M) -> (F(A*M))(M-1)
+                                   end
+                         end
+               end,
+           ((y__(F))(1))(N).
+\end{verbatim}
+The technique we developed in the previous lines can be used to reduce
+the amount of control stack in some functions. For example, consider
+\verbatiminput{join_2.def} Note how the parameter~\erlcode{Q} is
+threaded until the first argument is empty. This means that a
+reference to the original~\erlcode{Q} is duplicated at each rewrite
+until the last step, because the definition is not in tail form. In
+order to avoid this, we could use a recursive anonymous function which
+captures~\erlcode{Q} not as a parameter but as part of the (embedding)
+scope:
+\begin{alltt}
+join(P,\textbf{Q}) -> G = fun(F) -> fun(   []) -> \textbf{Q};\hfill% Q \emph{in scope}
+                              ([I|R]) -> [I|F(R)]
+                           end
+                 end,
+             (y\_\_(G))(P).
+\end{alltt}
+This transformation is called \emph{lambda\hyp{}dropping} and its
+inverse \emph{lambda\hyp{}lifting}. The function \erlcode{y\_\_/1} is
+called the \emph{Y fixpoint combinator}.
+
+We sometimes may want to define two mutually recursive anonymous
+functions. Consider the following example, which is in practice
+utterly useless and inefficient, but simple enough to illustrate our
+point.
+\begin{verbatim}
+even(0) -> true;
+even(N) -> odd(N-1).
+
+odd(0) -> false;
+odd(N) -> even(N-1).
+\end{verbatim}
+Let us say that we do not want \erlcode{even/1} to be callable from
+any other function but \erlcode{odd/1}. This means that we want the
+following pattern:
+\begin{alltt}
+odd(I) -> Even = fun(\fbcode{Odd}) -> \fbcode{fun(Odd)} end,
+          Odd  = fun(\fbcode{Odd}) -> \fbcode{fun(Odd)} end,
+          Odd(I).
+\end{alltt}
+where \erlcode{Even} and \erlcode{Odd} depend on each other. As the
+canvas is laid out, \erlcode{Even} cannot call \erlcode{Odd} and
+\erlcode{Odd} can only call \erlcode{Even}. The technique to allow
+mutual recursion consists in abstracting the first function over the
+second, that is, \erlcode{Even} becomes a function whose parameter is
+a function destined to be used as \erlcode{Odd}:
+\begin{alltt}
+odd(I) -> Even = fun(\textbf{Odd}) -> fun(0) -> true;
+                                (N) -> \textbf{Odd}(N-1)
+                             end
+                 end,
+          Odd  = fun(\fbcode{Odd}) -> \fbcode{fun(Odd)} end,
+          Odd(I).
+\end{alltt}
+This breaks the (lexical) dependence of \erlcode{Even} on
+\erlcode{Odd}. The next step is more tricky. We can start naively,
+though, and let the problem come to the fore by itself:
+\begin{alltt}
+odd(I) -> Even = fun(\textbf{Odd}) -> fun(0) -> true;
+                                (N) -> \textbf{Odd}(N-1)
+                             end
+                 end,
+          Odd  = fun(0) -> false;
+                    (N) -> (Even(\fbox{Odd}))(N-1)
+                 end,
+          Odd(I).
+\end{alltt}
+The problem is not unheard of and we already know how to define an
+anonymous recursive function by abstracting over the recursive call
+and passing the resulting function to a fixpoint combinator:
+\begin{alltt}
+odd(I) -> Even = fun(Odd) -> fun(0) -> true;
+                                (N) -> Odd(N-1)
+                             end
+                 end,
+          Odd  = \textbf{y(fun(F) ->} fun(0) -> false;
+                                (N) -> (Even(\textbf{F}))(N-1)
+                             end
+                   \textbf{end)},
+          Odd(I).
+\end{alltt}
+
+\medskip
+
+\paragraph{Exercises.}
+\label{ex:higher-order_functions}
+
+\noindent [See answers page~\pageref{ans:higher-order_functions}.]
+\begin{enumerate}
+
+  \item Write a definition for the function \erlcode{max\_f/3} such
+    that the call \erlcode{max\_f(\(F\),\(A\),\(B\))} is the maximum
+    value of the integer~\(F(X)\) when integer~\(X\) ranges between
+    integers \(A\)~and~\(B\), with~\(A \leqslant B\).
+
+  \item Write a definition for the function \erlcode{max\_x/3} such
+    that the call \erlcode{max\_x(\(F\),\(A\),\(B\))} is the smallest
+    integer~\(X\) ranging between integers \(A\)~and~\(B\), with~\(A
+    \leqslant B\), such that the integer \(F(X)\)~is maximum.
+
+\end{enumerate}
+

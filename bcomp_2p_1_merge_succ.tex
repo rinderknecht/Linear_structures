@@ -1,0 +1,27 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+%\usepackage{amsmath}
+
+\begin{document}
+
+\TeXtoEPS
+%\psset{showbbox=true}
+\pstree[nodesep=2pt,levelsep=25pt,treesep=6pt,arrows=<-]{\TR{\(\sum_{i=q}^{r}{2^{e_{i}}}+2^q\)}}{
+  \TR{\(2^{e_r}\)}
+  \Tn
+  \psset{linestyle=dotted}
+  \pstree[linestyle=solid]{\TR{\(2^{e_q}+2^q\)}}{
+    \TR{\(2^{e_{q}}\)}
+    \Tn
+    \Tn
+    \Tn
+    \TR{\(2^{q}\)}
+  }
+}
+\endTeXtoEPS
+
+\end{document}

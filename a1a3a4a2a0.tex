@@ -1,0 +1,21 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-node,pst-eps}
+
+\begin{document}
+
+\TeXtoEPS
+\begin{pspicture}[showgrid=false](0,-1)(4,1)
+\(\rnode{a1}{a_1} < \rnode{a3}{a_3} < \rnode{a4}{a_4} <
+\rnode{a2}{a_2} < \rnode{a0}{a_0}\)
+\ncbar[nodesep=3pt,angle=-90,arm=0.5]{->}{a0}{a1}
+\ncbar[nodesep=3pt,angle=90,arm=0.5]{->}{a1}{a2}
+\ncbar[nodesep=3pt,angle=-90,arm=0.25]{->}{a2}{a3}
+\ncbar[nodesep=3pt,angle=90,arm=0.25]{->}{a3}{a4}
+\end{pspicture}
+\endTeXtoEPS
+
+\end{document}

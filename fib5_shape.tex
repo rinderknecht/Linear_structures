@@ -1,0 +1,40 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+\newcommand\leaf{\Tr{\psframebox{\rule{0pt}{5pt}\erlcode{\ }}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[levelsep=20pt,treesep=14pt]{\TC[fillstyle=hlines]}{
+  \pstree{\TC}{
+    \pstree{\TC}{
+      \pstree{\TC}{
+        \TC*[linecolor=gray]
+        \TC*[linecolor=gray]
+      }
+      \TC*[linecolor=gray]
+    }
+    \pstree{\TC}{
+      \TC*[linecolor=gray]
+      \TC*[linecolor=gray]
+    }
+  }
+  \pstree{\TC}{
+    \pstree{\TC}{
+      \TC*[linecolor=gray]
+      \TC*[linecolor=gray]
+    }
+    \TC*[linecolor=gray]
+  }
+}
+\endTeXtoEPS
+
+\end{document}

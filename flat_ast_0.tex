@@ -1,0 +1,69 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+\usepackage{amsmath}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+\newcommand\erlcircdot[1]{\Tcircle[linestyle=dotted]{\erlcode{#1}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesepB=2pt,levelsep=20pt,treesep=14pt]{\erlbox{flat}}{
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \psset{nodesepB=0pt}
+    \erlcircdot{[]}
+    \Tn
+    \psset{nodesep=2pt}
+    \pstree{\erlnode{|}}{
+      \pstree{\erlnode{|}}{
+        \pstree{\erlnode{|}}{
+          \erlnode{a}
+          \pstree{\erlnode{|}}{
+            \pstree{\erlnode{|}}{
+              \erlnode{b}
+              \erlnode{[]}
+            }
+            \erlnode{[]}
+          }
+        }
+        \erlnode{[]}
+      }
+      \pstree{\erlnode{|}}{
+        \erlnode{c}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\zeta}\)}\hspace{0pt}
+\pstree[nodesepB=2pt,levelsep=20pt,treesep=14pt]{\erlbox{flat}}{
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \pstree{\erlnode{|}}{
+      \pstree{\erlnode{|}}{
+        \erlnode{a}
+        \pstree{\erlnode{|}}{
+          \pstree{\erlnode{|}}{
+            \erlnode{b}
+            \erlnode{[]}
+          }
+          \erlnode{[]}
+        }
+      }
+      \erlnode{[]}
+    }
+    \pstree{\erlnode{|}}{
+      \erlnode{c}
+      \erlnode{[]}
+    }
+  }
+}
+\endTeXtoEPS
+
+\end{document}

@@ -1,0 +1,6 @@
+\begin{alltt}
+flat(       []) \(\smashedrightarrow{\alpha}\) [];
+flat(   [[]|L]) \(\smashedrightarrow{\beta}\) flat(L);
+flat([[I|M]|L]) \(\smashedrightarrow{\gamma}\) flat([I,M|L]);
+flat(    [I|L]) \(\smashedrightarrow{\delta}\) [I|flat(L)].
+\end{alltt}

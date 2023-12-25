@@ -1,0 +1,108 @@
+%%-*-latex-*-
+
+\chapter*{Foreword}
+\addcontentsline{toc}{chapter}{Foreword}
+
+This book is intended for an undergraduate audience with a keen
+interest in discovering functional languages. It provides a
+slow\hyp{}paced and deep delving into its subject, instead of covering
+as much field as possible with many different language features and
+applications. It is more akin to a field trip in geology rather than
+to a geographical relation. Accordingly, \Erlang has been chosen
+amongst functional languages to serve this purpose because its core
+syntax is regular and plain and hence helps the reader to focus on the
+concepts at stake, not because it enables concurrent programming,
+which is a full\hyp{}fledged topic in itself. As a consequence, it is
+important to bear in mind that this book is not specifically meant as
+an introduction to \Erlang, but rather to kernels of many functional
+languages, more precisely those which enjoy a purely functional,
+strict and single\hyp{}threaded semantics. In my experience, the lack
+of static type inference in \Erlang is helpful in teaching beginners
+to write very short, first\hyp{}order programs because they do not
+need to understand cryptic error messages when the program may
+actually work and when it does not, they quickly understand that
+something is wrong at run\hyp{}time, without serious
+consequences. Also, not having to worry about user\hyp{}defined error
+messages in the design, by means of incomplete definitions, allows the
+beginner to focus only on the correct behaviour on correct
+input. Another point of interest is that function definitions in an
+\Erlang module are potentially mutually recursive, which allows us to
+introduce definitions in the most suitable order. Of course, in a more
+advanced course, complex data structures, robustness and module
+systems are best taught with a language featuring strong, static type
+inference.
+
+This book is not structured as most textbooks are, in the sense that
+it contains overarching threads, intertwined in spirals like the
+trajectory of a space probe orbiting a planet until, having
+accumulated enough thrust, it reaches the orbit of another celestial
+body. This dynamics reflects on the contents as linear structures are
+the main focus of this introductory exposition but trees are
+graphically present all along; for example, I make early use of
+abstract syntax trees which are displayed in many figures. I hope that
+this graphical support will prove a complement to the traditional
+textual explanations.
+
+The unusual length of this book is the unyielding consequence of its
+approach based on abundant examples, graphical illustrations, step by
+step resolutions and, furthermore, constant attempts at improving upon
+prior solutions. Also, in order to provide a unidirectional reading,
+references to other parts of the book are usually followed by a copy
+of the material referred to.
+
+Some metaprogramming techniques are refined along, mainly transforming
+definitions into tail form. Such a focus is unusual in undergraduate
+textbooks but I deemed it relevant for two reasons. First, it helps
+infusing the idea that programs are data, since they too can be
+transformed, and allows dovetailing postgraduate textbooks. Second, it
+hopefully contributes clearing the countless misunderstandings
+students who worry about efficiency can read on the internet about
+definitions in tail form. Another peculiarity of this book lies in the
+execution model proposed for \Erlang programs being based on abstract
+syntax trees. Control contexts, the control stack, the heap, garbage
+collection, aliasing and tail form optimisation are explained in terms
+of a memory model solely containing abstract syntax trees and
+references. A presentation more faithful to a modern interpreter would
+have required many details mostly relevant to the study of compilers
+and would have obscured the topics under focus.
+
+Perhaps the last striking feature of this book is its conspicuous
+obsession with precision, as found in its numerous mathematical
+reckonings, equations and logical derivations. I indeed chose not to
+separate the writing of small programs from the study of their running
+time, which can sometimes be accurately predicted by a rigorous
+analysis. Not systematically developing such analyses often leads the
+students, in my experience, to neglect the concern of efficiency when
+designing algorithms. Moreover, it fails to underlie one of the
+advantages of the functional paradigm, which is to enable mathematical
+investigations of program properties as a complement to the usual
+methods of software engineering, like testing. The analytical and
+algebraic tools are almost always within the grasp of a motivated
+secondary school pupil. When not, perhaps when presenting examples of
+structural induction, I invite the reader to consider the challenge as
+a hook for future postgraduate studies.
+
+It is advised not to skip any section and to perform a sequential
+reading from the start. If some part is found enigmatic upon first
+reading or overly long, just skim it. Often, new concepts are
+introduced informally or in passing and developed later, refined
+little by little, as it is normal in lecture notes. Some exercises are
+proposed and partially answered at the end of this book. These
+incomplete solutions are the last encouragement to complete the task.
+
+I would like to express my gratitude towards Didier, who introduced me
+to \Erlang and to my colleague HyungSeok Kim for suggesting me to
+write this book based on my lectures at Konkuk University, in South
+Korea. Fran\c{c}ois Pottier (French National Institute for Research in
+Computer Science and Control, also known as INRIA), Philippe Flajolet
+(INRIA), Francisco Javier Bar\'on L\'opez (Universidad de M\'alaga,
+Spain), Jaap Scherphuis and Nathaniel Johnston helped me with some
+mathematical derivations.
+
+\bigskip
+
+\hfill Seoul, Republic of Korea,
+
+\hfill\today.
+
+\hfill Ch. Rinderknecht

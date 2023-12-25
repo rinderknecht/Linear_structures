@@ -1,0 +1,31 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlcirc[1]{\Tcircle[linestyle=solid]{\erlcode{#1}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \TR{\(I_0\)}
+  \Tn
+  \pstree{\erlnode{|}}{
+    \TR{\(I_1\)}
+    \Tn
+    \psset{linewidth=1.5pt,linestyle=dotted}
+    \pstree[linewidth=0.8pt,linestyle=solid]{\erlnode{|}}{
+      \TR{\(I_{n-1}\)}
+      \erlnode{[]}
+    }
+  }
+}
+\endTeXtoEPS
+
+\end{document}

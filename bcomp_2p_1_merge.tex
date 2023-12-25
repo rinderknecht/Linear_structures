@@ -1,0 +1,32 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage{pst-tree,pst-eps}
+
+\begin{document}
+
+\TeXtoEPS
+%\psset{showbbox=true}
+\pstree[nodesep=2pt,levelsep=25pt,treesep=6pt,arrows=<-]{\TR{\(\sum_{j=q}^{r}{2^{e_{j}}}+\sum_{j=0}^{q-1}{2^{j}}\)}}{
+  \TR{\(2^{e_r}\)}
+  \psset{nodesepB=-2pt,linestyle=dotted}
+  \pstree[nodesep=2pt,linestyle=solid]{\TR{\(2^{e_q}+\sum_{j=0}^{q-1}{2^{j}}\)}}{
+    \TR{\(2^{e_{q}}\)}
+    \Tn
+    \pstree{\TR{\(\sum_{j=0}^{q-1}{2^{j}}\)}}{
+      \TR{\(2^{q-1}\)}
+      \psset{nodesepB=-2pt,linestyle=dotted}
+      \pstree[nodesep=2pt,linestyle=solid]{\TR{\(2^{1}+2^{0}\)}}{
+        \TR{\(2^{1}\)}
+        \Tn
+        \Tn
+        \Tn
+        \TR{\(2^{0}\)}
+      }
+    }
+  }
+}
+\endTeXtoEPS
+
+\end{document}

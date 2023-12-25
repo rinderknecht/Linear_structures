@@ -1,0 +1,93 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesepA=2pt]{\erlnode{|}}{
+    \erlnode{3}
+    \pstree{\erlnode{|}}{
+      \erlnode{7}
+      \pstree{\erlnode{|}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-18pt}
+\raisebox{-3pt}{\(\stackrel{\alpha}{\dashrightarrow}\)}
+\hspace*{-4pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\Tn}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rt]{three1}{\erlcode{3}}}
+    \pstree{\TR{\rnode[r]{sevenRoot1}{\erlcode{|}}}}{
+      \erlnode{7}
+      \pstree{\erlnode{|}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-22pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[lb]{acc1}{\rnode[rb]{arg1}{\erlbox{sum\_tf}}}}{
+  \Tn
+  \Tn
+}
+%
+\raisebox{-3pt}{\(\stackrel{\gamma}{\dashrightarrow}\)}
+\hspace*{-3pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\Tn}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[rb]{three2}{\erlcode{3}}}
+    \pstree{\TR{\erlcode{|}}}{
+      \TR{\rnode[r]{seven2}{\erlcode{7}}}
+      \pstree{\TR{\rnode[rb]{fiveRoot2}{\erlcode{|}}}}{
+        \erlnode{5}
+        \erlnode{[]}
+      }
+    }
+  }
+}
+\hspace*{-20pt}
+\phantom{%
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]%
+  {\erlnode{sum\_tf}}{
+  \Tn
+  \Tn
+}}
+\hspace*{-2pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+  {\rnode[rb]{arg2}{\erlbox{sum\_tf}}}{
+  \psset{nodesepB=2pt}
+  \pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]%
+    {\rnode[lb]{plusA1}{\rnode[rb]{plusB1}{\erlnode{+}}}}{
+      \Tn
+      \Tn
+  }
+  \Tn
+}
+%
+\ncarc[arcangle=15,nodesepA=7pt]{->}{acc1}{three1}
+\nccurve[angleA=-45,angleB=20,nodesepA=7pt]{->}{arg1}{sevenRoot1}
+%
+\nccurve[angleA=-135,angleB=-45,ncurvA=1,nodesepA=4pt]{->}{plusA1}{three2}
+\nccurve[angleA=-45,angleB=-10,ncurvA=1,nodesepA=4pt]{->}{plusB1}{seven2}
+\nccurve[angleA=-45,angleB=-15,ncurv=1.5,nodesepA=7pt]{->}{arg2}{fiveRoot2}
+\endTeXtoEPS
+
+\end{document}

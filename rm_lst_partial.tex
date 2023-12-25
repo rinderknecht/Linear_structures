@@ -1,0 +1,36 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-eps}
+\usepackage{booktabs}
+
+\input{commands}
+
+\begin{document}
+
+\TeXtoEPS
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+ & \multicolumn{5}{c}{Delay}\\
+\cmidrule(l){2-6}
+         & \multicolumn{2}{c}{Item}\\
+\cmidrule(lr){2-3}
+Function & Present & Absent         & Best & Worst & Average\\
+\midrule
+\erlcode{rm\_lst/2}
+  & \(3n - k + 4\) & \(3n+6\) & \(2n+5\) & \(3n+6\)
+  & \(\frac{5}{2}n+\frac{9}{2}\)\\
+\erlcode{rm\_lst1/2}
+  & \(3n - f - k + 4\) & \(n+1\) & \(n+1\)  & \(3n+4\) & \(2n+5\)\\
+\erlcode{rm\_lst\_tf/2}
+  & \(2n+4\) & \(2n+3\) & \(2n+3\) & \(2n+4\) & \(2n+4\)\\
+\erlcode{rm\_lst2/2}
+  & \(2n - k + 1\) & \(n+1\) & \(n+1\)  & \(2n+1\)
+  & \(\frac{3}{2}{n} + \frac{3}{2}\)\\
+\bottomrule
+\end{tabular}
+\endTeXtoEPS
+
+\end{document}

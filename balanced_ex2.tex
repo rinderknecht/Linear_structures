@@ -1,0 +1,26 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+%\psset{showbbox=true}
+\pstree[nodesep=2pt,levelsep=35pt,treesep=15pt,arrows=->,xbbr=-2]{\erlnode{[\(a\)]\!,\![\(b,c\)]}}{
+  \erlnode{[\(a,d\)]\!,\![\(b,c\)]}~{\((d,a,b,c)\)}\nbput[npos=0.6]{\(\eta\mu\!\!\!\!\!\)}
+  \erlnode{[\(d,a\)]\!,\![\(b,c\)]}~{\((a,d,b,c)\)}\nbput[npos=0.8]{\(\theta\!\!\!\)} 
+  \erlnode{[\(b,a\)]\!,\![\(d,c\)]}~{\((a,b,d,c)\)}\nbput[npos=0.1]{\(\zeta\kappa\!\!\!\)}
+  \erlnode{[\(b,a\)]\!,\![\(c,d\)]}~{\((a,b,c,d)\)}\naput[npos=0.6]{\(\!\!\!\!\!\zeta\iota\kappa\)}
+}
+\endTeXtoEPS
+
+\end{document}

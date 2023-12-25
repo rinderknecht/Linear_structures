@@ -1,0 +1,48 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[arrows=->,nodesep=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  \TR{\phantom{\erlcode{|}}}
+}
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\alpha}\)}\hspace{0pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  {\psset{arrows=->}\TR{\phantom{\erlcode{|}}}}
+  \psset{nodesepB=2pt}
+  \erlnode{1}
+}
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{0pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  {\psset{arrows=->}\TR{\phantom{\erlcode{|}}}}
+  \psset{nodesepB=2pt}
+  \erlnode{3}
+}
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{0pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  {\psset{arrows=->}\TR{\phantom{\erlcode{|}}}}
+  \psset{nodesepB=2pt}
+  \erlnode{6}
+}
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\gamma}\)}\hspace{0pt}
+\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\erlbox{sum\_tf}}{
+  {\psset{arrows=->}\TR{\phantom{\erlcode{|}}}}
+  \psset{nodesepB=2pt}
+  \erlnode{10}
+}
+\hspace{0pt}\raisebox{-3pt}{\(\xrightarrow{\beta}\)}\hspace{-2pt}
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{10}}{}
+\endTeXtoEPS
+
+\end{document}

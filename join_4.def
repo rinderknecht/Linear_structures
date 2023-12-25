@@ -1,0 +1,4 @@
+join(   [],   []) -> [];
+join(   [],[J|Q]) -> [J|Q];
+join([I|P],   []) -> [I|P];
+join([I|P],[J|Q]) -> [I|join(P,[J|Q])].

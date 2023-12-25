@@ -1,0 +1,38 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+  \psset{linewidth=1.5pt,linestyle=dotted}
+  \pstree{\erlnode{join}}{
+    \psset{linewidth=0.8pt,linestyle=solid,nodesepB=0pt}
+    \pstree[nodesepA=0pt,nodesepB=2pt]{\erlbox{srev}}{
+      \erlnode{[]}
+    }
+    \psset{nodesepB=2pt}
+    \pstree{\erlnode{|}}{
+      \TR{\(I_{n-1}\)}
+      \erlnode{[]}
+    }
+  }
+  \Tn
+  \psset{linewidth=0.8pt,linestyle=solid}
+  \pstree{\erlnode{|}}{
+    \TR{\(I_0\)}
+    \erlnode{[]}
+  }
+}
+\endTeXtoEPS
+
+\end{document}

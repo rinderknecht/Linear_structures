@@ -1,0 +1,53 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-eps}
+
+% AMS Maths and St Mary's Road nice symbols
+%
+\usepackage{amssymb,amsmath,stmaryrd}
+
+% Enlarging vertically the rows
+%
+\renewcommand\arraystretch{1.2}
+
+\input{commands}
+
+\begin{document}
+
+\TeXtoEPS
+\(
+\begin{array}{r@{}ccccc}
+\cline{2-6}
+  \multicolumn{1}{r|}{a \cdot y =}
+& \multicolumn{1}{c|}{a}
+& \multicolumn{1}{c|}{\Border{}{y}}
+& \phantom{HHHH}\ldots\phantom{HHHH}
+& \multicolumn{1}{|c|}{a?}
+& \multicolumn{1}{c|}{\Border{}{y}}\\
+\cline{2-6}
+&&&&&\\
+\cline{2-6}
+  \multicolumn{1}{r|}{a \cdot \Border{}{y} =}
+& \multicolumn{1}{c|}{a}
+& \multicolumn{1}{c|}{\Border{2}{y}}
+& \ldots
+& \multicolumn{1}{|c|}{a?}
+& \multicolumn{1}{c|}{\Border{2}{y}}\\
+\cline{2-6}
+&&&&&\\
+\cline{2-6}
+  \multicolumn{1}{r|}{a \cdot \Border{2}{y} =}
+& \multicolumn{1}{c|}{a}
+& \multicolumn{1}{c|}{\Border{3}{y}}
+& \ldots
+& \multicolumn{1}{|c|}{a}
+& \multicolumn{1}{c|}{\Border{3}{y}}\\
+\cline{2-6}
+\end{array}
+\)
+\endTeXtoEPS
+
+\end{document}

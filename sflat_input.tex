@@ -1,0 +1,46 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlcirc[1]{\Tcircle[linewidth=0.8pt,linestyle=solid]{\erlcode{#1}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesepA=2pt,levelsep=20pt,treesep=14pt]{\erlnode{|}}{
+  \pstree[nodesepB=2pt,thislevelsep=25pt]{\erlcirc{|}~[tnpos=l]{\(n\)}}{
+    \psset{linewidth=1.5pt,linestyle=dotted}
+    \pstree[linewidth=0.8pt,nodesepA=0pt]{\erlcirc{|}~[tnpos=l]{\(n\)}}{
+      \psset{nodesepB=0pt,linestyle=solid}
+      \pstree{\erlcirc{|}~[tnpos=l]{\(n\)}}{
+        \psset{nodesepB=2pt}
+        \TR{\(I_0\)}
+        \pstree{\erlnode{|}}{
+          \psset{nodesepA=2pt}
+          \TR{\(I_1\)}
+          \psset{linewidth=1.5pt,linestyle=dotted}
+          \pstree[linewidth=0.8pt]{\erlnode{|}}{
+            \psset{nodesep=2pt,linestyle=solid}
+            \TR{\(I_{n-1}\)}
+            \erlnode{[]}
+          }
+        }
+      }
+      \psset{nodesepA=0pt,nodesepB=2pt,linestyle=solid,linewidth=0.8pt}
+      \erlnode{[]}
+    }
+    \psset{nodesepA=0pt,nodesepB=2pt,linestyle=solid,linewidth=0.8pt}
+    \erlnode{[]}
+  }
+  \psset{nodesepB=2pt,linestyle=solid,linewidth=0.8pt}
+  \erlnode{[]}
+}
+\endTeXtoEPS
+
+\end{document}

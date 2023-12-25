@@ -1,0 +1,3 @@
+rm_fst(_,   []) -> [];
+rm_fst(I,[I|L]) -> L;
+rm_fst(I,[J|L]) -> [J|rm_fst(I,L)].

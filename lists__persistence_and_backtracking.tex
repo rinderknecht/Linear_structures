@@ -1,0 +1,844 @@
+%%-*-latex-*-
+
+\chapter{Persistence and Backtracking}
+\label{chap:persistence_and_backtracking}
+
+A distinctive feature of purely functional data structures is that
+they are \emph{persistent}. Persistence is the property of values to
+remain constant over time. It is a consequence of \Erlang functions
+always creating a new version of a data structure to be updated,
+instead of modifying it in place. Moreover, as we learnt previously,
+only the nodes which actually differ between the input and the output
+are actually created, whereas the others are shared by means of
+aliases or variables occurring both in the pattern and the body of a
+clause. Sharing is sound because it relies on persistence: since the
+data cannot be modified in place from different access points in the
+program (the roots of the directed acyclic graph), there is no way to
+tell apart a perfect copy from a reference to the original---in a
+chronological sense. In this chapter, we show how persistence allows
+us to undo operations, that is, \emph{to backtrack}, quite
+straightforwardly and how sharing makes it affordable in terms of
+memory consumption. As a simple case study, let us consider a list
+whose different versions we want to record, as items are pushed in and
+popped out, starting from the empty list.
+
+\medskip
+
+\paragraph{Version\hyp{}based persistence.}
+
+A simple idea to implement data structures enabling backtracking
+consists in keeping all successive states; then, backtracking means
+accessing a previous version. A list can be used to keep such a
+record, called \emph{history}. Since, from an algorithmic standpoint,
+a list is a stack, the most recent version is the top and is thus
+accessed in constant time. The older a version is, the longer it takes
+to access it, but always in proportion to the time elapsed
+in\hyp{}between. Furthermore, two successive versions share as much
+structure as the clauses that generated the new one specify. As a
+consequence, it is affordable in terms of memory to thread the
+history, instead of only passing around the latest version
+alone. Consider the following definitions of \erlcode{push/2} and
+\erlcode{pop/1}. The call \erlcode{push(\(I\),\(H\))} evaluates in a
+history which is made of history~\(H\) on top of which the last
+version, extended with~\(I\), has been pushed. The
+call~\erlcode{pop(\(H\))} is rewritten in a pair whose first component
+is the item~\(I\) on the top of the last version in~\(H\) and second
+component is~\(H\) on top of which the last version without~\(I\) is
+pushed. In discussing recursive definitions, we may also refer to the
+\emph{current version}, meaning the version corresponding to the input
+of the clause at hand. Let us assume in the following examples that
+the history always contains an empty list at the beginning, so it is
+never empty. We write
+\begin{alltt}
+push(I,H=[L|_])  \(\smashedrightarrow{\alpha}\) [[I|L]|H].
+pop(H=[[I|L]|_]) \(\smashedrightarrow{\beta}\) \{I,[L|H]\}.
+\end{alltt}
+Note the crucial use of \emph{aliases} (\erlcode{H}) to guarantee that
+the history before the change is not duplicated by the function
+calls. Imagine now the following series of operations on a list
+originally empty: push~\erlcode{a}, push~\erlcode{b},
+push~\erlcode{c}, pop, push~\erlcode{d}. Let us ignore the popped item
+by means of a function projecting the second component of a pair:
+\begin{alltt}
+snd({_,Y}) -> Y.
+\end{alltt}
+Then the whole history of the operations can be obtained by the
+following composition:
+\begin{center}
+\texttt{push(d,snd(pop(push(c,push(b,push(a,[])))))).}
+\end{center}
+This expression evaluates, as expected, into
+\begin{center}
+\texttt{[[d,b,a],[b,a],[c,b,a],[b,a],[a],[]].}
+\end{center}
+In order to understand how the data and the structure is shared among
+versions in this example, let us reconsider the clauses above under
+the aspect of the Directed Acyclic Graphs (DAG) built upon the
+abstract syntax trees in \fig~\vref{fig:memo_push_pop}.
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 622 297 720]{memo_push_pop}
+\caption{Definition of \erlcode{push/2} and \erlcode{pop/1} with DAGs
+\label{fig:memo_push_pop}}
+\end{figure}
+The graph of the result is shown in
+\fig~\vref{fig:history}. The~\(k\)th previous version in history~\(H\)
+is \erlcode{ver(\(k\),\(H\))}:
+\begin{verbatim}
+ver(K,H) when K >= 0 -> ver__(K,H).
+
+ver__(0,[V|_]) -> V;
+ver__(K,[_|H]) -> ver__(K-1,H).
+\end{verbatim}
+\begin{figure}[t]
+\centering
+\includegraphics[bb=71 574 226 721]{history}
+\caption{DAG of \erlcode{[[d,b,a],[b,a],[c,b,a],[b,a],[a],[]]}\label{fig:history}}
+\end{figure}
+It seems interesting to remark that the technique presented allows the
+newest version in the history to be modified, but not the older ones:
+just pop the head of the history and push some other version:
+\begin{alltt}
+change_last(Update,[Last|History]) -> [Update|History].
+\end{alltt}
+When a data structure allows every version in its history to be
+modified, it is said \emph{fully persistent}; if only the newest
+version is updatable, it is said \emph{partially persistent}. 
+
+\medskip
+
+\paragraph{Update\hyp{}based persistence.}
+\label{update_based_persistence}
+
+In order to achieve full persistence, we could keep on record the list
+of changes to the data structure, instead of the successive states, as
+we just did. In our continued example, we have two kinds of updates:
+\erlcode{\{push,\(I\)\}}, where~\(I\)~is some item to push, and
+\erlcode{pop}. Now history is a list of such updates. But not all
+series of \erlcode{push} and \erlcode{pop} are valid, a trivial
+example being~\erlcode{[pop]}, which does not allow a version to be
+extracted. Another is \erlcode{[pop,pop,\{push,a\}]}. How can we
+caracterise the valid histories? It is useful to consider a graphical
+representation of \erlcode{push} and \erlcode{pop}, as proposed in
+\fig~\vref{fig:push_pop}.
+\begin{figure}
+\centering
+\subfloat[\erlcode{\{push,a\}}]{%
+  \includegraphics[bb=71 662 130 721,scale=0.8]{push}
+}
+\qquad
+\subfloat[\erlcode{pop}]{%
+  \includegraphics[bb=71 662 130 721,scale=0.8]{pop}
+}
+\caption{Graphical representations of updates\label{fig:push_pop}}
+\end{figure}
+A history is, graphically, a broken line composed with these two kinds
+of segments, oriented from right to left in order to follow the
+\Erlang syntax for lists. Consider for instance the representation of
+the history
+\erlcode{[pop,pop,\{push,d\},\{push,c\},pop,\{push,b\},\{push,a\}]} in
+\fig~\vref{fig:dyck_meander_reversed}.
+\begin{figure}[!b]
+\centering
+\includegraphics[bb=71 577 298 721]{dyck_meander_reversed}
+\caption{\erlcode{[pop,pop,\{push,d\},\{push,c\},pop,\{push,b\},\{push,a\}]}
+\label{fig:dyck_meander_reversed}}
+\end{figure}
+Horizontally are the updates and vertically the lengths of the
+versions. The line starts at the origin of the axes because the
+version at that point is supposed to be an empty list (the caller may
+change this assumption at her own expenses). It ends at the present
+moment, distinguished by a dot, where the latest version has
+length~\(1\). \emph{A valid history is a line which never crosses the
+  absissa axis.} The definition of~\erlcode{push/2} is
+straightforward:
+\begin{alltt}
+push(I,H) -> [\{push,I\}|H].
+\end{alltt}
+The design of \erlcode{pop/1} requires more care as
+\begin{alltt}
+pop(H) -> [pop|H].\hfill% \emph{Incomplete}
+\end{alltt}
+does not return the item supposed to be popped and also may create an
+impossible configuration of the data structure, as~\erlcode{pop([])}
+is accepted instead of being rejected. A better try is
+\begin{alltt}
+pop(H=[\{push,I\}|_]) -> \{I,[pop|H]\}.\hfill% \emph{Still incomplete}
+\end{alltt}
+but this definition is incomplete, as it doesn't handle valid
+histories like
+\begin{alltt}
+pop([pop,\{push,b\},\{push,a\}]) \(\nrightarrow\).
+\end{alltt}
+The missing case is thus when the last update is a~\erlcode{pop}. It
+is not necessary to extract the newest version in order to take its
+topmost item: it is sufficient to deduce this item from the
+updates. If it exists, we know that we can record a~\erlcode{pop}
+update because the resulting version is constructible. Graphically, it
+means that the historical line reached a point of ordinate~\(1\) at
+least, so a~\erlcode{pop} will not cross the absissa axis. The task of
+finding this item is delegated to the function~\erlcode{top/1}, hence
+\begin{alltt}
+pop(H) -> \{top(H),[pop|H]\}.\hfill% \emph{Complete}
+\end{alltt}
+Note that the alternative \erlcode{[\{pop\}|H]} would waste memory for
+one node. The algorithm implemented by~\erlcode{top/1} is best
+understood on the graphical representation of updates. Consider again
+our running example in \fig~\vref{fig:dyck_meander_reversed}. The last
+update was a~\erlcode{pop}. What is the topmost item of the latest
+version? By following the historical line backwards, that is, from
+left to right, we see that the penultimate update was also
+a~\erlcode{pop}, so we cannot conclude yet. The ante\-penultimate
+update is a~\erlcode{push}, but its associated item,~\erlcode{d},
+cannot be the item we are looking for because it is popped by the
+following update (which is the penultimate). Following back in time we
+find another \erlcode{push}, but its item,~\erlcode{c}, is popped by
+the last update. The previous update is a~\erlcode{pop}, so we are
+back to square one. Following backwards is a~\erlcode{push} but its
+item,~\erlcode{b}, is popped by the next update. Finally, the previous
+update is a~\erlcode{push} and its item,~\erlcode{a}, is the one we
+want, because it is the first we found which is not popped by further
+updates. Graphically, this update is easily found by drawing a
+horizontal line from the present version to the right. There are
+several intersections with the historical line. The one we are
+interested in is the first end of a~\erlcode{push} update. If such a
+point does not exist, we reach the origin. It means that the last
+version (the leftmost point of the line) is an empty list and,
+consequently, the~\erlcode{pop} update must fail, as
+expected. Consider in \fig~\vref{fig:topmost} the geometrical
+solution.
+\begin{figure}[!t]
+\centering
+\includegraphics[bb=71 577 298 721]{topmost}
+\caption{Finding the topmost item~\erlcode{a} of the last version
+\label{fig:topmost}}
+\end{figure}
+This results in the following code:
+\begin{alltt}
+top(H)              -> top(0,H).
+top(0,[\{push,I\}|\_]) -> I;
+top(K,[\{push,\_\}|H]) -> top(K-1,H);
+top(K,     [pop|H]) -> top(K+1,H).
+\end{alltt}
+The counter~\erlcode{K} is used to keep track of the number
+of \erlcode{pop} updates (or, equivalently, the height of the old
+versions with respect to the last one), so, when it
+reaches~\erlcode{0}, we check whether the current update is
+a~\erlcode{push} (we know that we are on the same horizontal line as
+the last version). If so, we are done; otherwise, we resume the
+search. Encountering the origin leads to a match failure. Now, the
+call
+\begin{center}
+\texttt{push(d,snd(pop(push(c,push(b,push(a,[]))))))}
+\end{center}
+evaluates, as expected, into
+\begin{center}
+\texttt{[\{push,d\},pop,\{push,c\},\{push,b\},\{push,a\}].}
+\end{center}
+Let us pop twice more:
+\begin{alltt}
+pop(snd(pop(push(d,snd(pop(push(c,push(b,push(a,[])))))))))
+\end{alltt}
+and the evaluation yields the expected pair
+\begin{center}
+\texttt{\{b,[pop,pop,\{push,d\},pop,\{push,c\},\{push,b\},\{push,a\}]\}.}
+\end{center}
+Let \erlcode{ver(\(k\),\(H\))} be the~\(k\)th version from the last
+moment in history~\(H\), counting the last version as~\(0\). When a
+past version is needed, that is, we walk back through history until
+the time requested (searching phase),
+\begin{alltt}
+% Searching
+ver(0,    H) -> last(H);
+ver(K,[_|H]) -> ver(K-1,H).
+\end{alltt}
+and we rebuild the version from that point (building phase). How do we
+define~\erlcode{last/1}, which builds the last version? There are
+several ways. Perhaps the first idea is to recursively construct the
+penultimate version and if the last update was a push, then perform a
+push on it, otherwise, its top item is popped:\label{code:ver}
+\begin{alltt}
+% Building
+last(          []) -> [];
+last([\{push,I\}|H]) -> [I|last(H)];
+last(     [pop|H]) -> tail(last(H)).
+tail([_|L])       -> L.
+\end{alltt}
+Note how \erlcode{tail/1}~is used to discard the popped item on our
+way, but this creates an asymmetry in the delay between the processing
+of a push update and a pop (one more rewrite). Let us determine the
+delays of \erlcode{ver/2} and \erlcode{last/1}. First, let us note
+\(\comp{ver}{k,n}\) and \(\comp{last}{p}\) the respective delays of
+\erlcode{ver(\(k\),\(H_1\))} and \erlcode{last(\(H_2\))}, where
+histories \(H_1\)~and~\(H_2\) have respective lengths
+\(n\)~and~\(p\). The \Erlang definition of \erlcode{ver/2} directly
+leads to \(\comp{ver}{k,n} = (k + 1) + \comp{last}{n-k}\). The delay
+of \erlcode{last/1} depends on the nature of the updates: if
+a~\erlcode{push}, the second clause adds a delay of~\(1\), otherwise
+the third clause adds a delay of~\(2\), due to the additional delay of
+calling~\erlcode{tail/1}. Formally:
+\[
+\comp{last}{0} = 1,\qquad
+\comp{last}{p+1} = \begin{cases}
+                     1 + \comp{last}{p} & \text{if \erlcode{push}},\\
+                     2 + \comp{last}{p} & \text{if \erlcode{pop}}.
+                   \end{cases}
+\]
+This asymmetry can be remedied by a special construct of \Erlang,
+commonly found in other programming languages: a~\emph{case}, also
+known as a~\emph{switch} in \Java~and~\C:
+\begin{alltt}
+last(          []) -> [];
+last([\{push,I\}|H]) -> [I|last(H)];
+last(     [pop|H]) -> \textbf{case} last(H) \textbf{of} [_|V] -> V \textbf{end}.
+\end{alltt}
+The meaning is ``Compute the value of \erlcode{last(H)}, which must be
+a non\hyp{}empty list. Let us name~\erlcode{V} its tail and
+\erlcode{V}~is the value of the body.'' The arrow in the case
+construct is not compiled as a function call and thus its delay
+is~\(0\). When exactly one case of the value being tested
+(here~\erlcode{last(H)}) is expected, like here, \Erlang permits a
+shortcut notation:
+\begin{alltt}
+last(          []) -> [];
+last([\{push,I\}|H]) -> [I|last(H)];
+last(     [pop|H]) -> \textbf{[_|V] = last(H), V}.
+\end{alltt}
+Now it is very easy to derive the delay of \erlcode{last(H)}:
+\(\comp{last}{p} = p + 1\). Hence \(\comp{ver}{k,n} = (k+1) +
+\comp{last}{n-k} = k+1+(n-k)+1 = n + 2\). Interestingly, the delay
+does not depend on what version is computed. What about memory usage?
+As usual, since we do not know anything about the strategy of the
+garbage collector, we cannot deduce the exact amount of memory
+necessary to compute the result, but we can count the number of pushes
+needed, which allows us to compare different versions of the same
+function. (Incidentally, this number can be considered a contribution
+to the overall delay, as creating a node takes some time, therefore it
+complements our delay analysis as it only accounts for the number of
+function calls.) The only clause of \erlcode{last/1} performing a push
+is the second one and it applies when a~\erlcode{push} update is
+found. Therefore, the number of push nodes created is the number
+of \erlcode{push} updates in the history. This is a waste in certain
+cases, for example, when the version built is empty (consider the
+history \erlcode{[pop,\{push,6\}]}). The optimal situation would be to
+allocate only as much as the computed version actually contains. This
+brings us back to the function~\erlcode{top/1}, which computes the top
+of the last version. What we need is to call it recursively on the
+remainder of the history, until the empty list is reached. Here is the
+modification:
+\begin{alltt}
+ver(0,    H) -> last(0,H);
+ver(K,[_|H]) -> ver(K-1,H).
+
+last(0,[\{push,I\}|\textbf{H}]) -> \textbf{[I|last(0,H)]};\hfill% \emph{Keep going back}
+last(M,[\{push,_\}|H]) -> last(M-1,H);
+last(M,     [pop|H]) -> last(M+1,H);
+\textbf{last(_,          []) -> []}.\hfill% \emph{Origin of history}
+\end{alltt}
+We still have \(\comp{last}{p} = p + 1\), but the number of push nodes
+created is now the length of the last version
+\erlcode{ver(\(0\),\(H\))}. This is an example of
+\emph{output\hyp{}dependent} measure. There is still room for some
+improvement in the special case when the historical line meets the
+absissa axis---in other words, when a past version is the empty
+list. There is no need to visit the updates \emph{before}
+a~\erlcode{pop} resulting into an empty version, for instance, in
+\fig~\vref{fig:return_to_zero}, it is useless to go past
+\erlcode{\{push,c\}} to find the last version to be~\erlcode{[c]}.
+\begin{figure}[!b]
+\centering
+\includegraphics[bb=69 606 298 721]{return_to_zero}
+\caption{Last version \erlcode{[c]} found in four steps
+\label{fig:return_to_zero}}
+\end{figure}
+In order to detect whether the historical line meets the absissa axis,
+let us keep, jointly with the history of updates, the length of the
+last version. First, let us modify \erlcode{push/2} and
+\erlcode{pop/1} accordingly:
+\begin{verbatim}
+push(I,{N,H}) -> {N+1,[{push,I}|H]}.
+pop({N,H}) -> {top(H),{N-1,[pop|H]}}.
+\end{verbatim}
+We have to rewrite~\erlcode{ver/2} to keep track of the length of the
+last version and, while we are at it, we can check that \erlcode{K}~is
+not negative:
+\begin{verbatim}
+ver(K,NH) when K >= 0     -> ver__(K,NH).
+ver__(0,              NH) -> last(0,NH);
+ver__(K,{N,     [pop|H]}) -> ver__(K-1,{N+1,H});
+ver__(K,{N,[{push,_}|H]}) -> ver__(K-1,{N-1,H}).
+\end{verbatim}
+We can reduce the memory footprint by separating the length of the
+current version~\erlcode{N} from the current history~\erlcode{H}, so
+no pair nodes~(\erlcode{\{\textvisiblespace,\textvisiblespace\}}) are
+allocated:
+\begin{verbatim}
+ver(K,{N,H}) when K >= 0 -> ver__(K,N,H).
+ver__(0,N,           H)  -> last(0,N,H);
+ver__(K,N,     [pop|H])  -> ver__(K-1,N+1,H);
+ver__(K,N,[{push,_}|H])  -> ver__(K-1,N-1,H).
+\end{verbatim}
+Let us change the definition of \erlcode{last/2} so it processes the
+length of the current version:
+\begin{alltt}
+\textbf{last(_,0,           _) -> [];}\hfill% \emph{Absissa \(0\)}
+last(0,N,[\{push,I\}|H]) -> [I|last(0,N-1,H)];
+last(M,N,[\{push,_\}|H]) -> last(M-1,N-1,H);
+last(M,N,     [pop|H]) -> last(M+1,N+1,H).
+\end{alltt}
+Notice how the last clause of the previous version of \erlcode{last/2}
+\begin{alltt}
+last(_,          []) -> [].\hfill% \emph{Useless now}
+\end{alltt}
+became redundant with the new first clause and therefore removed. The
+delay now presents a worst and best cases. The worst case is when the
+bottom item of the last version is the first item pushed in the
+history, so \erlcode{last/2}~has to recur until the origin of
+time. This incurs the same delay as previously: \(\worst{last}{p} = p
++ 1\). The best case happens when the last version is empty. In this
+case \(\best{last}{p} = 1\), and this is an occurrence of the kind of
+improvement we sought.
+
+\medskip
+
+\paragraph{Changing the past.}
+\label{changing_the_past}
+
+The \emph{update\hyp{}based approach} is fully persistent, that is, it
+allows us to modify the past as follows: traverse history until the
+required moment, pop the update at that point, push another one and
+simply put back the previously traversed updates, which must have been
+kept in some accumulator. It is of utmost importance that, by changing
+the past, we do not create a history with a non\hyp{}constructible
+version in it, that is, we must check that the historical line does
+not cross the absissa axis after the modification. If the change
+consists in replacing a~\erlcode{pop} by a~\erlcode{push}, there is no
+need to worry, as this will raise by~\(2\) the end point of the
+line. It is the converse change that requires special attention, as
+this will lower by~\(2\) the end point. The~\(\pm 2\) offset comes
+from the vertical difference between the ending points of
+a~\erlcode{push} and a~\erlcode{pop} update of same origin, as can be
+easily figured out by looking back at \fig~\vref{fig:push_pop}. As a
+consequence, in \fig~\vref{fig:dyck_meander_reversed}, the last
+version has length~\(1\), which implies that it is impossible to
+replace a~\erlcode{push} by a~\erlcode{pop}, anywhere in the past.
+Let us consider the history in \fig~\vref{fig:short_dyck}
+\begin{figure}
+\centering
+\includegraphics[bb=69 578 270 721]{short_dyck}
+\caption{\erlcode{[pop,\{push,d\},\{push,c\},pop,\{push,b\},\{push,a\}]}
+\label{fig:short_dyck}}
+\end{figure}
+Let us note \erlcode{change(\(k\),\(U\),\{\(n\),\(H\)\})}, where
+\(k\)~is the index of the update we want to change, indexing the last
+one at~\(0\); \(U\)~is the new update we want to set; \(n\)~is the
+length of the last version of history~\(H\). The call
+\begin{alltt}
+  change(3,\{push,e\},
+         \{2,[pop,\{push,d\},\{push,c\},pop,\{push,b\},\{push,a\}]\})
+\end{alltt}
+is rewritten into (changes in bold)
+\begin{center}
+\texttt{\{\textbf{4},[pop,\{push,d\},\{push,c\},\textbf{\{push,e\}},\{push,b\},\{push,a\}]\})}
+\end{center}
+\begin{figure}%[H]
+\centering
+\includegraphics[bb=69 521 270 721]{pop_to_push}
+\caption{Changing \erlcode{pop} (\erlcode{b}) into \erlcode{\{push,e\}}
+\label{fig:pop_to_push}}
+\end{figure}
+This call succeeds because, as we can see graphically in
+\fig~\vref{fig:pop_to_push}, the new historical line does not cross
+the absissa axis. We can see in \fig~\vref{fig:push_to_pop}
+\begin{figure}[!b]
+\centering
+\includegraphics[bb=69 577 270 721]{push_to_pop}
+\caption{Changing \erlcode{\{push,c\}} into \erlcode{pop}
+  (\erlcode{a}).
+\label{fig:push_to_pop}}
+\end{figure}
+the result of the call
+\begin{alltt}
+ change(2,pop,
+        \{2,[pop,\{push,d\},\{push,c\},pop,\{push,b\},\{push,a\}]\}).
+\end{alltt}
+It should be clear now that
+\begin{alltt}
+change(4,pop,
+      \{2,[pop,\{push,d\},\{push,c\},pop,\{push,b\},\{push,a\}]\})\(\nrightarrow\),
+change(5,pop,
+      \{2,[pop,\{push,d\},\{push,c\},pop,\{push,b\},\{push,a\}]\})\(\nrightarrow\)
+\end{alltt}
+because the line would cross the absissa axis. All these examples help
+in guessing the characteristic property for a replacement to be valid:
+\begin{itemize}
+
+  \item the replacements of a~\erlcode{pop} by a~\erlcode{push},
+    a~\erlcode{pop} by a~\erlcode{pop}, a~\erlcode{push} by
+    a~\erlcode{push} are always valid;
+
+  \item the replacement of a~\erlcode{push} by a~\erlcode{pop} at
+    update~\(k>0\) is valid if and only if the historical line between
+    updates \(0\)~and~\(k-1\) remains above or reaches without
+    crossing the horizontal line of ordinate~\(2\).
+
+\end{itemize}
+We can divide the algorithm in two phases, as we did with
+\erlcode{ver/2} and \erlcode{ver\_\_/3}, on the one hand, and
+\erlcode{last/3}, on the other hand. First, the update to be replaced
+must be found, but, the difference with \erlcode{ver/2} (or, more
+accurately, \erlcode{ver\_\_/3}), is that we may need to know if the
+historical line before reaching the update lies above the horizontal
+line of ordinate~\(2\). This is easy to check if we maintain across
+recursive calls the lowest ordinate reached by the line. The second
+phase performs the change of update and checks if the resulting
+history is valid. Let us implement the first phase. First, we check
+that the index of the update is not negative; the length of the last
+version is separated from the history, in order to save some memory
+space, and the lowest ordinate is this length, which we pass as an
+additional argument to another function,~\erlcode{chg/5}:
+\begin{verbatim}
+change(K,U,{N,H}) when K >= 0 -> chg(K,U,N,H,N).
+\end{verbatim}
+Function~\erlcode{chg/5} traverses~\erlcode{H} while
+decrementing~\erlcode{K}, until the latter reaches~\erlcode{0}. At the
+same time, the length of the current version is computed (third
+argument) and compared to the previous lowest ordinate (the fifth
+argument), which is updated according to the outcome. When the update
+to be changed is found, \erlcode{K}~is~\erlcode{0}.
+\begin{alltt}
+chg(0,U,N,           H,M)          -> \fbcode{repl(U,H,M)};
+chg(K,U,N,     [pop|H],M)          -> chg(K-1,U,N+1,H,M);
+chg(K,U,N,[\{push,\_\}|H],M) when M<N -> chg(K-1,U,N-1,H,M);
+chg(K,U,N,[\{push,\_\}|H],\_)          -> chg(K-1,U,N-1,H,N-1).
+\end{alltt}
+The problem is that we forget the history down to the update we are
+looking for. There are two methods to record it: either we use an
+accumulator and stick with a definition in tail\hyp{}form, or we put
+back a visited update after each return of recursive call. The latter
+is faster, as there is no need to reverse the accumulator when we are
+done; the former allows us to share the history up to the update, at
+the cost of an extra parameter being the original history. Let us opt
+for limiting the number of arguments:
+\begin{alltt}
+chg(0,U,\_,             H,M)            -> \textbf{repl(U,H,M)};
+chg(K,U,N,       [pop|H],M)            ->
+             \textbf{\{N1,H1\} =} chg(K-1,U,N+1,H,  M)\textbf{, \{N1,[pop|H1]\}};
+chg(K,U,N,[\textbf{P=}\{push,\_\}|H],M) when M < N -> 
+             \textbf{\{N1,H1\} =} chg(K-1,U,N-1,H,  M)\textbf{, \{N1,  [P|H1]\}};
+chg(K,U,N,[\textbf{P=}\{push,\_\}|H],\_)            ->
+             \textbf{\{N1,H1\} =} chg(K-1,U,N-1,H,N-1)\textbf{, \{N1,  [P|H1]\}}.
+\end{alltt}
+Notice how the length~\erlcode{N1} of the changed history is
+invariant, because we can simply make it out once the update to change
+is found:
+\begin{itemize}
+
+  \item replacing a~\erlcode{pop} by a~\erlcode{pop} or
+    a~\erlcode{push} by a~\erlcode{push} leaves the original length
+    invariant;
+
+  \item replacing a~\erlcode{pop} by a~\erlcode{push} increases the
+    original length by~\(2\);
+
+  \item replacing a~\erlcode{push} by a~\erlcode{pop}, assuming this
+    is valid, decreases the original length by~\(2\).
+
+\end{itemize}
+This task is up to the new function~\erlcode{repl/3} (``replace''),
+which implements the second phase (the replacement itself). The idea
+is that it returns a pair made of the differential in
+length~\erlcode{D} and the new history~\erlcode{H1}, which implies
+that we need to change~\erlcode{change/3}:
+\begin{alltt}
+change(K,U,\{N,H\}) when K >= 0 ->
+\hfill\textbf{\{D,H1\} =} chg(K,U,N,H,N)\textbf{, \{N+D,H1\}}.
+
+repl(       pop,   H=[pop|\_],\_)            -> \{ 0,      H\};
+repl(P=\{push,\_\},[\{push,\_\}|H],\_)            -> \{ 0,  [P|H]\};
+repl(P=\{push,\_\},     [pop|H],\_)            -> \{ 2,  [P|H]\};
+repl(       pop,[\{push,\_\}|H],M) when M > 1 -> \{-2,[pop|H]\}.
+\end{alltt}
+
+\medskip
+
+\paragraph{Improvement.}
+
+Just like \vpageref{tuples_vs_list} we saved memory by nesting tuples
+instead of putting tuples in a list when transforming systematically
+definitions into tail form, we can here save memory by implementing a
+history by nested updates. Instead of having
+\begin{center}
+\texttt{[pop,pop,\{push,d\},pop,\{push,c\},\{push,b\},\{push,a\}]}
+\end{center}
+we shall prefer
+\begin{center}
+\texttt{\{pop,\{pop,\{push,d,\{pop,\{push,c,\{push,b,\{push,a,\{\}\}\}\}\}\}\}\}}
+\end{center}
+This alternative encoding leads to save a node and an edge for each
+\erlcode{push}~update. We wrote \verbatiminput{pers.erl} Now we can
+proceed to improve the definitions as intended:
+\verbatiminput{pers_opt.erl} Notice how this change of data structure
+has an impact on the maintenance of \erlcode{last/3} because we cannot
+anymore match any update with an underscore, thus the new version of
+this function is longer.
+
+\medskip
+
+\paragraph{Persistent associative arrays.}
+
+\hspace*{-5pt} Let us explore the possibilities offered by the
+persistence of purely functional data structures by implementing a
+\emph{persistent associative array}. A traditional array is a
+contiguous chunk of memory which can be accessed randomly by means of
+integer indexes ranging over an interval. An array has its length
+fixed at its creation and contains as many values as indexes are
+allowed. Associative arrays are commonly found in scripting languages,
+where they generalise arrays by accepting indexes to be any kind of
+value, not just integers. As a consequence, the notion of interval of
+indexes is dropped. All these arrays have in common the fact that they
+are updated destructively, that is, the value associated to some
+index, once updated, is lost. Arrays of both kinds are a staple
+feature of \emph{imperative programming}. To obtain a persistent
+associative array, our first attempt will make use of the
+update\hyp{}based persistence we studied above. Let us suppose that we
+only have two updates on arrays:
+\begin{itemize}
+
+  \item \erlcode{set}~records an assignment of a given value at a
+    given index, for instance, \erlcode{\{set,d,5\}} specifies that
+    the value at index~\erlcode{d} is~\erlcode{5} and any previous
+    value at that index is now part of an old version;
+
+  \item \erlcode{unset}~records the cancellation of a previous
+    \erlcode{set}~update at a given index, for instance,
+    \erlcode{\{unset,d\}} means to unset any previous
+    \erlcode{set}~update at index~\erlcode{d}. If the index was not in
+    use or was already unset, \erlcode{unset}~has not effect,
+    otherwise the previous value at that index becomes the latest,
+    that is, it becomes part of the current version (if constructed).
+
+\end{itemize}
+A history is made of a list of such updates, starting with the empty
+list, which is interpreted as an empty array. Notice that, in contrast
+with the histories we dealt with previously, \emph{we record here the
+  \erlcode{unset} update itself}. Here, it is not allowed to change
+the past directly: the only way to cancel a previous
+\erlcode{set}~update is to add an \erlcode{unset} update to the
+history---history grows monotonically. Of course, sometimes a version
+of the array needs to be built, so a list of pairs index\hyp{}value of
+the latest assigned indexes will be constructed from the history. This
+kind of list is called an \emph{association list} and the indexes are
+then often called \emph{keys} in this context. The reason why we
+started with the denomination ``associative array'' is because we
+wanted to provide the same functionalities as an array, but using a
+list. Hence, the array can be considered as the specification here,
+whilst the list is the actual implementation. Note that, since in
+general keys are not required to be totally ordered, several
+up\hyp{}to\hyp{}date lists may correspond to one array. Let us
+consider two basic functions on these persistent associative arrays.
+\begin{itemize}
+
+  \item The function~\erlcode{get/2} accesses a value by means of its
+    given key, for instance, \erlcode{get(d,\(H\))} evaluates to the
+    value associated with the key~\erlcode{d} in the history~\(H\). If
+    the key was not last assigned by~\erlcode{set}, the
+    atom~\erlcode{none} results. Notice that the key in this example
+    is an atom, but any kind of value is permited.
+
+  \item The function~\erlcode{ver/2} is such that
+    \erlcode{ver(\(n\),\(H\))} builds the version \(n\)~steps before
+    the present moment in history~\(H\), the current version
+    corresponding to \(0\)~steps.
+
+\end{itemize}
+Let us start with the former. We need to make five cases: one for the
+empty history and two for each update, depending on whether the sought
+key is present in the last update or not:
+\begin{alltt}
+get(_,           []) \(\smashedrightarrow{\alpha}\) absent;
+get(X,[\{set,X,Y\}|H]) \(\smashedrightarrow{\beta}\) \fbcode{skip(X,H)};\hfill% \emph{Index found}
+get(X,[\{set,A,B\}|H]) \(\smashedrightarrow{\gamma}\) \fbcode{skip(X,H)};
+get(X,[\{unset,X\}|H]) \(\smashedrightarrow{\delta}\) \fbcode{skip(X,H)};\hfill% \emph{Index found}
+get(X,[\{unset,A\}|H]) \(\smashedrightarrow{\epsilon}\) \fbcode{skip(X,H)}.
+\end{alltt}
+Clause~\clause{\beta} corresponds to the case when we found the value
+associated with the key~\erlcode{X}: it is~\erlcode{Y}:
+\begin{alltt}
+get(X,[\{set,X,Y\}|_]) \(\smashedrightarrow{\beta}\) Y;
+\end{alltt}
+Clause~\clause{\gamma} matches when we find an assignement about a
+different key, so we have to keep looking in~\erlcode{H}:
+\begin{alltt}
+get(X,[\{set,_,_\}|H]) \(\smashedrightarrow{\gamma}\) get(X,H);
+\end{alltt}
+Clause~\clause{\epsilon} finds a different key being unset, so this is
+not our concern and we also should pass our way:
+\begin{alltt}
+get(X,[\{unset,_\}|H]) \(\smashedrightarrow{\epsilon}\) get(X,H).
+\end{alltt}
+The difficult one is clause~\clause{\delta} because we found the key
+we are seeking to be unset. This means that looking forward in the
+history~\erlcode{H}, that is, the past, \emph{the next assignment to
+  the key~\erlcode{X} must be ignored}, and the search should
+resume. This sounds very much like a variant of \erlcode{get/2}, we
+could call~\erlcode{skip/2}. Here are the final definitions:
+\begin{alltt}
+get(_,           []) -> absent;
+get(X,[\{set,X,Y\}|_]) -> Y;
+get(X,[\{set,_,_\}|H]) -> get(X,H);
+get(X,[\{unset,X\}|H]) -> skip(X,H);\hfill% \emph{Skip the next} set...
+get(X,[\{unset,_\}|H]) -> get(X,H).
+
+skip(_,           []) -> absent;
+skip(X,[\{set,X,_\}|H]) -> get(X,H);
+skip(X,[\{set,_,_\}|H]) -> skip(X,H);\hfill% \emph{...done.}
+skip(X,[\{unset,_\}|H]) -> skip(X,H).
+\end{alltt}
+The usual improvement in terms of memory usage consists in getting rid
+of the list:
+\begin{verbatim}
+get(_,         {}) -> absent;
+get(X,{set,X,Y,_}) -> Y;
+get(X,{set,_,_,H}) -> get(X,H);
+get(X,{unset,X,H}) -> skip(X,H);
+get(X,{unset,_,H}) -> get(X,H).
+
+skip(_,         {}) -> absent;
+skip(X,{set,X,_,H}) -> get(X,H);
+skip(X,{set,_,_,H}) -> skip(X,H);
+skip(X,{unset,_,H}) -> skip(X,H).
+\end{verbatim}
+
+\medskip
+
+\paragraph{Exercises.}
+\label{ex:persistence_and_backtracking}
+
+\noindent [See answers page~\pageref{ans:persistence_and_backtracking}.]
+\begin{enumerate}
+
+  \item Consider the following variant of \erlcode{ver/2}:
+\begin{verbatim}
+ver(0,H) -> last([],rev(H)).
+
+last(    V,          []) -> V;
+last(    V,[{push,I}|R]) -> last([I|V],R);
+last([_|V],     [pop|R]) -> last(V,R).
+
+rev(L)            -> rev_join(L,[]).
+rev_join(   [],Q) -> Q;
+rev_join([I|P],Q) -> rev_join(P,[I|Q]).
+\end{verbatim}
+    Find the delay and the number of pushes.
+
+  \item The function call~\erlcode{ver(\(n\),\(H\))}
+    \vpageref{code:ver} builds the version at \(n\)~steps in the
+    history~\(H\) counted from the present version. Define a
+    function~\erlcode{mk\_ver/2} such that
+    \erlcode{mk\_ver(\(n\),\(H\))}~is the version at position~\(n\)
+    \emph{counted from the origin} of the history~\(H\). Find the
+    delay.
+
+  \item Write a definition of \erlcode{ver/2} for persistent
+    associative arrays and compare it with the one
+    \vpageref{code:ver}.
+
+  \item Let us define a variation on the theme of the persistent
+    array. We wish to grant the user the possibility to think an array
+    to be a contiguous piece of memory whose basic components, called
+    \emph{cells}, are accessed through their \emph{index}. Contrary to
+    associative arrays, indexes must range over an integer interval,
+    from a \emph{lower bound} to an \emph{upper bound}. For example,
+    the following array is made of five cells containing \(a\), \(b\),
+    \(c\), \(d\)~and~\(e\), which have the respective indexes~\(4\),
+    \(5\), \(6\), \(7\)~and~\(8\), the lower bound being~\(4\) and the
+    upper bound~\(8\):
+    \[
+    \begin{array}{|c|c|c|c|c|}
+      \multicolumn{1}{c}{4} &
+      \multicolumn{1}{c}{5} &
+      \multicolumn{1}{c}{6} &
+      \multicolumn{1}{c}{7} &
+      \multicolumn{1}{c}{8}\\
+      \hline
+      a & b & c & d & e\\
+      \hline
+    \end{array}
+    \]
+    An empty array is implemented by an empty tuple. A non\hyp{}empty
+    array is a triple made of
+    \begin{enumerate}
+
+      \item a pair of integers representing the index bounds;
+
+      \item a default value for unassigned cells;
+
+      \item a series of updates in the shape of nested tuples.
+
+    \end{enumerate}
+    Contrary to persistent associative arrays, there is only one
+    update, \erlcode{\{set,\(E\),\(I\),\(A\)\}}, which represents the
+    assignment of the value~\(E\) at index~\(I\) in the
+    array~\(A\). It is possible to reassign a cell, that is, to
+    specify two updates for the same index (this enables the
+    interpretation of the data structure as an imperative array) and
+    also to undo an update (which supposes the array to be persistent
+    as well). The function~\erlcode{init/3} is such that
+    \erlcode{init(\(L\),\(U\),\(D\))} creates an array whose indexes
+    range from the lower bound~\(L\) to the upper bound \(U \geqslant
+    L\) and containing the default value of~\(D\). We simply have
+\begin{verbatim}
+init(L,U,D) when L =< U -> {{L,U},D,{}}.
+\end{verbatim}
+    Define the following functions:
+    \begin{itemize}
+
+      \item \erlcode{ver/1} is such that \erlcode{ver(\(A\))} is
+        rewritten into an association list containing the bindings
+        index\hyp{}item lastly assigned in the array \(A\). In
+        particular, values of reassigned indexes are ignored. The
+        order of the bindings is not significant.
+
+      \item \erlcode{set/3} is such that
+        \erlcode{set(\(E\),\(I\),\(A\))} is an array obtained by
+        assigning the value of~\(E\) to the index~\(I\) of the
+        non\hyp{}empty array~\(A\). If the index is out of bounds,
+        including if the array is empty, then the result is the
+        atom~\erlcode{out}.
+
+      \item \erlcode{get/2}~is such that \erlcode{get(\(A\),\(I\))} is
+        the content of the cell in the array~\(A\) at index~\(I\). If
+        the index is out of bound, the atom~\erlcode{out} results.
+
+      \item \erlcode{nth/2} is such that \erlcode{nth(\(A\),\(I\))} is
+        the content of the \(I\)th cell in the array~\(A\). If the
+        intended index is out of bounds, the atom~\erlcode{out}
+        results.
+
+      \item \erlcode{mem/2} is such that \erlcode{mem(\(A\),\(E\))}
+        rewrites to the last (temporally) index in the array~\(A\) to
+        have been assigned~\(E\). If the sought value has been
+        reassigned, it is not part of the last version of the array,
+        thus it is not found. If not found, the atom~\erlcode{absent}
+        is the final value.
+
+      \item \erlcode{inv/1} is such that
+        \erlcode{inv(\(A\))}~evaluates to an array whose cell contents
+        are in reverse order with respect to array~\(A\). The history
+        of all updates must be preserved, only indexes change.
+
+      \item \erlcode{unset/2} is such that
+        \erlcode{unset(\(A\),\(I\))} returns an array identical
+        to~\(A\) except that the last assignment to the cell of
+        index~\(I\) is undone. If the cell in question was never
+        assigned, the result is~\(A\). If the index is out of bounds,
+        the atom~\erlcode{out} results. Note that~\erlcode{unset} was
+        an update when we presented earlier the persistent associative
+        arrays.
+
+    \end{itemize}
+
+\end{enumerate}
+
+

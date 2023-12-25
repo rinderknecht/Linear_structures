@@ -1,0 +1,67 @@
+%%-*-latex-*-
+
+\documentclass[10pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{pst-tree,pst-eps}
+\usepackage{amsmath,amssymb}
+\usepackage[scaled=0.8]{beramono}
+
+\newcommand\erlcode[1]{\texttt{#1}}
+\newcommand\erlnode[1]{\TR{\erlcode{#1}}}
+\newcommand\erlbox[1]{\TR{\fbox{\erlcode{#1}}}}
+
+\begin{document}
+
+\TeXtoEPS
+\pstree[nodesep=2pt,levelsep=20pt,treesep=14pt]{\erlnode{join}}{
+  \pstree{\erlnode{|}}{
+    \TR{\rnode[b]{a}{\erlcode{a}}}
+    \pstree{\TR{\rnode[b]{b_root}{\erlcode{|}}}}{
+      \TR{\rnode[b]{b}{\erlcode{b}}}
+      \TR{\rnode[rb]{empty}{\erlcode{[]}}}
+    }
+  }
+  \pstree{\TR{\rnode[rb]{c_root_rb}{\rnode[r]{c_root_r}{\rnode[rt]{c_root_rt}{\rnode[t]{c_root_t}{\erlcode{|}}}}}}}{
+    \erlnode{c}
+    \pstree{\erlnode{|}}{
+      \erlnode{d}
+      \erlnode{[]}
+    }
+  }
+}
+\hspace*{-16pt}
+\raisebox{-3pt}{\phantom{\(\xrightarrow{\beta}\)}}
+\hspace*{8pt}
+\pstree[nodesepA=-1pt,nodesepB=2pt,levelsep=20pt,treesep=14pt,arrows=->]{\TR{\(\circ\)}}{
+  \pstree[nodesepA=2pt,arrows=-]{\TR{\rnode[bl]{join_root1}{\erlcode{|}}}}{
+    \Tn
+    \pstree{\rnode[bl]{join_l1}{\rnode[br]{join_r1}{\erlnode{join}}}}{
+      \Tn
+      \Tn
+    }
+  }
+}
+\hspace*{-9pt}
+\raisebox{-3pt}{\phantom{\(\xrightarrow{\beta}\)}}
+\hspace*{3pt}
+\pstree[nodesepA=-1pt,nodesepB=2pt,levelsep=20pt,treesep=14pt,arrows=->]{\TR{\(\circ\)}}{
+  \pstree[nodesepA=2pt,arrows=-]{\TR{\rnode[bl]{join_root_l2}{\rnode[br]{join_root_r2}{\erlcode{|}}}}}{
+    \Tn
+    \Tn
+  }
+}
+\hspace*{-11pt}
+\raisebox{-3pt}{\phantom{\(\xrightarrow{\alpha}\)}}
+\hspace*{11pt}
+\phantom{\pstree[nodesep=0pt,levelsep=20pt,treesep=14pt]{\rnode[cb]{circ}{\TR{\(\circ\)}}}{}}
+%
+\nccurve[angleA=-105,angleB=-90,ncurvB=2.2,nodesepA=2pt,nodesepB=1pt]{->}{join_root1}{a}
+\nccurve[angleA=-130,angleB=-90,nodesepA=6pt,nodesepB=2pt,ncurvB=1.2]{->}{join_l1}{b_root}
+\nccurve[angleA=-40,angleB=30,nodesepA=6pt,ncurvA=2,ncurvB=2.4]{->}{join_r1}{c_root_rt}
+%
+\nccurve[angleA=-130,angleB=-80,ncurvB=0.8,nodesepA=2pt,nodesepB=1pt]{->}{join_root_l2}{b}
+\nccurve[angleA=-40,angleB=-30,nodesepA=2pt,nodesepB=0pt,ncurv=2]{->}{join_root_r2}{c_root_r}
+\endTeXtoEPS
+
+\end{document}
